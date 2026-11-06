@@ -37,8 +37,8 @@ All audio processing runs on the Render backend. No GPU required — all operati
 
 ## AI / ML (External APIs, Free Tiers)
 
-- **Groq API** (Llama 3.3 70B) — conversation layer, plain language to music parameter translation, lyric co-writing, mix instruction interpretation
-- **Whisper** (via Hugging Face Inference API) — speech-to-text for voice memo transcription
+- **Groq API** (`openai/gpt-oss-120b`) — conversation layer, plain language to music parameter translation, lyric co-writing, mix instruction interpretation. Note: Groq's model lineup shifts over time; `llama-3.3-70b-versatile` was retired from this account, so Frank uses `openai/gpt-oss-120b`, the strongest JSON-mode-capable chat model currently on the free tier. The model name lives in one place: `backend/app/services/llm/groq_client.py`.
+- **Whisper** (`whisper-large-v3-turbo` via Groq) — speech-to-text for voice memo transcription. Originally planned for Hugging Face, but HF retired the `api-inference.huggingface.co` domain; Groq hosts Whisper directly and is already our provider, so transcription runs through Groq.
 - **MusicGen** (Meta, via Hugging Face Inference API or Replicate) — instrumental stem generation from musical fingerprint parameters. Used as a controllable instrument, not a one-shot generator.
 - **Basic Pitch** — runs locally on backend server, no API needed
 

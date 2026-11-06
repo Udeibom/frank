@@ -131,3 +131,15 @@ This spec builds the complete Idea Room: the editor, the co-writer conversation,
 - [ ] Update `project_active_state.active_lyrics_id` when a new version is saved
 - [ ] Idea Room loads the active lyrics version on entry
 - [ ] Sidebar status indicator for Idea Room updates to "has content" when lyrics exist
+
+---
+
+## Post-Review Follow-Ups (deferred, tracked)
+
+These came out of the Frank Code Reviewer pass on the Spec 02 implementation. They are intentionally deferred, not forgotten:
+
+1. **Cross-session conversation persistence + summarization.** The conversation-layer steering doc calls for storing a conversation summary per project and summarizing after 20 turns. Currently conversation history is client-held and lost on refresh. This is a shared concern across all conversational layers, so it will be built once as a reusable mechanism when the Feel Lab (Spec 03) adds the second conversation surface — rather than a one-off in the Idea Room.
+
+2. **Lyrics dedup tie-break.** `get_latest_version` orders by `created_at DESC`; two saves in the same clock tick could tie. With a 2-second debounce this is very unlikely. If it ever surfaces, add a monotonic sequence column to `lyrics_versions` rather than relying on timestamp ordering.
+
+3. **Private storage + signed URLs.** Voice memos currently use public URLs. When auth + RLS land (Spec 08), switch user audio buckets to private and use `create_signed_url` (already implemented in `services/storage/files.py`).
