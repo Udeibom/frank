@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Frank dark studio palette */
+    --background: 0 0% 5%;
+    --foreground: 40 10% 92%;
+
+    --card: 0 0% 8%;
+    --card-foreground: 40 10% 92%;
+
+    --popover: 0 0% 8%;
+    --popover-foreground: 40 10% 92%;
+
+    /* Amber/warm gold accent */
+    --primary: 38 92% 50%;
+    --primary-foreground: 0 0% 5%;
+
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 40 10% 92%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 40 5% 55%;
+
+    --accent: 38 80% 45%;
+    --accent-foreground: 0 0% 5%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 40 10% 92%;
+
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 38 92% 50%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Scrollbar — dark and minimal */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+@layer utilities {
+  /* Studio glow — amber light effect for active elements */
+  .glow-amber {
+    box-shadow: 0 0 20px -5px hsl(38 92% 50% / 0.3);
+  }
+
+  /* Waveform container */
+  .waveform-container {
+    @apply relative w-full overflow-hidden rounded-md bg-muted;
+    height: 64px;
+  }
+}

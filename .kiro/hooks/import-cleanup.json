@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Stale Import Cleanup",
+      "trigger": "PostFileDelete",
+      "matcher": "frontend/components/.*\\.tsx$",
+      "action": {
+        "type": "agent",
+        "prompt": "A component file was just deleted from Frank's frontend. Search the entire codebase for any import statements that reference this deleted file. For each file that imports the deleted component:\n\n1. Show the affected file and the stale import line\n2. Remove the stale import\n3. Check if removing the import leaves any JSX references to the deleted component — if so, remove those too or replace with a placeholder comment: {/* TODO: [ComponentName] removed */}\n\nThis prevents runtime errors from dead imports during rapid development."
+      }
+    }
+  ]
+}

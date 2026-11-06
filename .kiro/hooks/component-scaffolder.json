@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Component Scaffolder",
+      "trigger": "PostFileCreate",
+      "matcher": "frontend/components/.*\\.tsx$",
+      "action": {
+        "type": "agent",
+        "prompt": "A new React component file was just created in Frank's frontend. Examine the file path to understand its role (studio, audio, conversation, or ui component). If the file is empty or has only a placeholder, scaffold it with:\n- A proper TypeScript React functional component with typed props interface\n- The correct imports based on its folder (shadcn/ui for ui/, Tone.js/Web Audio for audio/, Zustand store imports for studio/)\n- JSX that matches Frank's design language: dark studio aesthetic, amber accents, no music jargon in any text\n- An export default statement\n- A brief comment at the top explaining the component's role in Frank\n\nFollow the conventions in the structure.md and design-and-ui.md steering docs. Do not add logic beyond the skeleton — just the right shape for the component."
+      }
+    }
+  ]
+}

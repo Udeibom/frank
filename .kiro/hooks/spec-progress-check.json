@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Spec Progress Tracker",
+      "trigger": "PostTaskExec",
+      "action": {
+        "type": "agent",
+        "prompt": "A spec task was just completed in Frank. Do the following:\n\n1. Read the relevant spec file from .kiro/specs/ to see which tasks are now done\n2. Check the actual implementation: does the code match what the spec required? Look at the relevant files.\n3. Check if any steering doc needs to be updated based on what was built — for example, if a new pattern was established, it should be documented\n4. Report: what was completed, whether it matches the spec, and any steering doc updates made\n\nKeep the report brief — one paragraph. This is a quality checkpoint, not a full review."
+      }
+    }
+  ]
+}
