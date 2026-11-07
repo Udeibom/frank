@@ -26,12 +26,12 @@ Every technology choice must work on a free tier and must not require GPU comput
 
 ## Audio Processing (Server-Side, CPU Only)
 
-- **Rubber Band Library** (via pyrubberband) — pitch shifting and time stretching
+- **Rubber Band Library** (via `pylibrb`, which binds `librubberband` directly — not the CLI) — pitch shifting for vocal tuning and harmony generation. Chosen over librosa's pitch_shift, which is ~100x slower (27s for 3s of audio vs 2.6s for 30s with Rubber Band). The native `librubberband` lib is installed via the Dockerfile.
 - **FFmpeg** — audio encoding, mixing, format conversion, MP3 export
-- **librosa** — audio analysis, pitch detection, tempo detection, onset detection
-- **pedalboard (Spotify)** — audio effects chain (reverb, compression, EQ, limiting)
-- **Basic Pitch (Spotify)** — pitch detection and MIDI extraction from vocal recordings
-- **soundfile / pydub** — audio file I/O
+- **librosa** — audio analysis: pitch detection (`pyin`), tempo detection, energy/RMS. Used for both hum analysis and vocal pitch contours.
+- **FluidSynth** — SoundFont synthesis for the procedural music engine (see instrumental generation section)
+- **soundfile** — audio file I/O
+- Pitch detection uses **librosa `pyin`**, not Basic Pitch. Basic Pitch pulls in TensorFlow (~500MB, neural), which breaks the free-tier memory budget and the "no heavy local model" principle. `pyin` is accurate enough for showing a pitch contour and driving correction, with no heavy dependency.
 
 All audio processing runs on the Render backend. No GPU required — all operations are CPU-based.
 

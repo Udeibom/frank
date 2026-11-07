@@ -192,3 +192,25 @@ The Voice Room is the most personal layer. The user records their vocal — as m
 ### Task 10 — Active state and sidebar
 - [ ] `project_active_state.active_vocal_id` and `active_comp_id` updated
 - [ ] Sidebar status indicator updates
+
+---
+
+## Post-Review Follow-Ups (Spec 05)
+
+From the Frank Code Reviewer pass. Addressed in this spec:
+- **C1 (crash):** `correct_pitch` referenced undefined `y`/`sr` — fixed to `y_full`/`sr_full`. Every correction above the threshold was crashing; my happy-path test missed it because the test sample's average error fell below the threshold (the no-op path). Now verified across light/moderate/full.
+- **W2 ("Lock it in" was a no-op):** `full` mode now does real per-note snapping (`_snap_to_grid`) — segments the pitch contour and shifts each off-note to the grid with crossfades, instead of a global average that cancels out.
+- **W3 (harmony ignored key):** harmony intervals are now mode-aware (major third vs minor third) via the project's fingerprint mode, threaded through the route and runner.
+- **W7 (WAV storage):** corrected/comp/harmony playback copies are now stored as MP3 (originals stay WAV for lossless preservation). Keeps uploads within the Supabase free-tier limit and streams faster.
+- **W8 (event-loop blocking):** audio downloads moved inside the worker threads (jobs fetch by URL), not blocking `httpx.get` in the request handler.
+- **S4 (harmony perpetual "listening"):** harmony takes get an empty pitch_data list so the UI doesn't show the analyzing state forever.
+
+Preservation (verified): correction writes `processed_url`, harmony/comp create new records, originals never touched; soft-delete keeps the file and row.
+
+Deferred, with reasoning:
+1. **R3 alternating "play both" comparison.** Per-take playback and multi-select-to-blend are built; the 4-bar alternating A/B playback is not. Nice-to-have, not demo-critical. Tracked.
+2. **R4 pitch display as a waveform overlay + show/hide toggle.** Current display is a color-coded bar view conveying the same "where are the rough spots" info without jargon. The waveform overlay and the hide toggle are deferred polish.
+3. **R8 vocal effects preview ("add space"/"smooth"/"warm up").** Unimplemented. These are effects — they belong with the Mix Room's effect chain (Spec 06), where the same pedalboard-style processing lives. Will build there and expose a preview here if time allows.
+4. **W1/W6 multi-take alignment.** The comp assumes takes are time-aligned (same start against the beat). True for the common case (record-with-beat from the top); drift between takes isn't compensated. A start-timestamp + alignment pass is a future improvement.
+5. **Concurrency cap (W9):** no global limit on simultaneous heavy jobs. A single-slot job queue would harden the free-tier instance. Deferred; acceptable for single-user demo.
+6. **S6 active-vocal reconciliation:** when a comp auto-sets `active_comp_id`, the UI still reads `active_vocal_id`. Needs a clear "which wins" rule — will settle this in the Mix Room (Spec 06) where the active vocal actually feeds the mix.

@@ -12,4 +12,5 @@ mido==1.3.3
 numpy==2.2.1
 soundfile==0.12.1
 librosa==0.10.2.post1
+pylibrb==0.1.2
 # httpx version is resolved by supabase's dependency requirements

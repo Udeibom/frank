@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fluidsynth \
     libfluidsynth3 \
     ffmpeg \
+    librubberband2 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

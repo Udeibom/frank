@@ -29,15 +29,26 @@ Recording with vocal + beat simultaneously requires headphones to avoid the mic 
 - **Stored/playable renders (beats, section mixes, textures)**: MP3 (192kbps). A full 2.5-minute beat is ~25MB as WAV but ~3-4MB as MP3 — storing WAV blows past Supabase free-tier upload limits and streams slowly. WAV stays in memory only during processing; what lands in storage for playback is MP3.
 - **Final export**: MP3 320kbps via FFmpeg
 
-### Pitch Processing (Basic Pitch + Rubber Band)
-1. Run Basic Pitch on every vocal take immediately after upload
-2. Store pitch contour data (note, confidence, timestamp) alongside the audio file
-3. For pitch correction: Rubber Band Library (pyrubberband) applies pitch shifting per-segment
-4. Three correction modes (presented to user in plain language):
-   - "Just the obvious mistakes" — correct notes more than 50 cents from the nearest chromatic pitch
-   - "Tighten it up" — correct notes more than 20 cents from nearest chromatic pitch
-   - "Lock it in" — fully quantize to nearest chromatic pitch (autotune effect)
-5. Original is always preserved. Correction is a new derived file.
+### Pitch Processing (librosa pyin + Rubber Band)
+1. Run librosa `pyin` on every vocal take after upload to get a pitch contour
+   (fundamental frequency over time, with a voiced/confidence flag).
+2. Store the contour as JSON alongside the take: [{time, note, confidence}, ...].
+   Confidence maps to a colour: >0.8 green (in tune), 0.5–0.8 yellow, <0.5 red.
+3. For correction, compute how far each voiced segment sits from the nearest
+   chromatic pitch and apply a per-segment pitch shift via Rubber Band (pylibrb)
+   to nudge it toward the target. Strength depends on the chosen mode.
+4. Three correction modes (plain language for the user):
+   - "Just the obvious mistakes" — only correct notes far off (>50 cents)
+   - "Tighten it up" — correct moderately off notes (>20 cents)
+   - "Lock it in" — fully snap to the nearest note (the autotuned sound)
+5. The original take is ALWAYS preserved. Correction produces a new derived file;
+   the user compares and chooses. Nothing is overwritten.
+
+### Harmony (Rubber Band)
+A harmony part is generated from the user's own vocal by pitch-shifting it by a
+musical interval (a third or a fifth above/below), chosen to fit the song's key
+from the fingerprint. No second recording is needed — the harmony is derived
+from the take. Stored as its own layer the Mix Room can turn on/off.
 
 ### Beat / Instrumental Generation (Frank's procedural engine)
 Frank builds instrumentals with its own procedural engine (see tech.md for why — no free hosted MusicGen exists). The flow:
