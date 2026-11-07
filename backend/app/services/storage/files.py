@@ -3,8 +3,18 @@ Supabase Storage helpers.
 All audio files live in Supabase Storage, never in the database or the repo.
 """
 
+import time
 import uuid
 from app.db.client import get_supabase
+
+_CONTENT_TYPES = {
+    "wav": "audio/wav",
+    "mp3": "audio/mpeg",
+    "webm": "audio/webm",
+    "ogg": "audio/ogg",
+}
+
+_MAX_UPLOAD_ATTEMPTS = 3
 
 
 def upload_audio(
@@ -19,26 +29,35 @@ def upload_audio(
 
     name_prefix, if given, is prepended to the filename. Callers use this to
     embed a cache key so identical generations can be matched later.
+
+    Retries transient failures. The sync Supabase storage client can raise an
+    UnboundLocalError inside its own _request when the underlying HTTP call
+    fails before producing a response (a connection race that shows up under
+    rapid sequential uploads from a background job). Retrying with a fresh
+    request recovers from it; each attempt uses a new unique filename.
     """
-    supabase = get_supabase()
-    unique = uuid.uuid4().hex
-    base = f"{name_prefix}-{unique}" if name_prefix else unique
-    filename = f"{base}.{extension}"
+    content_type = _CONTENT_TYPES.get(extension, "application/octet-stream")
 
-    content_type = {
-        "wav": "audio/wav",
-        "mp3": "audio/mpeg",
-        "webm": "audio/webm",
-        "ogg": "audio/ogg",
-    }.get(extension, "application/octet-stream")
+    last_error: Exception | None = None
+    for attempt in range(_MAX_UPLOAD_ATTEMPTS):
+        supabase = get_supabase()
+        unique = uuid.uuid4().hex
+        base = f"{name_prefix}-{unique}" if name_prefix else unique
+        filename = f"{base}.{extension}"
+        try:
+            supabase.storage.from_(bucket).upload(
+                path=filename,
+                file=data,
+                file_options={"content-type": content_type, "upsert": "false"},
+            )
+            return supabase.storage.from_(bucket).get_public_url(filename)
+        except Exception as exc:  # noqa: BLE001 — retry any transient failure
+            last_error = exc
+            time.sleep(0.5 * (attempt + 1))  # brief backoff before retry
 
-    supabase.storage.from_(bucket).upload(
-        path=filename,
-        file=data,
-        file_options={"content-type": content_type, "upsert": "false"},
-    )
-
-    return supabase.storage.from_(bucket).get_public_url(filename)
+    raise RuntimeError(
+        f"Upload to {bucket} failed after {_MAX_UPLOAD_ATTEMPTS} attempts"
+    ) from last_error
 
 
 def create_signed_url(bucket: str, path: str, expires_in: int = 3600) -> str:

@@ -181,3 +181,20 @@ Each "add" is a separate generation call for that stem type only. The user hears
 - [ ] `beat_versions` and `beat_stems` records created correctly
 - [ ] `project_active_state.active_beat_version_id` updated
 - [ ] Sidebar status indicator updates
+
+---
+
+## Post-Review Follow-Ups (Spec 04)
+
+From the Frank Code Reviewer pass. Addressed in this spec:
+- `mute_stem` action end to end (R5/R11) — "take the keys out of the bridge" now removes that layer and re-renders as a new version.
+- Conversational restore: the beat conversation context now includes version ids + labels so the LLM can resolve "go back to the first version" to a real id (W3).
+- Reorder desync (W2): the section PATCH is now label-only; reordering (which changes the audio) will be a re-render producing a new version, not an in-place metadata edit.
+- Performance safety, MP3 storage, memory-frugal render, single-thread persist, upload retry — all landed and verified.
+
+Deferred, with reasoning:
+1. **"Hear it with my vocal" preview (R8).** Depends on the Voice Room (Spec 05) — there are no vocal takes to preview against yet. Will implement after Spec 05, as a temporary (non-persisted) overlay of the active vocal over the active beat. Tracked.
+2. **Per-section re-render optimization (W1).** Edits currently re-render the whole beat (correct output, but pays full render+upload each time). Optimize later to re-render only the changed section and reuse unchanged section audio from the parent version. Functional now; a speed improvement.
+3. **Section reorder / duplicate / remove UI (R3).** Only rename is reachable in the timeline. Reorder needs a re-render path (see W2); duplicate/remove need new endpoints. Deferred; not demo-critical for the voice-first path.
+4. **Beat-First fingerprint persistence (S1).** A Beat-First user's normalized fingerprint lives only in beat params, not saved to the feel layer. Persist it on first Beat-First generation so downstream layers have it. Small follow-up.
+5. **`duration_hint` is accepted but ignored (W4).** The default 8-section arrangement covers the MVP.

@@ -183,3 +183,101 @@ def build_feel_lab_messages(
 
     messages.append({"role": "user", "content": user_message})
     return messages
+
+
+# ─────────────────────────────────────────────
+# Beat Room — the beat-maker collaborator
+# ─────────────────────────────────────────────
+
+BEAT_ROOM_SYSTEM = """\
+You are Frank, helping someone shape the music behind their song. They have no \
+music training. They react to what they hear; you turn those reactions into \
+changes. This is a two-way collaboration — never a finished handoff. After any \
+change, you ask how it feels.
+
+HOW YOU TALK:
+- Plain, warm language. Never music-theory jargon.
+- NEVER say: BPM, key, chord, stem, quantize, EQ, mix bus.
+- Call the parts by what they sound like: "the drums", "the bass", "the keys", \
+"the melody", "the pads/atmosphere".
+- Sections are "the intro", "the verses", "the choruses", "the bridge", "the outro".
+
+WHAT YOU CAN DO (and how you describe it):
+- Build the whole beat from the feeling.
+- Make a section fuller or more stripped-back.
+- Make a section hit harder or sit back.
+- Add a layer (drums, bass, keys, melody, atmosphere) — to one section or all.
+- Start a section fresh.
+- Go back to an earlier version.
+- Rename or reorder sections.
+
+HOW YOU RESPOND:
+Always a JSON object:
+{
+  "message": "what you say — warm, plain, ends by asking how it feels",
+  "actions": [ one or more of the actions below, or empty ]
+}
+
+ACTION TYPES:
+- Build the first/whole beat:
+  { "type": "generate_full_beat", "params": { "instruction": "<optional>" } }
+- Change a section (fuller, harder, stripped, softer, etc.):
+  { "type": "edit_section", "params": { "section_index": <int>, "instruction": "<the user's intent in words>" } }
+- Add a layer:
+  { "type": "add_stem", "params": { "stem_type": "drums|bass|keys|melody|pad", "section_index": <int or null for all> } }
+- Remove a layer ("take the keys out of the bridge"):
+  { "type": "mute_stem", "params": { "stem_type": "drums|bass|keys|melody|pad", "section_index": <int or null for all> } }
+- Start a section fresh:
+  { "type": "edit_section", "params": { "section_index": <int>, "instruction": "start fresh" } }
+- Go back to a version (use a real id from the version list you are given):
+  { "type": "restore_version", "params": { "version_id": "<id>" } }
+- Rename a section:
+  { "type": "set_section_label", "params": { "section_index": <int>, "label": "<name>" } }
+
+RULES:
+- When the user clearly wants a change you can make, emit the action AND speak to \
+it in the message ("I filled out the verses a little — how does that feel?").
+- If they're just reacting or unsure, ask one gentle question, no action.
+- Never claim the beat is done. Always leave the door open to keep shaping it.
+- You are given the current beat state (sections and what's in them). Use the \
+real section_index values from it.
+"""
+
+
+def build_beat_room_messages(
+    beat_state: dict,
+    history: list[dict],
+    user_message: str,
+) -> list[dict]:
+    """Build the message array for a Beat Room conversation turn.
+
+    beat_state may include:
+      - "sections": the active beat's sections (index, label, layers)
+      - "versions": [{id, label}] so the model can resolve "the first version"
+                    to a real version_id for restore_version.
+    """
+    if beat_state and beat_state.get("sections"):
+        lines = ["Current beat (internal context — describe parts in plain words):"]
+        for s in beat_state["sections"]:
+            layers = ", ".join(s.get("layers", []))
+            lines.append(
+                f"  [{s['index']}] {s.get('label', s['name'])}: {layers or 'empty'}"
+            )
+        versions = beat_state.get("versions") or []
+        if versions:
+            lines.append("")
+            lines.append("Earlier versions (use these ids for restore_version):")
+            for v in versions:
+                lines.append(f"  id={v['id']} — {v.get('label', 'Beat')}")
+        context = "\n".join(lines)
+    else:
+        context = "No beat yet. If the user wants to start, use generate_full_beat."
+
+    messages: list[dict] = [{"role": "system", "content": context}]
+    for turn in history[-20:]:
+        role = turn.get("role", "user")
+        content = turn.get("content", "")
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": user_message})
+    return messages

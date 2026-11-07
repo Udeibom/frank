@@ -25,8 +25,8 @@ Recording with vocal + beat simultaneously requires headphones to avoid the mic 
 
 ### File Formats
 - **Input (vocals)**: WebM/Opus from browser, or WAV from upload — always converted to WAV for processing
-- **Working format**: 44.1kHz, 16-bit or 32-bit float WAV for all internal processing
-- **Output (stems)**: WAV
+- **Working format**: 44.1kHz 16-bit WAV in memory for all internal processing (synthesis, mixing)
+- **Stored/playable renders (beats, section mixes, textures)**: MP3 (192kbps). A full 2.5-minute beat is ~25MB as WAV but ~3-4MB as MP3 — storing WAV blows past Supabase free-tier upload limits and streams slowly. WAV stays in memory only during processing; what lands in storage for playback is MP3.
 - **Final export**: MP3 320kbps via FFmpeg
 
 ### Pitch Processing (Basic Pitch + Rubber Band)
