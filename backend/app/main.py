@@ -10,6 +10,7 @@ from app.routers import (
     mix,
     export,
     conversation,
+    jobs,
 )
 
 settings = get_settings()
@@ -37,6 +38,7 @@ app.include_router(voice.router)
 app.include_router(mix.router)
 app.include_router(export.router)
 app.include_router(conversation.router)
+app.include_router(jobs.router)
 
 
 @app.get("/health", tags=["health"])

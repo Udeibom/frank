@@ -160,3 +160,17 @@ This spec builds the complete Feel Lab: texture generation, humming input, the f
 - [ ] Detect existing fingerprint on Feel Lab entry
 - [ ] Load conversation summary and fingerprint
 - [ ] Opening message from system summarizing what was established
+
+---
+
+## Post-Review Follow-Ups (deferred, tracked)
+
+From the Frank Code Reviewer pass on the Spec 03 implementation. Addressed in this spec: return-visit flow (C1), indexed cache_key column replacing URL-substring cache (C2), guarded job failure writes (W1), dropped unreliable hum→mode inference (W4), accumulating fingerprint list-field merge + reference_texture_id on approval (W5), texture loops once then stops (S1), and texture→fingerprint linkage (S3).
+
+Deferred, with reasoning:
+
+1. **Background job durability on Render free tier (W2).** Texture generation runs via FastAPI BackgroundTasks in-process. If Render spins the worker down mid-render, the job is stranded in `processing` and the client polls to timeout. Acceptable for the MVP demo (renders take ~10s; spin-down needs 15 min idle). A proper fix is a stuck-job reaper or an external worker/queue — revisit if reliability becomes an issue near submission.
+
+2. **Duplicate in-flight texture races (W3).** Two identical fingerprints requested before the first completes will both miss the cache and both render. Wasteful but harmless. A fix is reserving the cache key at job creation or client-side debouncing. Low priority.
+
+3. **"Your feel changed" Beat Room notification (part of R4).** When a returning user significantly changes the fingerprint, the Beat Room should offer to adapt. This belongs in Spec 04 (Beat Room) where that cross-layer awareness lives, so it's tracked there rather than here.

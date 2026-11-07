@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     dev_user_id: str = "00000000-0000-0000-0000-000000000001"
     environment: str = "development"
 
+    # Procedural music engine
+    soundfont_path: str = "assets/FluidR3Mono_GM.sf3"
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",")]

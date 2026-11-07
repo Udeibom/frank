@@ -76,6 +76,7 @@ The following tables must be created via a SQL migration file at `backend/db/mig
 - `project_id` UUID NOT NULL REFERENCES projects(id)
 - `fingerprint_id` UUID REFERENCES feel_fingerprints(id)
 - `audio_url` TEXT NOT NULL
+- `cache_key` TEXT  (added Spec 03 — deterministic hash of the generating params for reuse)
 - `approved` BOOLEAN DEFAULT false
 - `created_at` TIMESTAMPTZ DEFAULT now()
 

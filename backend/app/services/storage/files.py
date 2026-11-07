@@ -7,13 +7,23 @@ import uuid
 from app.db.client import get_supabase
 
 
-def upload_audio(bucket: str, data: bytes, extension: str = "wav") -> str:
+def upload_audio(
+    bucket: str,
+    data: bytes,
+    extension: str = "wav",
+    name_prefix: str | None = None,
+) -> str:
     """
     Upload audio bytes to a Supabase Storage bucket.
     Returns the public URL of the uploaded file.
+
+    name_prefix, if given, is prepended to the filename. Callers use this to
+    embed a cache key so identical generations can be matched later.
     """
     supabase = get_supabase()
-    filename = f"{uuid.uuid4()}.{extension}"
+    unique = uuid.uuid4().hex
+    base = f"{name_prefix}-{unique}" if name_prefix else unique
+    filename = f"{base}.{extension}"
 
     content_type = {
         "wav": "audio/wav",

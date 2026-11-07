@@ -39,13 +39,14 @@ Recording with vocal + beat simultaneously requires headphones to avoid the mic 
    - "Lock it in" — fully quantize to nearest chromatic pitch (autotune effect)
 5. Original is always preserved. Correction is a new derived file.
 
-### Beat / Instrumental Generation (MusicGen)
-- MusicGen is called with a structured prompt derived from the musical fingerprint
-- The prompt is built by the LLM translator from the user's emotional description
-- MusicGen returns a full audio file — this is the starting point, not the finished beat
-- The beat is broken into conceptual sections (intro, verse, chorus, bridge, outro) by the backend using onset/energy detection
-- Individual section files are stored as stems so the user can work section by section
-- Regeneration of a single section is possible without regenerating the whole beat
+### Beat / Instrumental Generation (Frank's procedural engine)
+Frank builds instrumentals with its own procedural engine (see tech.md for why — no free hosted MusicGen exists). The flow:
+- The musical fingerprint (key, mode, tempo, energy, density, instrumentation hints) drives explicit musical choices.
+- A **composer** layer builds MIDI: chord progression from the key/mode, a bassline, a melody/pad line, and drum patterns — per section (intro, verse, chorus, bridge, outro).
+- A **renderer** layer plays that MIDI through FluidSynth + a SoundFont to produce real instrument audio per stem.
+- Each instrument part (drums, bass, keys/melody, pads/atmosphere) is rendered as its own **stem** so the user can work layer by layer.
+- Because the composition is explicit and parameterized, regenerating or adjusting a single section or a single stem is a precise, controllable operation — not a re-roll of a black box. "The bass feels too busy" lowers the bass pattern's note density and re-renders only the bass stem.
+- Section boundaries are known by construction (we built them), so no onset-detection guesswork is needed to split sections.
 
 ### Effects Chain (pedalboard)
 All effects are applied non-destructively. Each effect application creates a new derived file.

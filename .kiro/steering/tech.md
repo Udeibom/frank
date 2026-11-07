@@ -39,8 +39,27 @@ All audio processing runs on the Render backend. No GPU required — all operati
 
 - **Groq API** (`openai/gpt-oss-120b`) — conversation layer, plain language to music parameter translation, lyric co-writing, mix instruction interpretation. Note: Groq's model lineup shifts over time; `llama-3.3-70b-versatile` was retired from this account, so Frank uses `openai/gpt-oss-120b`, the strongest JSON-mode-capable chat model currently on the free tier. The model name lives in one place: `backend/app/services/llm/groq_client.py`.
 - **Whisper** (`whisper-large-v3-turbo` via Groq) — speech-to-text for voice memo transcription. Originally planned for Hugging Face, but HF retired the `api-inference.huggingface.co` domain; Groq hosts Whisper directly and is already our provider, so transcription runs through Groq.
-- **MusicGen** (Meta, via Hugging Face Inference API or Replicate) — instrumental stem generation from musical fingerprint parameters. Used as a controllable instrument, not a one-shot generator.
 - **Basic Pitch** — runs locally on backend server, no API needed
+
+### Instrumental generation: Frank's own procedural engine (not MusicGen)
+
+MusicGen was the original plan, but during Spec 03 we confirmed there is **no free hosted path** to it anymore: Hugging Face retired the inference-API domain and `hf-inference` no longer serves MusicGen; Replicate requires paid credit (402 Insufficient credit). Self-hosting a 3B-parameter model needs a GPU and gigabytes of RAM — impossible on Render's free tier.
+
+So Frank generates instrumentals with its **own procedural music engine**, which turns out to fit the product vision better than MusicGen ever did:
+
+- **Music theory in code** → chord progressions, basslines, melodies, and drum patterns are derived explicitly from the musical fingerprint (key, mode, tempo, energy, density).
+- **MIDI → audio via FluidSynth + SoundFont** → real recorded instrument samples (SF2 SoundFonts), rendered on CPU. A piano sounds like a piano.
+- **Fully controllable** → because every element is an explicit musical decision, "the bass feels too busy" is a real change to the bass pattern, not a re-roll of a black box. This is the two-way production Frank promises, and the opposite of one-shot generation.
+- **Free, CPU-only, no rate limits, never sleeps** → runs anywhere, including Render free tier.
+
+Engine stack:
+- **FluidSynth** (`libfluidsynth`, system package) + **pyfluidsynth** — SoundFont-based audio synthesis
+- **SoundFont (SF2)** — instrument samples. A GM SoundFont (e.g. the free FluidR3_GM or GeneralUser GS) is bundled/downloaded at build time and committed-by-reference, not stored in the repo.
+- **mido / MIDIUtil** — MIDI construction in Python
+- **numpy** — sample buffer handling
+- The engine lives in `backend/app/services/generation/` and is used by both the Feel Lab (short textures) and the Beat Room (full instrumentals).
+
+Note: a neural model like MusicGen could be added later as an optional "richer texture" enhancement via a self-hosted Space, but the procedural engine is Frank's reliable core.
 
 ## Key Architectural Principles
 

@@ -53,3 +53,5 @@ yarn-error.log*
 
 # Vercel
 .vercel
+*.sf2
+*.sf3

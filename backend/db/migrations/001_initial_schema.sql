@@ -84,9 +84,13 @@ CREATE TABLE IF NOT EXISTS texture_samples (
     project_id      UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     fingerprint_id  UUID REFERENCES feel_fingerprints(id) ON DELETE SET NULL,
     audio_url       TEXT NOT NULL,
+    cache_key       TEXT,
     approved        BOOLEAN NOT NULL DEFAULT false,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS idx_texture_samples_cache
+    ON texture_samples(project_id, cache_key);
 
 -- ─────────────────────────────────────────────
 -- BEAT VERSIONS

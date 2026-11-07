@@ -10,9 +10,20 @@ Every service in Frank's production deployment uses a free tier. No credit card 
 | Backend API | Render (free web service) | 750 hours/month, spins down after 15min inactivity |
 | Database | Supabase | 500MB database, 1GB storage, 50MB file uploads |
 | LLM | Groq | 6,000 tokens/min on free tier |
-| Speech-to-text | Hugging Face Inference API | Rate limited but free |
-| Music generation | Hugging Face or Replicate | Replicate: $0.000225/sec, HF: free with rate limits |
+| Speech-to-text | Groq (whisper-large-v3-turbo) | Free tier |
+| Music generation | Frank's own procedural engine (FluidSynth) | Free, CPU-only, self-contained |
 | Audio storage | Supabase Storage | Included in free tier |
+
+## Backend must deploy via Docker (not the plain Python env)
+
+Frank's procedural music engine depends on native system libraries — FluidSynth
+(`libfluidsynth`) and FFmpeg — which pip cannot install and Render's plain Python
+environment cannot `apt-get`. So the backend deploys from `backend/Dockerfile`,
+which installs those packages and fetches the SoundFont at build time. On Render,
+create the backend as a Docker web service pointed at `backend/Dockerfile`.
+
+The SoundFont (~14MB) is not committed to the repo; `scripts/fetch_soundfont.sh`
+downloads it during the Docker build. It's also run during local setup.
 
 ## Render Cold Start
 
