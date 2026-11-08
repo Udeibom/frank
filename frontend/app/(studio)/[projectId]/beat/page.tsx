@@ -24,6 +24,7 @@ import {
   listBeatVersions,
   setActiveBeatVersion,
   updateSection,
+  previewWithVocal,
   type BeatVersion,
   type BeatSection,
 } from "@/lib/api/beat"
@@ -32,7 +33,7 @@ import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
 import type { MusicalFingerprint } from "@/types/project"
 import type { ConversationMessage, ConversationAction } from "@/types/api"
-import { Drum, Play, Pause, Loader2 } from "lucide-react"
+import { Drum, Play, Pause, Loader2, Mic2 } from "lucide-react"
 
 export default function BeatRoomPage() {
   const params = useParams()
@@ -288,6 +289,47 @@ export default function BeatRoomPage() {
     setActiveVersion(v)
   }
 
+  // "Hear it with my vocal" — a throwaway preview of beat + the recorded vocal
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+
+  async function handlePreviewWithVocal() {
+    setPreviewing(true)
+    setTurns((t) => [
+      ...t,
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "Let me play the beat with your voice over it…",
+      },
+    ])
+    try {
+      const { job_id } = await previewWithVocal(projectId)
+      const result = await pollJob(job_id)
+      const url = (result.result as { render_url?: string })?.render_url
+      if (url) {
+        setPreviewUrl(url)
+        previewAudioRef.current?.pause()
+        const audio = new Audio(url)
+        previewAudioRef.current = audio
+        audio.play().catch(() => {})
+      }
+    } catch {
+      setTurns((t) => [
+        ...t,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content:
+            "Couldn't play that back — make sure you've recorded a vocal in the Voice Room.",
+        },
+      ])
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
   const sections: BeatSection[] = activeVersion?.params.sections ?? []
   const hasBeat = Boolean(activeVersion?.render_url)
 
@@ -329,9 +371,22 @@ export default function BeatRoomPage() {
                     <Play className="h-5 w-5 translate-x-0.5" />
                   )}
                 </button>
-                <div className="text-sm text-muted-foreground">
+                <div className="flex-1 text-sm text-muted-foreground">
                   {activeVersion?.label}
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={previewing || building}
+                  onClick={handlePreviewWithVocal}
+                >
+                  {previewing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Mic2 className="h-3.5 w-3.5" />
+                  )}
+                  Hear it with my vocal
+                </Button>
               </div>
 
               {/* Timeline */}

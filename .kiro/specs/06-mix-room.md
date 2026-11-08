@@ -139,3 +139,20 @@ Action types the Beat Room LLM can emit:
 ### Task 7 — Active state and sidebar
 - [ ] `project_active_state.active_mix_id` updated
 - [ ] Sidebar status indicator updates
+
+---
+
+## Post-Review Follow-Ups (Spec 06)
+
+From the Frank Code Reviewer pass. Addressed in this spec:
+- **C1 (critical — section gain was a silent no-op / fake handoff):** `render_mix` now actually applies `section_gain_db` by time-windowing the beat using the section bars + tempo (boundaries known by construction from the beat version's params). Verified: "boost the chorus" makes the chorus nearly 2x the verse RMS within the mix. Frank no longer claims a change it didn't make — this was the most important fix because a fake handoff breaks the core product promise.
+- **W1 (preview polluted the mix version list + stole active pointer):** "Hear it with my vocal" now uses a dedicated `run_vocal_preview_job` that renders a throwaway preview and returns only the audio URL — it does NOT create a mix version or touch `active_mix_id`.
+- **W2 (memory — three full buffers at once on 512MB free tier):** `render_mix` now accumulates each layer into the mix and releases the source buffer (`del`) before the next, instead of holding vocal+beat+harmony simultaneously.
+- **W3 (preview bitrate):** preview renders are now 64kbps per R4 (full export stays 320kbps).
+- **W4 (R3 plain-text summary was dead code):** the per-version summary is now baked into the mix label ("Mix v2 — vocals forward, warmer") and shown in the versions panel.
+
+Deferred, with reasoning:
+1. **S1 — harmony resolved by label prefix ("Harmony ...").** Brittle if a user renames the take. A dedicated `is_harmony` flag would be cleaner. Low risk for the MVP (harmony takes aren't typically renamed); tracked for a schema tidy-up.
+2. **S2 — active comp fetched via `get_latest_comp` rather than by `active_comp_id`.** Only matters if multiple comps exist; today there's effectively one. Tracked.
+3. **S4 — full-render milestone messaging.** The full-quality render currently shows the same copy as a preview; the "your song is ready to export" moment is better delivered in the Export Room (Spec 07), which is next.
+4. **Server-side jargon scrub:** the no-jargon guarantee is prompt-only. A belt-and-suspenders scrub of the LLM `message` could be added, but every layer's prompt has held up in testing. Tracked as a possible hardening.

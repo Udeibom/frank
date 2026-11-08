@@ -98,6 +98,15 @@ export async function setActiveBeatVersion(
   })
 }
 
+export async function previewWithVocal(
+  projectId: string,
+): Promise<{ job_id: string }> {
+  return api.post<{ job_id: string }>(
+    `/projects/${projectId}/beat/preview-with-vocal`,
+    {},
+  )
+}
+
 export async function updateSection(
   projectId: string,
   sectionIndex: number,

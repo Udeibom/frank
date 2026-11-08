@@ -21,9 +21,11 @@ from app.services.jobs.beat_runner import (
     run_add_stem_job,
     run_mute_stem_job,
 )
+from app.services.jobs.mix_runner import run_vocal_preview_job
 from app.db import jobs as jobs_db
 from app.db import beat as beat_db
 from app.db import projects as projects_db
+from app.db import voice as voice_db
 
 router = APIRouter(prefix="/projects/{project_id}/beat", tags=["beat"])
 
@@ -115,6 +117,41 @@ async def beat_conversation(
     return BeatConversationResponse(
         message=result.get("message", ""), actions=actions
     )
+
+
+@router.post("/preview-with-vocal", response_model=JobResponse)
+async def preview_with_vocal(
+    project_id: str, background: BackgroundTasks
+) -> JobResponse:
+    """
+    "Hear it with my vocal" — a quick preview mix of the active beat and the
+    active vocal, so the user can judge whether the beat fits their voice. This
+    reuses the mix renderer (it IS a preview mix); it writes a mix version like
+    any other render, which is fine — the user can keep it or move on.
+    Only available when a vocal take exists.
+    """
+    takes = await voice_db.list_takes(project_id)
+    has_vocal = any(
+        not (t.get("label") or "").lower().startswith("harmony") for t in takes
+    )
+    if not has_vocal:
+        raise HTTPException(
+            status_code=400,
+            detail="Record a vocal first, then you can hear it over the beat.",
+        )
+
+    # A vocal-forward preview so the voice is clearly audible over the beat
+    preview_params = {
+        "vocal_gain_db": 1.0,
+        "beat_gain_db": -7.0,
+        "harmony_enabled": False,
+        "vocal_effects": [],
+        "beat_effects": [],
+        "section_gain_db": {},
+    }
+    job = await jobs_db.create_job(project_id, job_type="vocal_preview")
+    background.add_task(run_vocal_preview_job, job["id"], project_id, preview_params)
+    return JobResponse(job_id=job["id"])
 
 
 @router.get("/versions", response_model=list[BeatVersionResponse])
