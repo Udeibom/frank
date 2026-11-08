@@ -88,3 +88,21 @@ The Export Room is the finish line. The user listens to the final mix one more t
 - [ ] All three endpoints
 - [ ] Signed URL generation for download
 - [ ] Export record creation in DB
+
+---
+
+## Post-Review Follow-Ups (Spec 07)
+
+From the Frank Code Reviewer pass. Addressed in this spec:
+- **C1 (duplicate exports / re-render on every download):** exports now dedup by (mix_version_id + mastered). Download reuses an existing export if one matches — instant, no duplicate rows.
+- **C2 (R4 "which mix version"):** `exports` table gained `mix_version_id` and `mastered` columns; both are recorded and returned. This also powers the dedup.
+- **C3 (R5 signed URL):** the exports bucket is now private, and the download endpoint returns a time-limited signed URL from the stored `storage_path` (public-URL fallback for legacy rows).
+- **W2/W3 (R2 auto-play + compare):** the mastered version auto-plays when ready, with a "Radio-ready version" badge and one-click "Go back to the original".
+- **W4 (silent failures):** entry load errors and master/download failures now surface plain-language messages.
+- **S3 (emotional finish):** "It's yours. Good luck with it." now appears right after a successful download, not merely when history exists.
+
+Deferred, with reasoning:
+1. **W1 — waveform display (R1).** The final-listen screen shows a large play button and the song, but not a rendered waveform. Deferred as visual polish; the core "final listen" works. A waveform overlay would need peak data from the backend (a small addition).
+2. **S1 — two-pass loudnorm.** Single-pass loudnorm hits the target well enough for the MVP; two-pass is more accurate and worth it later for a stronger "radio ready" claim.
+3. **W5 — 320k over a 192k mix source.** The export container is 320k but the mix render it's built from is 192k MP3, so it can't recover lost detail. A true-320k export would render from the un-encoded mix buffer; tracked as a quality improvement.
+4. **W6 — heavy-job concurrency guard.** Same cross-cutting item tracked since Spec 03: a single-slot queue for mastering/mix/beat renders would harden the free-tier instance. Deferred.

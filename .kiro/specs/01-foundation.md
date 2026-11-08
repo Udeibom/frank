@@ -125,9 +125,12 @@ The following tables must be created via a SQL migration file at `backend/db/mig
 **exports**
 - `id` UUID PRIMARY KEY DEFAULT gen_random_uuid()
 - `project_id` UUID NOT NULL REFERENCES projects(id)
+- `mix_version_id` UUID REFERENCES mix_versions(id)  (added Spec 07 — which mix this came from, enables dedup)
+- `storage_path` TEXT  (added Spec 07 — for signed download URLs)
 - `audio_url` TEXT NOT NULL
 - `format` TEXT NOT NULL DEFAULT 'mp3'
 - `quality` TEXT NOT NULL DEFAULT '320k'
+- `mastered` BOOLEAN NOT NULL DEFAULT false  (added Spec 07)
 - `created_at` TIMESTAMPTZ DEFAULT now()
 
 **async_jobs**

@@ -60,6 +60,41 @@ def upload_audio(
     ) from last_error
 
 
+def upload_audio_with_path(
+    bucket: str,
+    data: bytes,
+    extension: str = "wav",
+    name_prefix: str | None = None,
+) -> tuple[str, str]:
+    """
+    Like upload_audio, but returns (storage_path, public_url). The storage path
+    is needed to generate signed URLs later (e.g. for private export buckets).
+    """
+    content_type = _CONTENT_TYPES.get(extension, "application/octet-stream")
+
+    last_error: Exception | None = None
+    for attempt in range(_MAX_UPLOAD_ATTEMPTS):
+        supabase = get_supabase()
+        unique = uuid.uuid4().hex
+        base = f"{name_prefix}-{unique}" if name_prefix else unique
+        filename = f"{base}.{extension}"
+        try:
+            supabase.storage.from_(bucket).upload(
+                path=filename,
+                file=data,
+                file_options={"content-type": content_type, "upsert": "false"},
+            )
+            url = supabase.storage.from_(bucket).get_public_url(filename)
+            return filename, url
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            time.sleep(0.5 * (attempt + 1))
+
+    raise RuntimeError(
+        f"Upload to {bucket} failed after {_MAX_UPLOAD_ATTEMPTS} attempts"
+    ) from last_error
+
+
 def create_signed_url(bucket: str, path: str, expires_in: int = 3600) -> str:
     """Create a time-limited signed URL for a private file (used for downloads)."""
     supabase = get_supabase()

@@ -171,12 +171,15 @@ CREATE INDEX idx_mix_versions_project ON mix_versions(project_id, created_at DES
 -- Final deliverable MP3s
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS exports (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    audio_url   TEXT NOT NULL,
-    format      TEXT NOT NULL DEFAULT 'mp3',
-    quality     TEXT NOT NULL DEFAULT '320k',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id      UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    mix_version_id  UUID REFERENCES mix_versions(id) ON DELETE SET NULL,
+    storage_path    TEXT,
+    audio_url       TEXT NOT NULL,
+    format          TEXT NOT NULL DEFAULT 'mp3',
+    quality         TEXT NOT NULL DEFAULT '320k',
+    mastered        BOOLEAN NOT NULL DEFAULT false,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ─────────────────────────────────────────────
