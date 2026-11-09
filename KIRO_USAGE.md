@@ -83,3 +83,48 @@ curl workflow never would have told us this.
 
 ## (more sections to come: specs, hooks, custom agents, PBT, and the
 ## integration bug story — added as we do the work)
+
+---
+
+## Specs — and an honest correction
+
+Frank's specs did not start out as Kiro specs. We wrote them first as single
+Markdown files — one per feature (`01-foundation.md` … `08-auth.md`) — each with
+Overview / Requirements / Design Notes / Implementation Tasks. We built the six
+rooms end to end against those files. They were good documents, but they were not
+Kiro's native spec format, and treating them as if they were would be overclaiming.
+
+So we converted them. Each single file became a proper feature folder under
+`.kiro/specs/<feature>/` with the three native documents:
+
+- **requirements.md** — user stories plus acceptance criteria in EARS form
+  (`WHEN <event> THEN THE SYSTEM SHALL <response>`, with `IF/THEN` for conditionals
+  and `WHERE` for feature-scoped rules).
+- **design.md** — architecture, components and interfaces, data models, error
+  handling, testing strategy, and the real engineering decisions with their
+  rationale.
+- **tasks.md** — a numbered implementation plan where each task cites the
+  requirements it satisfies (`_Requirements: 1.2, 3.1_`).
+
+The originals are not deleted. They're archived unedited under
+`.kiro/specs/_original-single-file-specs/` with a README that maps old to new, so
+the history stays honest: we started vibe-style, built the product, then adopted
+the structured flow and brought the specs up to it.
+
+### What the conversion surfaced
+
+Rewriting the specs against what was actually built — not what was originally
+planned — caught two places where the old specs had drifted from reality:
+
+- The originals described **MusicGen** for generation. Frank actually uses its
+  own **procedural engine** (FluidSynth + SoundFont), because there is no free
+  hosted MusicGen anymore. The native specs say so.
+- The originals described **Basic Pitch** for pitch detection. Frank actually
+  uses **librosa `pyin`**, because Basic Pitch pulls in TensorFlow (~500MB,
+  neural) and breaks the free-tier budget. The native specs say so.
+
+Each converted spec also carries its real "deferred, with reasoning" list — the
+follow-ups from the code-review passes — so the tasks reflect what's done, what's
+intentionally postponed, and why. The `auth` spec folder is deliberately empty:
+it's the one feature we haven't built yet, and we'll run it through the native
+requirements → design → tasks flow from the start rather than back-filling it.
