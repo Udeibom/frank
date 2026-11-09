@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils"
 export default function VoiceRoomPage() {
   const params = useParams()
   const projectId = params.projectId as string
-  const { activeState, updateActiveState } = useProjectStore()
+  const { activeState, updateActiveState, revision } = useProjectStore()
 
   const [takes, setTakes] = useState<VocalTake[]>([])
   const [beatUrl, setBeatUrl] = useState<string | null>(null)
@@ -54,14 +54,8 @@ export default function VoiceRoomPage() {
     return t
   }, [projectId])
 
+  // Greeting — once, so the conversation isn't reset on every re-sync.
   useEffect(() => {
-    refreshTakes()
-    // Load the active beat so the singer can record along to it
-    listBeatVersions(projectId).then((vs) => {
-      const activeId = activeState?.active_beat_version_id
-      const active = vs.find((v) => v.id === activeId) ?? vs[0]
-      setBeatUrl(active?.render_url ?? null)
-    })
     setTurns([
       {
         id: crypto.randomUUID(),
@@ -72,6 +66,19 @@ export default function VoiceRoomPage() {
     ])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
+
+  // Data load — re-runs whenever the shared state refreshes (e.g. the user
+  // navigated in from the Beat Room having just built a beat), so the beat to
+  // sing over and the take list stay current.
+  useEffect(() => {
+    refreshTakes()
+    listBeatVersions(projectId).then((vs) => {
+      const activeId = activeState?.active_beat_version_id
+      const active = vs.find((v) => v.id === activeId) ?? vs[0]
+      setBeatUrl(active?.render_url ?? null)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, revision])
 
   function playUrl(url: string) {
     if (playingUrl === url) {
@@ -93,6 +100,9 @@ export default function VoiceRoomPage() {
     try {
       const { take, analysis_job_id } = await uploadTake(projectId, blob, ext)
       setTakes((t) => [take, ...t])
+      // The backend makes a new recording the active vocal — mirror that into
+      // the shared store so the Beat and Mix Rooms know a vocal now exists.
+      updateActiveState({ active_vocal_id: take.id })
       // Pitch analysis runs in the background — refresh when it lands
       pollJob(analysis_job_id)
         .then(() => refreshTakes())

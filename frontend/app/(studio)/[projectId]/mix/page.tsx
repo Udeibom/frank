@@ -43,7 +43,7 @@ const DEFAULT_PARAMS: Partial<MixParams> = {
 export default function MixRoomPage() {
   const params = useParams()
   const projectId = params.projectId as string
-  const { activeState, updateActiveState } = useProjectStore()
+  const { activeState, updateActiveState, revision } = useProjectStore()
 
   const [hasVocal, setHasVocal] = useState(false)
   const [hasBeat, setHasBeat] = useState(false)
@@ -58,6 +58,9 @@ export default function MixRoomPage() {
   const mixParamsRef = useRef<Partial<MixParams>>({ ...DEFAULT_PARAMS })
   const historyRef = useRef<ConversationMessage[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  // Guards so we greet once and auto-assemble the first mix only once.
+  const greetedRef = useRef(false)
+  const autoAssembledRef = useRef(false)
 
   const loadVersions = useCallback(async () => {
     const vs = await listMixVersions(projectId)
@@ -70,7 +73,9 @@ export default function MixRoomPage() {
     return active
   }, [projectId, activeState?.active_mix_id])
 
-  // On entry: check what exists, load mixes, assemble if needed
+  // On entry AND whenever the shared state refreshes (navigating in from the
+  // Voice/Beat rooms), re-check what exists and reload mixes. This is what lets
+  // the Mix Room always see the vocal and beat you just made elsewhere.
   useEffect(() => {
     Promise.all([
       listTakes(projectId),
@@ -83,47 +88,59 @@ export default function MixRoomPage() {
       const harmonies = takes.filter((t) =>
         (t.label ?? "").toLowerCase().startsWith("harmony"),
       )
-      setHasVocal(vocalTakes.length > 0)
-      setHasBeat(beats.length > 0)
+      const haveVocal = vocalTakes.length > 0
+      const haveBeat = beats.length > 0
+      setHasVocal(haveVocal)
+      setHasBeat(haveBeat)
       setHasHarmony(harmonies.length > 0)
       setVersions(mixes)
-      setActiveVersion(mixes[0] ?? null)
-      if (mixes[0]?.mix_params) {
-        mixParamsRef.current = { ...DEFAULT_PARAMS, ...mixes[0].mix_params }
+      const active =
+        mixes.find((m) => m.id === activeState?.active_mix_id) ?? mixes[0] ?? null
+      setActiveVersion(active)
+      if (active?.mix_params) {
+        mixParamsRef.current = { ...DEFAULT_PARAMS, ...active.mix_params }
       }
 
-      if (mixes.length > 0) {
-        setTurns([
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content:
-              "Here's how it sounds right now. Tell me what you'd change — is the voice sitting right? Too much beat? Something feel off? I'll adjust and we'll listen again.",
-          },
-        ])
-      } else if (vocalTakes.length > 0 && beats.length > 0) {
-        setTurns([
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: "Let me put your voice and the beat together. One moment…",
-          },
-        ])
-        // Auto-assemble the first mix
+      // Greet once (don't reset the conversation on every re-sync).
+      if (!greetedRef.current) {
+        greetedRef.current = true
+        if (mixes.length > 0) {
+          setTurns([
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content:
+                "Here's how it sounds right now. Tell me what you'd change — is the voice sitting right? Too much beat? Something feel off? I'll adjust and we'll listen again.",
+            },
+          ])
+        } else if (haveVocal && haveBeat) {
+          setTurns([
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: "Let me put your voice and the beat together. One moment…",
+            },
+          ])
+        } else {
+          const missing = !haveVocal ? "a vocal" : "a beat"
+          setTurns([
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: `We need ${missing} before we can mix. Pop back to ${!haveVocal ? "the Voice Room" : "the Beat Room"} and I'll be ready when you are.`,
+            },
+          ])
+        }
+      }
+
+      // Auto-assemble the first mix once, when both parts exist and none yet.
+      if (mixes.length === 0 && haveVocal && haveBeat && !autoAssembledRef.current) {
+        autoAssembledRef.current = true
         doRender(mixParamsRef.current)
-      } else {
-        const missing = vocalTakes.length === 0 ? "a vocal" : "a beat"
-        setTurns([
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: `We need ${missing} before we can mix. Pop back to ${vocalTakes.length === 0 ? "the Voice Room" : "the Beat Room"} and I'll be ready when you are.`,
-          },
-        ])
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId])
+  }, [projectId, revision])
 
   useEffect(() => {
     audioRef.current?.pause()

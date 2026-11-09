@@ -38,8 +38,9 @@ import { Drum, Play, Pause, Loader2, Mic2 } from "lucide-react"
 export default function BeatRoomPage() {
   const params = useParams()
   const projectId = params.projectId as string
-  const { activeState, updateActiveState } = useProjectStore()
+  const { activeState, updateActiveState, revision } = useProjectStore()
 
+  const greetedRef = useRef(false)
   const [fingerprint, setFingerprint] = useState<Partial<MusicalFingerprint> | null>(null)
   const [versions, setVersions] = useState<BeatVersion[]>([])
   const [activeVersion, setActiveVersion] = useState<BeatVersion | null>(null)
@@ -60,17 +61,29 @@ export default function BeatRoomPage() {
     const activeId = activeState?.active_beat_version_id
     const active = vs.find((v) => v.id === activeId) ?? vs[0] ?? null
     setActiveVersion(active)
+    // Push the newest beat into the shared store so the Voice and Mix Rooms
+    // immediately know a beat exists and which one is current.
+    if (active && active.id !== activeState?.active_beat_version_id) {
+      updateActiveState({ active_beat_version_id: active.id })
+    }
     return active
-  }, [projectId, activeState?.active_beat_version_id])
+  }, [projectId, activeState?.active_beat_version_id, updateActiveState])
 
-  // On entry: load fingerprint + existing beats, set the greeting
+  // On entry AND whenever the shared state refreshes: reload the fingerprint
+  // and beats so the room reflects anything made elsewhere (e.g. the feel the
+  // user just approved). Honors the active beat pointer rather than assuming
+  // the newest. Greets only once.
   useEffect(() => {
     Promise.all([getFingerprint(projectId), listBeatVersions(projectId)]).then(
       ([fp, vs]) => {
         setFingerprint(fp?.fingerprint ?? null)
         setVersions(vs)
-        const active = vs[0] ?? null
+        const active =
+          vs.find((v) => v.id === activeState?.active_beat_version_id) ?? vs[0] ?? null
         setActiveVersion(active)
+
+        if (greetedRef.current) return
+        greetedRef.current = true
 
         if (vs.length > 0) {
           setTurns([
@@ -103,7 +116,7 @@ export default function BeatRoomPage() {
       },
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId])
+  }, [projectId, revision])
 
   // Set up audio element when the active beat changes
   useEffect(() => {

@@ -70,6 +70,14 @@ async def upload_take(
         project_id, audio_url, label=f"Take {count + 1}"
     )
 
+    # A freshly recorded take becomes the active vocal, so the rest of the song
+    # (Beat preview, Mix assembly) immediately knows a vocal exists. Recording
+    # is an intentional act, so making the newest take current matches what the
+    # user expects. They can switch to another take later.
+    await projects_db.update_project_active_state(
+        project_id, {"active_vocal_id": take["id"]}
+    )
+
     # Pitch analysis runs in the background
     job = await jobs_db.create_job(project_id, job_type="pitch_analysis")
     background.add_task(run_pitch_analysis_job, job["id"], take["id"], wav)

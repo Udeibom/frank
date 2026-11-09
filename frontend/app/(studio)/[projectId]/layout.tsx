@@ -1,13 +1,18 @@
 "use client"
 
 /**
- * Per-project layout — loads the project into the store and renders
- * the persistent StudioNav sidebar alongside all layer pages.
+ * Per-project layout — loads the project into the shared store and renders the
+ * persistent StudioNav sidebar alongside all layer pages.
+ *
+ * Crucially, it re-syncs the shared state every time the user moves between
+ * layers (the pathname changes but this layout does NOT remount across sibling
+ * routes). That keeps all six rooms looking at one live view of the song, so a
+ * vocal recorded in the Voice Room is immediately known to the Beat and Mix
+ * Rooms.
  */
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import { getProject } from "@/lib/api/projects"
+import { useEffect, useState, useRef } from "react"
+import { useParams, usePathname } from "next/navigation"
 import { useProjectStore } from "@/store/project"
 import { StudioNav } from "@/components/studio/StudioNav"
 
@@ -17,21 +22,32 @@ export default function ProjectLayout({
   children: React.ReactNode
 }) {
   const params = useParams()
+  const pathname = usePathname()
   const projectId = params.projectId as string
-  const { setCurrentProject, setActiveState } = useProjectStore()
+  const { refresh } = useProjectStore()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const didInitialLoad = useRef(false)
 
+  // Initial load — show the opening state only the first time.
   useEffect(() => {
-    if (!projectId) return
-    getProject(projectId)
-      .then(({ project, active_state }) => {
-        setCurrentProject(project)
-        if (active_state) setActiveState(active_state)
+    if (!projectId || didInitialLoad.current) return
+    didInitialLoad.current = true
+    refresh(projectId)
+      .then(() => setLoading(false))
+      .catch(() => {
+        setError(true)
+        setLoading(false)
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [projectId, setCurrentProject, setActiveState])
+  }, [projectId, refresh])
+
+  // Re-sync the shared state on every layer navigation (pathname change),
+  // after the first load. This is what binds the rooms together.
+  useEffect(() => {
+    if (!projectId || !didInitialLoad.current) return
+    refresh(projectId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   if (loading) {
     return (
