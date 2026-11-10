@@ -23,7 +23,9 @@ def to_wav(input_bytes: bytes, input_ext: str = "webm") -> bytes:
             in_file.write(input_bytes)
             in_path = in_file.name
 
-        out_path = in_path.rsplit(".", 1)[0] + ".wav"
+        # Distinct output name: for a .wav input the old name was identical to
+        # the input, and FFmpeg cannot overwrite its own input file.
+        out_path = in_path.rsplit(".", 1)[0] + ".converted.wav"
 
         result = subprocess.run(
             [
@@ -40,7 +42,8 @@ def to_wav(input_bytes: bytes, input_ext: str = "webm") -> bytes:
 
         if result.returncode != 0:
             raise RuntimeError(
-                f"FFmpeg conversion failed: {result.stderr.decode()[:200]}"
+                # Tail, not head: the head is just FFmpeg's version banner.
+                f"FFmpeg conversion failed: {result.stderr.decode(errors='replace')[-300:]}"
             )
 
         with open(out_path, "rb") as f:

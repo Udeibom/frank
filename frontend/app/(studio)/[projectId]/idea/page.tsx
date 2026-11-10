@@ -191,6 +191,7 @@ export default function IdeaRoomPage() {
 
       {/* Conversation panel */}
       <ConversationPanel
+        emptyText="Stuck on a line? Need a rhyme? Want a second pair of ears? Frank is here."
         turns={turns}
         onSend={handleSend}
         isThinking={isThinking}

@@ -138,6 +138,16 @@ export default function MixRoomPage() {
         autoAssembledRef.current = true
         doRender(mixParamsRef.current)
       }
+    }).catch(() => {
+      // Never leave the room silently empty if a request fails.
+      setTurns([
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content:
+            "I couldn't reach your song just now. Give it a moment and refresh. Nothing has been lost.",
+        },
+      ])
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, revision])
@@ -306,6 +316,7 @@ export default function MixRoomPage() {
       </div>
 
       <ConversationPanel
+        emptyText="Getting your mix ready…"
         turns={turns}
         onSend={handleSend}
         isThinking={isThinking}

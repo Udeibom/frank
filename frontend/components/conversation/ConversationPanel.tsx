@@ -26,6 +26,8 @@ interface ConversationPanelProps {
   placeholder?: string
   // Optional slot above the input (e.g. the voice memo button)
   inputAccessory?: ReactNode
+  // Shown before the first message. Each room should pass its own.
+  emptyText?: string
 }
 
 export function ConversationPanel({
@@ -34,6 +36,7 @@ export function ConversationPanel({
   isThinking,
   placeholder = "Talk to Frank…",
   inputAccessory,
+  emptyText = "Frank is here.",
 }: ConversationPanelProps) {
   const [input, setInput] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -61,9 +64,7 @@ export function ConversationPanel({
         {turns.length === 0 && !isThinking ? (
           <div className="flex h-full items-center justify-center px-4 text-center">
             <p className="text-sm text-muted-foreground/50 leading-relaxed">
-              Stuck on a line? Need a rhyme? Want a second pair of ears?
-              <br />
-              Frank is here.
+              {emptyText}
             </p>
           </div>
         ) : (

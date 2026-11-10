@@ -436,6 +436,7 @@ export default function BeatRoomPage() {
       </div>
 
       <ConversationPanel
+        emptyText="Getting your beat ready…"
         turns={turns}
         onSend={handleSend}
         isThinking={isThinking}

@@ -284,6 +284,7 @@ export default function FeelLabPage() {
 
       {/* Conversation */}
       <ConversationPanel
+        emptyText="Tell me how the song should feel."
         turns={turns}
         onSend={handleSend}
         isThinking={isThinking}
