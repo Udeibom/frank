@@ -376,3 +376,79 @@ writing code (`.kiro/specs/auth/`). The spec had real consequences:
 The Component Scaffolder hook fired when we created `AuthForm.tsx`. It only acts on
 empty or placeholder files, and this one was complete, so it did nothing. It has not
 produced a change in this project that we can point to.
+
+---
+
+## Follow-ups: private audio, token refresh, live hooks, and running the agents
+
+### Private audio (new spec: `.kiro/specs/private-audio/`)
+
+Six of seven storage buckets were public, so anyone with an audio URL could play a
+user's takes. We made all seven private. The API now hands out 2-hour signed links,
+added in one place (an ASGI middleware over every JSON response) so no endpoint can
+forget. Stored URLs in the database are unchanged and act as references, so no data
+migration was needed. Background jobs read files with the service role.
+
+Verified live: the API returns signed URLs that download; the permanent public form
+of the same file returns 400, including a take recorded before the change; harmony,
+comp, tuning, mix and export jobs all still complete. 9 property tests cover the URL
+rewrite. One honest wrinkle: for a short time right after the switch, a file fetched
+moments before still served from the edge cache. A few minutes later it was refused.
+
+### Token refresh, tested deliberately
+
+In the browser we replaced the stored session with one whose access token was expired
+(and invalid), keeping the real refresh token. The next action (creating a song)
+succeeded, and the cookie held a brand-new token with about an hour left. Control case:
+with a garbage refresh token, navigating sent the user to login and remembered the room.
+
+### The blocking hook, live
+
+The `PreToolUse` guard became active in this session. We tried two real writes: a Groq-
+format key into a Python file, and an `@ffmpeg/ffmpeg` import into the frontend. Both
+were blocked before execution and neither file exists. This is the first hook in the
+project with a demonstrated block, not just a report.
+
+### Running the agents for real
+
+**Frank Integration Tester.** Its first real run worked the voice-to-export contract,
+private audio and the browser rooms with a throwaway account, and cleaned up after
+itself (original projects verified untouched). Results:
+- Passed nearly everything, with before/after pointer values for each step.
+- **Found a real bug:** beat generation failed twice, then passed on the third try. We
+  measured the cause: a 3.3 MB beat upload took ~30 s on this connection, but the
+  storage client's default timeout is 20 s. Fixed by giving storage its own 180 s
+  budget; the same upload then succeeded twice in ~17 s.
+- Also flagged: sidebar status icons had no text for screen readers (fixed), and a
+  stale docstring (fixed).
+- Limit: it had to script Chromium directly because the Playwright MCP tools weren't
+  exposed to the sub-agent.
+
+**PBT Author.** First run hit a network error partway, after writing the comp tests;
+we re-ran it for mastering. It found **two real bugs**, each confirmed by us
+independently before fixing:
+1. **Comp:** a take just 2 samples longer than the others produced a zero-length
+   segment (`start 2.0, end 2.0`) that the UI would draw as a sliver. Fixed by folding
+   sub-5 ms tails into the previous segment.
+2. **Mastering:** fully silent audio crashed the export, because FFmpeg's MP3 encoder
+   aborts on `loudnorm` output for silence. Fixed by skipping normalization for silence.
+
+For both fixes we reverted the change and watched the regression test fail, then
+restored it. The suite is now 51 backend tests, all passing.
+
+### One more bug, found by the network failing
+
+While re-running the beat test the internet connection degraded. A status poll got a
+503 ("can't check your login right now") while the beat was still being built. The
+frontend's `pollJob` threw on the first failed poll, so the UI would have reported a
+failed beat that was actually still running. Fixed: transient errors (network, 5xx)
+are retried up to 8 times in a row; 401 and 404 still stop immediately. Not yet tested
+end to end against a live outage.
+
+### Not finished
+- The end-to-end beat rerun after the timeout fix was cut short by the outage. The fix
+  is verified at the upload level only.
+- A throwaway test account (`frank-test-beat-…`) and its project are left in the
+  database until the connection is back.
+- The larger timeout has a cost: on a connection that is open but dead, a job can now
+  hang for minutes per file instead of failing in 20 s.
