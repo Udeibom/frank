@@ -1,8 +1,13 @@
 import { api, ApiError } from "./client"
 import type { JobStatusResponse } from "@/types/api"
 
-const POLL_INTERVAL_MS = 2000
-const MAX_POLL_ATTEMPTS = 150 // 5 minutes max
+// Poll quickly at first (most jobs finish in seconds), then ease off.
+const FAST_POLL_MS = 2000
+const SLOW_POLL_MS = 5000
+const FAST_PHASE_MS = 60_000
+// Longer than the server's 10-minute stale limit (job-reliability spec 4.1), so
+// a stuck job is reported as failed by the server rather than timed out here.
+const MAX_WAIT_MS = 12 * 60_000
 // How many polls in a row may fail for transient reasons (network blip, 5xx)
 // before we give up. A job keeps running on the server while a poll fails, so
 // one bad poll must never be reported as a failed job.
@@ -23,12 +28,11 @@ export async function pollJob(
   jobId: string,
   onProgress?: (status: JobStatusResponse) => void,
 ): Promise<JobStatusResponse> {
-  let attempts = 0
+  const started = Date.now()
   let consecutiveErrors = 0
 
-  while (attempts < MAX_POLL_ATTEMPTS) {
-    await sleep(POLL_INTERVAL_MS)
-    attempts++
+  while (Date.now() - started < MAX_WAIT_MS) {
+    await sleep(pollDelay(Date.now() - started))
 
     let status: JobStatusResponse
     try {
@@ -53,6 +57,11 @@ export async function pollJob(
   }
 
   throw new Error("This is taking longer than usual — give it another go in a moment.")
+}
+
+/** How long to wait before the next poll, given how long we've been waiting. */
+export function pollDelay(elapsedMs: number): number {
+  return elapsedMs < FAST_PHASE_MS ? FAST_POLL_MS : SLOW_POLL_MS
 }
 
 function sleep(ms: number): Promise<void> {

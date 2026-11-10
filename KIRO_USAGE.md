@@ -455,3 +455,39 @@ end to end against a live outage.
   data were cleaned up once the connection returned.)
 - The larger timeout has a cost: on a connection that is open but dead, a job can now
   hang for minutes per file instead of failing in 20 s.
+
+---
+
+## Closing the loose ends: stuck jobs and the beat rerun
+
+### Stuck jobs (new spec: `.kiro/specs/job-reliability/`)
+
+The outage left a job showing "processing" forever: the worker died, and its "mark
+failed" write was lost too. We specified the fix before building it. Every job must
+now end as complete or failed:
+
+1. Recording a failure retries through brief network blips.
+2. When the browser polls a job that hasn't changed for 10 minutes, the server marks
+   it failed with a plain message. The update only matches a job that is still active
+   and still old, so one that just finished is never clobbered.
+3. On startup the backend fails every job left active by the previous process.
+4. The browser now waits 12 minutes (longer than the server's limit), polling every
+   2 s for the first minute and every 5 s after that.
+
+Verified live: 20-minute-old processing and pending jobs were resolved on the next
+poll; a fresh job and an old completed job were left alone (5/5). 6 property tests
+cover the rules, and two mutations were caught.
+
+**The live test caught a gap in our own fix.** The first restart test failed: a
+network blip hit the startup sweep, which only tried once, so the orphaned job stayed
+"processing". The server still started (as specified), but the job wasn't cleaned up.
+We added retries to the sweep and the rerun passed. A unit test would not have found
+this; only running it on a flaky connection did.
+
+### Beat generation, end to end
+
+With the storage timeout fix in place we ran beat generation three times in a row
+against the live backend: **3 of 3 succeeded** (150–190 s each), each saved all 8
+section files, and the beat plays through a signed link. Each run hit one or two
+failed status polls on this connection and rode them out. Before the polling fix in
+the previous round, the app would have reported each of those runs as failed.
