@@ -158,12 +158,10 @@ async def mix_conversation(
 
 def _download_and_analyze(url: str) -> dict:
     """Blocking download + analysis — run via asyncio.to_thread."""
-    import httpx
     from app.services.audio import mixing
+    from app.services.storage.signing import fetch_audio_bytes
 
-    resp = httpx.get(url, timeout=30)
-    resp.raise_for_status()
-    mix = mixing._load_stereo(resp.content)
+    mix = mixing._load_stereo(fetch_audio_bytes(url, timeout=30))
     return mixing.analyze_mix(mix)
 
 

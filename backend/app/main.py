@@ -1,6 +1,7 @@
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth import require_project_access
+from app.middleware.signed_urls import SignedUrlMiddleware
 from app.config import get_settings
 from app.routers import (
     projects,
@@ -22,6 +23,8 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Added BEFORE CORS so CORS stays the outermost layer (later = outer).
+app.add_middleware(SignedUrlMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,

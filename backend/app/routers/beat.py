@@ -126,8 +126,8 @@ async def preview_with_vocal(
     """
     "Hear it with my vocal" — a quick preview mix of the active beat and the
     active vocal, so the user can judge whether the beat fits their voice. This
-    reuses the mix renderer (it IS a preview mix); it writes a mix version like
-    any other render, which is fine — the user can keep it or move on.
+    reuses the mix renderer but is a throwaway: it does NOT create a mix version
+    or move active_mix_id (voice-to-export-flow requirement 4).
     Only available when a vocal take exists.
     """
     takes = await voice_db.list_takes(project_id)

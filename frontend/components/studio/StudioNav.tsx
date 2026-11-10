@@ -76,11 +76,13 @@ const LAYERS = [
 type LayerStatus = "empty" | "in_progress" | "has_content"
 
 function LayerStatusIcon({ status }: { status: LayerStatus }) {
+  // Icon shape differs per state; the label gives screen readers the same
+  // information (design-and-ui.md: colour is never the only signal).
   if (status === "has_content")
-    return <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+    return <CheckCircle2 role="img" aria-label="has something" className="h-3.5 w-3.5 text-primary" />
   if (status === "in_progress")
-    return <CircleDot className="h-3.5 w-3.5 text-primary/60" />
-  return <Circle className="h-3.5 w-3.5 text-muted-foreground/30" />
+    return <CircleDot role="img" aria-label="in progress" className="h-3.5 w-3.5 text-primary/60" />
+  return <Circle role="img" aria-label="not started" className="h-3.5 w-3.5 text-muted-foreground/30" />
 }
 
 export function StudioNav({ projectId }: { projectId: string }) {

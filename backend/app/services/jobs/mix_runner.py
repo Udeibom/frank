@@ -11,8 +11,8 @@ pattern established for beats, to keep sync Supabase I/O off the event loop.
 
 from __future__ import annotations
 import asyncio
-import httpx
 
+from app.services.storage.signing import fetch_audio_bytes
 from app.db import jobs as jobs_db
 from app.db import mix as mix_db
 from app.db import voice as voice_db
@@ -26,9 +26,7 @@ from app.services.audio.vocal_resolution import resolve_vocal_url
 def _fetch(url: str | None) -> bytes | None:
     if not url:
         return None
-    resp = httpx.get(url, timeout=30)
-    resp.raise_for_status()
-    return resp.content
+    return fetch_audio_bytes(url, timeout=30)
 
 
 def _summarize_params(mix_params: dict) -> str:

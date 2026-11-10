@@ -9,8 +9,8 @@ worker thread, and never overwrite the original take.
 
 from __future__ import annotations
 import asyncio
-import httpx
 
+from app.services.storage.signing import fetch_audio_bytes
 from app.db import jobs as jobs_db
 from app.db import voice as voice_db
 from app.db import projects as projects_db
@@ -25,9 +25,7 @@ import soundfile as sf
 
 def _fetch(url: str) -> bytes:
     """Download stored audio. Runs inside the worker thread, not the event loop."""
-    resp = httpx.get(url, timeout=30)
-    resp.raise_for_status()
-    return resp.content
+    return fetch_audio_bytes(url, timeout=30)
 
 
 def _to_mp3(wav_bytes: bytes) -> bytes:

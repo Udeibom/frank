@@ -102,8 +102,13 @@ def build_comp(takes: list[tuple[str, bytes]]) -> tuple[bytes, list[dict]]:
             comp[start:start + fade] *= (1.0 - ramp)
         comp[start:end] += chunk[: end - start]
 
-        # Record the segment (merge consecutive windows from the same take)
-        if segments and prev_take == best_tid:
+        # Record the segment (merge consecutive windows from the same take).
+        # A tail window too short to survive 2-decimal rounding (< 5 ms, e.g. a
+        # take 2 samples longer than the others) would become a zero-length
+        # segment; fold it into the previous segment instead. Found by a
+        # property-based test (tests/test_properties_comp.py).
+        too_short = round(end / SR, 2) <= round(start / SR, 2)
+        if segments and (prev_take == best_tid or too_short):
             segments[-1]["end_time"] = round(end / SR, 2)
         else:
             segments.append(
@@ -113,7 +118,8 @@ def build_comp(takes: list[tuple[str, bytes]]) -> tuple[bytes, list[dict]]:
                     "end_time": round(end / SR, 2),
                 }
             )
-        prev_take = best_tid
+        if not too_short:
+            prev_take = best_tid
 
     # Normalize
     peak = float(np.abs(comp).max())

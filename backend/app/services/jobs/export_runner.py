@@ -8,8 +8,8 @@ All fetch + master + upload + record runs in one worker thread.
 
 from __future__ import annotations
 import asyncio
-import httpx
 
+from app.services.storage.signing import fetch_audio_bytes
 from app.db import jobs as jobs_db
 from app.db import export as export_db
 from app.db import mix as mix_db
@@ -18,9 +18,7 @@ from app.services.audio import mastering
 
 
 def _fetch(url: str) -> bytes:
-    resp = httpx.get(url, timeout=60)
-    resp.raise_for_status()
-    return resp.content
+    return fetch_audio_bytes(url, timeout=60)
 
 
 def _reencode_320(mp3_bytes: bytes) -> bytes:

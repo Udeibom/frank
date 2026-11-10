@@ -108,10 +108,17 @@ def _encode_mastered_mp3(audio: np.ndarray) -> bytes:
             wav_path = wf.name
         mp3_path = wav_path[:-4] + ".mastered.mp3"
 
+        # Silence has no loudness to normalize, and loudnorm on pure silence
+        # makes libmp3lame abort (psymodel assertion, exit 134). Found by a
+        # property-based test (tests/test_properties_mastering.py). Encode
+        # silent audio as-is instead.
+        silent = audio.size == 0 or float(np.abs(audio).max()) < 1e-6
+        filters = [] if silent else ["-af", f"loudnorm=I={TARGET_LUFS}:TP=-1.0:LRA=11"]
+
         result = subprocess.run(
             [
                 "ffmpeg", "-y", "-i", wav_path,
-                "-af", f"loudnorm=I={TARGET_LUFS}:TP=-1.0:LRA=11",
+                *filters,
                 "-b:a", "320k",
                 mp3_path,
             ],
@@ -120,7 +127,8 @@ def _encode_mastered_mp3(audio: np.ndarray) -> bytes:
         )
         if result.returncode != 0:
             raise RuntimeError(
-                f"Mastering encode failed: {result.stderr.decode()[:200]}"
+                # Tail, not head: the head is only FFmpeg's version banner.
+                f"Mastering encode failed: {result.stderr.decode(errors='replace')[-300:]}"
             )
         with open(mp3_path, "rb") as f:
             return f.read()
