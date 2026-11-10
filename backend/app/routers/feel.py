@@ -86,7 +86,7 @@ async def analyze_hum_route(
     if file.filename and "." in file.filename:
         ext = file.filename.rsplit(".", 1)[-1].lower()
 
-    wav = to_wav(raw, input_ext=ext)
+    wav = await asyncio.to_thread(to_wav, raw, input_ext=ext)
 
     # Store the hum audio (reusable by the Beat Room / as a melodic reference)
     audio_url = upload_audio("hums", wav, extension="wav")

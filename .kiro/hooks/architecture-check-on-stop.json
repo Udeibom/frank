@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Architecture check after each agent run",
+      "trigger": "Stop",
+      "description": "Runs the deterministic architecture checker over the repo when an agent run ends.",
+      "action": {
+        "type": "command",
+        "command": "python3 scripts/check_architecture.py",
+        "timeout": 30
+      }
+    }
+  ]
+}

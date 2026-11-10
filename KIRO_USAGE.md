@@ -184,3 +184,52 @@ This was a manual spot-check, not a mutation-testing tool.
 
 No frontend property tests (fast-check) yet. No test covers mastering loudness,
 pitch correction accuracy, or comp assembly. Nothing here runs in CI.
+
+---
+
+## Browser-driven integration run (Playwright MCP + live database)
+
+We ran the cross-room scenario from `voice-to-export-flow` against the real stack
+(local frontend and backend, live Supabase). The Playwright MCP drove the browser.
+Recording a take needs a microphone, so that one step used the HTTP API instead.
+
+Scenario: a project with 2 takes, a beat and a mix. Build a comp, then upload a new
+take, then open the Mix Room.
+
+| Step | What we checked | Result |
+|---|---|---|
+| Comp job completes | `active_comp_id` set | yes |
+| New take uploaded | `active_vocal_id` = new take, `active_comp_id` cleared | yes, after fix |
+| Mix Room resolution | `_resolve_layers` returns the new take's audio | yes, after fix |
+| Old comp row | still in the database | yes |
+| Mix Room in the browser | shows "Mix v1 — balanced", stem list, versions | yes |
+
+We did not capture a "before" run of the comp-wins bug. We found it by reading the
+code while writing the spec, fixed it, and then verified the fixed behavior live.
+
+### What the run found (none of it was in a spec)
+
+1. **WAV uploads always failed.** `to_wav` wrote its output to the same path as a
+   `.wav` input, and FFmpeg can't overwrite its own input. Browser recordings are
+   WebM, so normal use never hit it. The error message also showed only FFmpeg's
+   version banner, which hid the cause. Fixed: distinct output name, error shows the
+   tail of stderr.
+2. **Stale Supabase connection caused a 500.** The shared client reused a keep-alive
+   connection the server had closed, giving `Server disconnected`. The browser showed
+   it as a CORS error, because error responses carry no CORS headers. Fixed by
+   dropping idle connections after 5 seconds. We checked DB and storage calls still
+   work after a 12-second idle gap. We did not reproduce the original failure on
+   demand, so this fix is based on the traceback, not on a before/after.
+3. **Misleading loading state in the Mix Room.** For several seconds on this slow
+   machine it showed "No mix yet" and the Idea Room's chat text, and a failed request
+   left it that way forever. Fixed: per-room empty text and an error message.
+
+### Tool problems we hit
+
+- The first Playwright navigation returned `about:blank`; the second worked. We think
+  it was a slow first compile of the route, but didn't confirm.
+- The Supabase MCP's `execute_sql` fails with `crypto is not defined` (Node 18 again,
+  since that server still runs through `npx`). We read the database through the
+  backend client instead until the config is fixed.
+- Our early snapshot was taken before the page finished loading and briefly looked
+  like a bug. It wasn't; the page just needed more time.

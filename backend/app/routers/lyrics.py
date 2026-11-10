@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.models.lyrics import (
     SaveLyricsRequest,
@@ -93,7 +95,7 @@ async def transcribe_voice_memo(
         ext = file.filename.rsplit(".", 1)[-1].lower()
 
     # Convert to WAV for Whisper
-    wav = to_wav(raw, input_ext=ext)
+    wav = await asyncio.to_thread(to_wav, raw, input_ext=ext)
 
     # Store the original memo audio (WAV) — reusable by the Feel Lab later
     audio_url = upload_audio("voice-memos", wav, extension="wav")
