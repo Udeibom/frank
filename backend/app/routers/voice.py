@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks
 import httpx
 
@@ -61,7 +63,8 @@ async def upload_take(
     ext = "webm"
     if file.filename and "." in file.filename:
         ext = file.filename.rsplit(".", 1)[-1].lower()
-    wav = to_wav(raw, input_ext=ext)
+    # FFmpeg conversion off the event loop so other requests keep flowing.
+    wav = await asyncio.to_thread(to_wav, raw, input_ext=ext)
 
     audio_url = upload_audio("vocals", wav, extension="wav", name_prefix="take")
 
@@ -74,8 +77,11 @@ async def upload_take(
     # (Beat preview, Mix assembly) immediately knows a vocal exists. Recording
     # is an intentional act, so making the newest take current matches what the
     # user expects. They can switch to another take later.
+    # Cross-room rule (voice-to-export-flow R2): the most recently chosen vocal
+    # wins, so choosing a take clears any older comp pointer. The comp record
+    # itself is kept; only the pointer moves.
     await projects_db.update_project_active_state(
-        project_id, {"active_vocal_id": take["id"]}
+        project_id, {"active_vocal_id": take["id"], "active_comp_id": None}
     )
 
     # Pitch analysis runs in the background
@@ -167,7 +173,11 @@ async def set_active_vocal(
 ) -> dict:
     """Set which vocal (a take or a comp) is the active one for the song."""
     key = "active_comp_id" if body.vocal_type == "comp" else "active_vocal_id"
-    await projects_db.update_project_active_state(project_id, {key: body.vocal_id})
+    updates: dict = {key: body.vocal_id}
+    if body.vocal_type != "comp":
+        # Last chosen wins: picking a take overrides any active comp.
+        updates["active_comp_id"] = None
+    await projects_db.update_project_active_state(project_id, updates)
     return {"status": "ok", key: body.vocal_id}
 
 

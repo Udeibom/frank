@@ -40,7 +40,8 @@ def normalize(fingerprint: dict) -> dict:
     # Tempo sanity
     try:
         fp["tempo_bpm"] = int(fp["tempo_bpm"])
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError: int(float("inf")) — found by property-based testing.
         fp["tempo_bpm"] = DEFAULTS["tempo_bpm"]
     fp["tempo_bpm"] = max(50, min(180, fp["tempo_bpm"]))
 

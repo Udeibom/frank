@@ -20,6 +20,7 @@ from app.db import beat as beat_db
 from app.db import projects as projects_db
 from app.services.storage.files import upload_audio
 from app.services.audio import mixing
+from app.services.audio.vocal_resolution import resolve_vocal_url
 
 
 def _fetch(url: str | None) -> bytes | None:
@@ -112,18 +113,13 @@ async def _resolve_layers(project_id: str) -> dict:
     beat_bpm = 90
 
     if state:
-        # Active vocal: prefer the comp if one is set, else the active take.
+        # Active vocal: the pointers decide (see vocal_resolution.py), and the
+        # comp is fetched by its own id, not "newest comp".
         comp_id = state.get("active_comp_id")
         vocal_id = state.get("active_vocal_id")
-        if comp_id:
-            comp = await voice_db.get_latest_comp(project_id)
-            if comp:
-                vocal_url = comp["audio_url"]
-        if not vocal_url and vocal_id:
-            take = await voice_db.get_take(vocal_id)
-            if take:
-                # Prefer a tuned version if the user made one
-                vocal_url = take.get("processed_url") or take["audio_url"]
+        active_comp = await voice_db.get_comp(comp_id) if comp_id else None
+        active_take = await voice_db.get_take(vocal_id) if vocal_id else None
+        vocal_url = resolve_vocal_url(active_comp, active_take)
 
         beat_vid = state.get("active_beat_version_id")
         if beat_vid:

@@ -128,3 +128,59 @@ follow-ups from the code-review passes — so the tasks reflect what's done, wha
 intentionally postponed, and why. The `auth` spec folder is deliberately empty:
 it's the one feature we haven't built yet, and we'll run it through the native
 requirements → design → tasks flow from the start rather than back-filling it.
+
+---
+
+## Cross-room integration spec and what writing it found
+
+The worst bugs in Frank were between rooms, not inside them. So we wrote a spec
+for the seams: `.kiro/specs/voice-to-export-flow/` (requirements, design, tasks).
+It adds no features. It states how the four active pointers must stay consistent.
+
+Writing its requirements meant checking each one against the code. Requirement 2.2
+("a take recorded after a comp is what the Mix Room uses") **was false**:
+
+- `upload_take` set `active_vocal_id` but never cleared `active_comp_id`.
+- The Mix Room checks the comp first, so an old comp silently beat the newest
+  recording. It also fetched "the newest comp" instead of the active one.
+- **Fix:** "most recently chosen vocal wins." Uploading or choosing a take clears
+  the comp pointer (the comp row is kept). The decision moved into a pure function,
+  `vocal_resolution.py`, so it can be property-tested.
+
+We have not yet driven this through the browser. Task 2.4 and the Playwright
+click-through are still open in that spec's `tasks.md`.
+
+## Property-based testing
+
+Before this we had no automated tests. We added Hypothesis (`backend/tests/`,
+18 tests, all passing; run with `python -m pytest` from `backend/`). The properties
+come from invariants the product depends on:
+
+- Fingerprint fields always land in 0..1 and tempo in 50..180, for any input.
+- Normalizing twice equals normalizing once; the cache key ignores fields that
+  don't shape the texture.
+- A mix is never shorter than its longest input and never clips past headroom.
+- Section gain changes **only** the named sections, by exactly the requested amount.
+- Pitch shifting preserves duration; a zero shift returns the input untouched.
+- The vocal resolution rule never drops an available vocal.
+
+### What it caught
+
+- **Real bug, found by a property:** `normalize()` crashed with `OverflowError` on
+  `{"tempo_bpm": Infinity}`. Python's `json.loads` accepts `Infinity`, so an LLM
+  reply could break a Feel Lab request. The broad fingerprint property did **not**
+  find it at default settings; a focused float-only property failed immediately.
+  Fixed by catching `OverflowError`.
+- We did not find new bugs in the mixer, pitch shifter, or section gains. Those
+  properties pass. The section-gain one exists because of the Spec 06 bug.
+
+### Do these tests actually test anything?
+
+We checked. We reintroduced two old bugs by hand and confirmed the tests fail:
+a no-op section gain, and a resolver that ignores a tuned take. Both were caught.
+This was a manual spot-check, not a mutation-testing tool.
+
+### Not done yet
+
+No frontend property tests (fast-check) yet. No test covers mastering loudness,
+pitch correction accuracy, or comp assembly. Nothing here runs in CI.

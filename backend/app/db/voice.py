@@ -105,3 +105,16 @@ async def get_latest_comp(project_id: str) -> Optional[dict]:
         .execute()
     )
     return result.data[0] if result.data else None
+
+
+async def get_comp(comp_id: str) -> Optional[dict]:
+    """A specific comp by id (the active comp, not just the newest one)."""
+    supabase = get_supabase()
+    result = (
+        supabase.table("vocal_comps")
+        .select("*")
+        .eq("id", comp_id)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
