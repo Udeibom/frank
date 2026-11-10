@@ -12,7 +12,9 @@ import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/store/project"
 import { updateProject } from "@/lib/api/projects"
+import { createClient } from "@/lib/supabase/client"
 import {
+  LogOut,
   PenLine,
   Waves,
   Sparkles,
@@ -116,6 +118,12 @@ export function StudioNav({ projectId }: { projectId: string }) {
     }
   }
 
+  async function handleLogout() {
+    await createClient().auth.signOut()
+    router.push("/login")
+    router.refresh()
+  }
+
   function getLayerStatus(activeStateKey: string | null): LayerStatus {
     if (!activeStateKey || !activeState) return "empty"
     const value = activeState[activeStateKey as keyof typeof activeState]
@@ -131,7 +139,7 @@ export function StudioNav({ projectId }: { projectId: string }) {
     <nav className="flex h-full w-56 flex-col border-r border-border bg-card px-3 py-4">
       {/* Back to all songs */}
       <Link
-        href="/"
+        href="/songs"
         className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
         <ChevronLeft className="h-3.5 w-3.5" />
@@ -203,6 +211,15 @@ export function StudioNav({ projectId }: { projectId: string }) {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Log out — small and out of the way */}
+      <button
+        onClick={handleLogout}
+        className="mb-3 flex items-center gap-1.5 px-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
+      >
+        <LogOut className="h-3.5 w-3.5" />
+        Log out
+      </button>
 
       {/* Frank wordmark at bottom */}
       <p className="px-1 text-xs text-muted-foreground/30 font-semibold tracking-widest uppercase">

@@ -233,3 +233,146 @@ code while writing the spec, fixed it, and then verified the fixed behavior live
   backend client instead until the config is fixed.
 - Our early snapshot was taken before the page finished loading and briefly looked
   like a bug. It wasn't; the page just needed more time.
+
+---
+
+## Hooks — what we had, what it caught, what we changed
+
+**What we had.** Four hooks written early, all prompt-based (the hook hands a
+paragraph of instructions to the model and the model judges the file).
+
+**What they actually did.** Be careful here, because an early version of this
+section would have flattered us. The "Audio Safety Check" hook fires on every save
+of a `.ts`, `.tsx` or `.py` file. In this working session it fired on roughly 25
+saves. It caught one real problem: a blocking FFmpeg call inside the `upload_take`
+route (it would stall the server on a long recording). It raised one more fair
+point about voice memos having no database row. Every other firing was "no
+violations", mostly on edits that obviously couldn't violate anything. The other
+three hooks (component scaffolder, stale import cleanup, spec progress check) have
+no finding we can point to; we have no evidence they ever caught anything.
+
+**The problem.** The four rules in that hook are checkable exactly by code. Asking a
+model to read each file and judge them is slow, noisy, and unreliable.
+
+**What we changed.**
+
+1. `scripts/check_architecture.py` checks the same rules deterministically (AST for
+   routes, regex for secrets and frontend imports, run over every tracked file).
+   Its first run found **2 errors the hook had not**: the Feel Lab hum route and the
+   voice-memo route both ran FFmpeg inline in the request handler, the same bug the
+   hook had caught once in `upload_take`. Fixed both. Errors went from 2 to 0.
+   It still reports 4 warnings (the "uploads audio without a version record"
+   heuristic). We triaged them: two are by design (a throwaway preview that must not
+   create a version; a helper whose caller records the version), one is the hum
+   (referenced from the versioned fingerprint), and one is real (see below).
+2. `scripts/guard_write.py` + a `PreToolUse` hook that **blocks** a write (exit 2)
+   when it puts a key/token literal in code or imports an audio library into the
+   frontend. We tested the script offline against six cases (two blocks, four
+   allows, including garbage input). **Not yet verified live:** Kiro says new hooks
+   activate on the next session, so we have not watched it block a real write.
+3. A `Stop` hook that runs the checker at the end of each agent run.
+4. We deleted the old prompt-based Audio Safety Check, since the scripts cover its
+   four rules. Recoverable from git.
+
+The other three prompt hooks are unchanged and unproven.
+
+**Open gap the checker confirmed.** Voice-memo audio is stored in `voice-memos/` but
+no database row points to it, so it can be orphaned from the project. Fixing it
+needs a new table, so it is queued with the auth migration.
+
+## Custom agents
+
+We wrote three, in `.kiro/agents/`, next to the existing Frank Code Reviewer:
+
+- **Plain Language Auditor** — runs `scripts/check_plain_language.py` (scans every
+  string a user can read in the frontend) and then audits the LLM prompts, which a
+  script can't. **We ran it.** The frontend scanner found nothing, and we checked it
+  can fail by feeding it planted jargon (it flagged all of it and ignored identifiers
+  such as `tempo_bpm`). The agent found real things the scanner couldn't:
+  - `PitchDisplay` showed in-tune/out-of-tune by color alone, breaking our own
+    accessibility rule, with red bars on the user's own singing. Fixed: distinct bar
+    shapes, a text legend, a screen-reader summary, warmer color.
+  - The Beat prompt told the model to say "the pads/atmosphere" ("pads" is studio
+    slang). Fixed.
+  - Several prompts banned only some jargon (Feel/Beat didn't ban reverb or
+    compression; no prompt banned MIDI/DAW/VST). Fixed.
+  It also correctly marked what it could not confirm: whether any component prints a
+  raw error message, and what the live model actually says.
+- **Frank Integration Tester** — drives the browser and compares it with the database
+  pointers, against the `voice-to-export-flow` spec. **Written, not yet run as an
+  agent.** (We did the same checks by hand earlier in this file's browser section.)
+- **PBT Author** — writes Hypothesis/fast-check tests from acceptance criteria and
+  must show each test failing against a mutation. **Written, not yet run as an
+  agent.**
+
+**Limits.** The plain-language guarantee for model-written replies still rests on
+prompt wording; nothing verifies what the live model says. We have no sample of real
+replies to audit yet.
+
+---
+
+## Auth, built through the native spec flow
+
+This was the first feature we ran through requirements → design → tasks *before*
+writing code (`.kiro/specs/auth/`). The spec had real consequences:
+
+- **It changed the scope.** The old single-file spec said "add login pages and a
+  middleware". Planning against the code showed that only the projects router checked
+  who owned a project. Every other route trusted whatever `project_id` it was handed,
+  so once real accounts existed any signed-in user could open another user's song by
+  ID. The native spec made ownership a requirement (5.x), and the design enforces it
+  once, at router mount time, so a future route can't forget it.
+- **It corrected an earlier belief.** We had written that enabling Row Level Security
+  without policies "would lock out our own backend". That was wrong for the service
+  role, which bypasses RLS. We verified it instead of assuming.
+
+### What we verified, with before/after
+
+- **RLS (Supabase MCP + REST).** Before: the public anon key, which ships in every
+  browser, could read the projects, lyrics and takes. After migration `002`: it reads 0
+  rows on every table, and the backend still reads all of them. The MCP confirmed 12 of
+  12 tables have RLS on. (The MCP is read-only by design, so the migration itself went
+  through the Management API.)
+- **Ownership, live, two real accounts:** 17 of 17 request checks plus 3 job checks
+  passed. User B gets 404 for everything of user A's (project, voice takes, lyrics,
+  rename, starting a mix job, A's job status); no token gets 401; `/health` stays
+  public; a malformed id gets 404 rather than a 500. We deleted the test accounts and
+  data afterwards.
+- **Browser (Playwright MCP):** signed-out visit to `/songs` redirects to login with
+  the destination remembered; a wrong login shows "That email and password didn't
+  match."; mismatched passwords are blocked before submitting; sign-up lands on
+  `/songs`; a new song opens; log out works; opening that song's URL while signed out
+  redirects to login, and logging in returns to that exact song.
+- Context7 confirmed the current `@supabase/ssr` pattern (`getAll`/`setAll` cookie
+  handlers, cookies set on both request and response) before we wrote the middleware.
+
+### Bugs this work exposed that no spec had
+
+1. **The song list page was unreachable.** `app/page.tsx` (landing) and
+   `app/(studio)/page.tsx` (dashboard) both resolved to `/`; the landing page won, so
+   "All Songs" went back to the landing page. This had been broken since Spec 01 and
+   our earlier browser run missed it because it navigated by URL. Fixed by moving the
+   dashboard to `/songs`.
+2. **A missing or foreign song still rendered the studio**, then told the user to
+   "refresh". The project store swallowed every error, including a permanent 404.
+   Fixed: a 404 clears the store and redirects to `/songs`; transient errors are still
+   tolerated.
+3. The Playwright run is how we found #2 and the misleading messages. A request-level
+   test alone would have passed.
+
+### Not done / limits (also in `auth/tasks.md`)
+
+- **Audio files are still publicly readable by URL.** Only the `exports` bucket is
+  private. URLs are unguessable but not secret; fixing it means signed URLs everywhere
+  audio plays.
+- **Existing songs are orphaned.** They belong to the old dev user id, so no real
+  account sees them until they are reassigned.
+- Not tested: token refresh mid-session, and `AUTH_REQUIRED=false` against a running
+  server (the rule is property-tested, the wiring is not).
+- No password reset. Rate limiting is whatever Supabase Auth applies.
+
+## Hook note
+
+The Component Scaffolder hook fired when we created `AuthForm.tsx`. It only acts on
+empty or placeholder files, and this one was complete, so it did nothing. It has not
+produced a change in this project that we can point to.

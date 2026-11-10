@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState, useRef } from "react"
-import { useParams, usePathname } from "next/navigation"
+import { useParams, usePathname, useRouter } from "next/navigation"
 import { useProjectStore } from "@/store/project"
 import { StudioNav } from "@/components/studio/StudioNav"
 
@@ -22,6 +22,7 @@ export default function ProjectLayout({
   children: React.ReactNode
 }) {
   const params = useParams()
+  const router = useRouter()
   const pathname = usePathname()
   const projectId = params.projectId as string
   const { refresh } = useProjectStore()
@@ -36,16 +37,19 @@ export default function ProjectLayout({
     refresh(projectId)
       .then(() => setLoading(false))
       .catch(() => {
+        // Not found, or not this user's song: don't show a broken studio.
         setError(true)
         setLoading(false)
+        setTimeout(() => router.replace("/songs"), 1800)
       })
-  }, [projectId, refresh])
+  }, [projectId, refresh, router])
 
   // Re-sync the shared state on every layer navigation (pathname change),
   // after the first load. This is what binds the rooms together.
   useEffect(() => {
     if (!projectId || !didInitialLoad.current) return
-    refresh(projectId)
+    // A 404 here is handled by the initial-load path; ignore it on re-syncs.
+    refresh(projectId).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
@@ -63,7 +67,7 @@ export default function ProjectLayout({
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-sm text-muted-foreground">
-          Something went wrong loading this project. Try refreshing.
+          We couldn&apos;t find that song in your studio. Taking you back to your songs…
         </p>
       </div>
     )

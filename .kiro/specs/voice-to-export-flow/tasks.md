@@ -11,7 +11,7 @@
     - _Requirements: 2.2, 2.4_
   - [x] 2.3 Move FFmpeg conversion in `upload_take` off the event loop (found by the audio-architecture hook)
     - _Requirements: 2.1_
-  - [ ] 2.4 Verify in the browser and database that a take recorded after a comp is what the Mix Room plays
+  - [x] 2.4 Verified against the live database (take after comp wins; browser Mix Room loads). The mic step used the API, not the browser.
     - _Requirements: 2.2, 2.3, 2.5_
 
 - [x] 3. Previews never change saved state

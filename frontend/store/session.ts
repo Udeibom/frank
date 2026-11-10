@@ -1,14 +1,25 @@
 import { create } from "zustand"
 
+/**
+ * Who is signed in. The real session lives in Supabase's cookies (managed by
+ * @supabase/ssr and checked in middleware.ts); this store is just a convenient
+ * client-side copy for components that want to show it.
+ */
 interface SessionState {
-  // Dev stub — replaced with real Supabase auth session in Spec 08
-  userId: string
+  userId: string | null
+  email: string | null
   isAuthenticated: boolean
-  setUserId: (id: string) => void
+  setSession: (user: { id: string; email: string | null } | null) => void
 }
 
 export const useSessionStore = create<SessionState>()((set) => ({
-  userId: "00000000-0000-0000-0000-000000000001", // dev user ID
-  isAuthenticated: true, // always true until auth is implemented
-  setUserId: (id) => set({ userId: id }),
+  userId: null,
+  email: null,
+  isAuthenticated: false,
+  setSession: (user) =>
+    set(
+      user
+        ? { userId: user.id, email: user.email, isAuthenticated: true }
+        : { userId: null, email: null, isAuthenticated: false },
+    ),
 }))

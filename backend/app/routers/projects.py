@@ -7,17 +7,9 @@ from app.models.project import (
     ProjectActiveState,
 )
 from app.db import projects as db
-from app.config import get_settings, Settings
+from app.auth import get_current_user_id, require_project_access
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
-
-def get_current_user_id(settings: Settings = Depends(get_settings)) -> str:
-    """
-    Dev stub: returns the hardcoded dev user ID.
-    Replaced with real JWT extraction in Spec 08 (auth).
-    """
-    return settings.dev_user_id
 
 
 @router.post("", response_model=ProjectResponse, status_code=201)
@@ -42,15 +34,9 @@ async def list_projects(
 @router.get("/{project_id}", response_model=ProjectWithState)
 async def get_project(
     project_id: str,
-    user_id: str = Depends(get_current_user_id),
+    project: dict = Depends(require_project_access),
 ) -> ProjectWithState:
     """Get a single project with its active state pointers."""
-    project = await db.get_project(project_id=project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    if project["user_id"] != user_id:
-        raise HTTPException(status_code=403, detail="Not your project")
-
     active_state = await db.get_project_active_state(project_id=project_id)
 
     return ProjectWithState(
@@ -63,15 +49,9 @@ async def get_project(
 async def update_project(
     project_id: str,
     body: ProjectUpdate,
-    user_id: str = Depends(get_current_user_id),
+    existing: dict = Depends(require_project_access),
 ) -> ProjectResponse:
     """Update a project's title or status."""
-    existing = await db.get_project(project_id=project_id)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Project not found")
-    if existing["user_id"] != user_id:
-        raise HTTPException(status_code=403, detail="Not your project")
-
     updates = body.model_dump(exclude_none=True)
     if not updates:
         return ProjectResponse(**existing)

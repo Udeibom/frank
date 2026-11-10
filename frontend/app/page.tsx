@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { createProject } from "@/lib/api/projects"
+import { createClient } from "@/lib/supabase/client"
 import { useState } from "react"
 
 export default function LandingPage() {
@@ -11,6 +12,12 @@ export default function LandingPage() {
   async function handleStart() {
     setLoading(true)
     try {
+      // Signed-out visitors make an account first; signed-in users go straight in.
+      const { data } = await createClient().auth.getUser()
+      if (!data.user) {
+        router.push("/signup")
+        return
+      }
       const project = await createProject({ title: "Untitled Song" })
       router.push(`/${project.id}/idea`)
     } catch {

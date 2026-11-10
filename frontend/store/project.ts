@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import type { Project, ProjectActiveState } from "@/types/project"
 import { getProject } from "@/lib/api/projects"
+import { ApiError } from "@/lib/api/client"
 
 interface ProjectState {
   // Current project loaded in the studio
@@ -54,8 +55,14 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         activeState: active_state ?? s.activeState,
         revision: s.revision + 1,
       }))
-    } catch {
-      // Leave existing state in place on a transient failure
+    } catch (err) {
+      // A 404 is permanent (the song doesn't exist or isn't yours): drop any
+      // stale song from the store and let the caller redirect. Anything else is
+      // treated as transient, so we keep the existing state.
+      if (err instanceof ApiError && err.status === 404) {
+        set({ currentProject: null, activeState: null })
+        throw err
+      }
     }
   },
 
