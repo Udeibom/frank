@@ -448,7 +448,10 @@ end to end against a live outage.
 ### Not finished
 - The end-to-end beat rerun after the timeout fix was cut short by the outage. The fix
   is verified at the upload level only.
-- A throwaway test account (`frank-test-beat-…`) and its project are left in the
-  database until the connection is back.
+- The outage also showed the stuck-job problem the Feel Lab spec lists as deferred:
+  the beat worker died on a connection error, and its "mark failed" write failed too,
+  so the job stayed `processing`. The UI stops waiting after 5 minutes; a reaper that
+  marks old `processing` jobs as failed is still not built. (The test account and its
+  data were cleaned up once the connection returned.)
 - The larger timeout has a cost: on a connection that is open but dead, a job can now
   hang for minutes per file instead of failing in 20 s.
