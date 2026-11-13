@@ -39,7 +39,7 @@ All audio processing runs on the Render backend. No GPU required — all operati
 
 - **Groq API** (`openai/gpt-oss-120b`) — conversation layer, plain language to music parameter translation, lyric co-writing, mix instruction interpretation. Note: Groq's model lineup shifts over time; `llama-3.3-70b-versatile` was retired from this account, so Frank uses `openai/gpt-oss-120b`, the strongest JSON-mode-capable chat model currently on the free tier. The model name lives in one place: `backend/app/services/llm/groq_client.py`.
 - **Whisper** (`whisper-large-v3-turbo` via Groq) — speech-to-text for voice memo transcription. Originally planned for Hugging Face, but HF retired the `api-inference.huggingface.co` domain; Groq hosts Whisper directly and is already our provider, so transcription runs through Groq.
-- **Basic Pitch** — runs locally on backend server, no API needed
+- **Basic Pitch** — NOT used. Decision (Nov 11): hum-to-notes uses librosa `pyin` plus Frank's own note segmentation and cleanup (`services/intake/melody.py`). The founder listened to 3 real hums played back and judged them close and manageable, so the neural option was not needed. Revisit only if real users' hums prove much worse.
 
 ### Instrumental generation: Frank's own procedural engine (not MusicGen)
 

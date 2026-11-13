@@ -14,7 +14,7 @@
   - [x] 2.4 Verified against the live database (take after comp wins; browser Mix Room loads). The mic step used the API, not the browser.
     - _Requirements: 2.2, 2.3, 2.5_
 
-- [x] 3. Previews never change saved state
+- [ ] 3. Previews never change saved state
   - [x] 3.1 Dedicated vocal-preview job, no mix version and no pointer change
     - _Requirements: 4.1, 4.2_
   - [ ] 3.2 Automated check that a preview leaves the mix list unchanged (needs DB; covered by the browser test in 5.1)

@@ -60,12 +60,12 @@ Frank/
 │   │   │   │   ├── mastering.py # Mastering chain
 │   │   │   │   └── export.py    # Format conversion
 │   │   │   ├── generation/      # Instrumental generation
-│   │   │   │   ├── musicgen.py  # MusicGen API wrapper
+│   │   │   │   ├── theory.py / composer.py / renderer.py / beat.py / texture.py / hum.py  # procedural engine
 │   │   │   │   └── fingerprint.py # Musical fingerprint system
 │   │   │   ├── llm/             # LLM integration
-│   │   │   │   ├── groq.py      # Groq API client
+│   │   │   │   ├── groq_client.py # Groq API client
 │   │   │   │   ├── prompts.py   # All system prompts
-│   │   │   │   └── translator.py # Language → audio parameter translation
+│   │   │   │   └── (translator.py planned: shared song brief + role routing)
 │   │   │   └── storage/         # Supabase storage operations
 │   │   ├── models/              # Pydantic data models
 │   │   ├── db/                  # Database access layer

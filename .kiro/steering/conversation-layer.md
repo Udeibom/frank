@@ -2,7 +2,7 @@
 
 ## Role of the LLM
 
-The LLM (Groq / Llama 3.3 70B) is a production assistant, not a chatbot and not a creator. Its job is to:
+The LLM (Groq, currently `openai/gpt-oss-120b`; see tech.md) is a production assistant, not a chatbot and not a creator. Its job is to:
 
 1. Understand what the user means in plain, emotional, non-technical language
 2. Translate that meaning into structured parameters the audio pipeline can execute

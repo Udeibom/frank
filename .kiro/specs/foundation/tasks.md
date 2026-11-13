@@ -29,7 +29,7 @@
     - _Requirements: 2.5_
   - [x] 5.2 `components/studio/StudioNav.tsx` — editable title, six layers, status indicators, back link
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
-  - [x] 5.3 `app/(studio)/page.tsx` — dashboard with empty state and project list
+  - [x] 5.3 `app/(studio)/songs/page.tsx` — dashboard with empty state and project list (the dashboard lives at /songs)
     - _Requirements: 2.7, 10.3_
   - [x] 5.4 `app/(studio)/[projectId]/layout.tsx` — load project, populate store
     - _Requirements: 3.1_

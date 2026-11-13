@@ -13,7 +13,7 @@
     - _Requirements: 3.3, 10.3_
 
 - [x] 3. Stem layer view
-  - [x] 3.1 `components/studio/BeatLayers.tsx` — plain-language layers, mute toggle triggers re-render
+  - [x] 3.1 `components/studio/BeatTimeline.tsx` — plain-language layers, mute toggle triggers re-render (built as part of the timeline; there was never a separate BeatLayers component)
     - _Requirements: 4.1, 4.2, 4.3_
 
 - [x] 4. Beat versions panel
