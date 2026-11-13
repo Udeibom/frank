@@ -75,3 +75,25 @@ def chat_text(system_prompt: str, user_message: str, temperature: float = 0.5) -
         temperature=temperature,
     )
     return completion.choices[0].message.content or ""
+
+
+def chat_json(system_prompt: str, user_message: str, temperature: float = 0.0) -> str:
+    """
+    One question, one JSON answer, returned as raw text. The caller parses and validates it
+    (and decides what to do when it is wrong); nothing is added to the shape.
+
+    Defaults to temperature 0: this is for reading and measuring, where the same input should give
+    the same answer. Creative replies use chat_structured.
+    """
+    client = get_groq()
+    completion = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ],
+        temperature=temperature,
+        response_format={"type": "json_object"},
+        max_tokens=4000,   # generous: the model also spends tokens thinking before it answers
+    )
+    return completion.choices[0].message.content or "{}"

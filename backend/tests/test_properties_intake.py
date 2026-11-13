@@ -59,17 +59,22 @@ def raw(pitch: float, start: float, dur: float) -> m.RawNote:
     return m.RawNote(start_s=start, end_s=start + dur, midi=int(round(pitch)), midi_f=float(pitch))
 
 
-tunes = st.lists(
-    st.tuples(st.integers(50, 66), st.floats(0.3, 0.7)),
-    min_size=8,
-    max_size=12,
-).filter(lambda ns: all(abs(a[0] - b[0]) <= 7 for a, b in zip(ns, ns[1:])))
+@st.composite
+def tunes(draw):
+    """A short tune: 8 to 12 notes between 50 and 66, no jump bigger than a fifth. Valid by construction
+    (an earlier version filtered random lists, discarded ~95%, and Hypothesis sometimes refused to run)."""
+    pitch = draw(st.integers(52, 62))
+    out = []
+    for _ in range(draw(st.integers(8, 12))):
+        out.append((pitch, draw(st.floats(0.3, 0.7))))
+        pitch = min(66, max(50, pitch + draw(st.integers(-7, 7))))
+    return out
 
 
 # ─── 7.2 Round trip: known notes come back ───
 
 @SLOW
-@given(tunes)
+@given(tunes())
 def test_hummed_notes_are_recovered_with_their_pitch_and_timing(tune):
     y, onsets = synth_hum(tune)
     midi, _prob, times = m.track_pitch(y)
@@ -401,7 +406,7 @@ def assert_same_as_librosa(y: np.ndarray) -> None:
 
 
 @SLOW
-@given(tunes)
+@given(tunes())
 def test_the_fast_pitch_tracker_gives_exactly_librosas_answer_on_hums(tune):
     y, _ = synth_hum(tune)
     assert_same_as_librosa(y)
@@ -421,7 +426,7 @@ def test_the_fast_pitch_tracker_gives_exactly_librosas_answer_on_silence_and_a_p
 
 
 @SLOW
-@given(tunes, st.integers(0, 10_000), st.floats(0.08, 0.3))
+@given(tunes(), st.integers(0, 10_000), st.floats(0.08, 0.3))
 def test_the_fast_pitch_tracker_gives_exactly_librosas_answer_on_breathy_hums(tune, seed, breath):
     # Real hums are not clean: breath, room noise, dropouts. That is where the decoder has to decide
     # between "voiced" and "not voiced", so this is the input that exercises the switching costs.
@@ -486,6 +491,7 @@ def test_known_and_hostile_filenames(name):
         assert ext == "webm"
 
 
+@settings(max_examples=30, deadline=None)   # each example starts FFmpeg, which takes a variable time
 @given(st.text(min_size=1, max_size=30))
 def test_converting_never_lets_the_extension_act_like_a_path(ext):
     # Garbage audio is fine to fail on; what must never happen is a path-related crash

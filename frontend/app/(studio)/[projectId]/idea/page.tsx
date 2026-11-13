@@ -10,6 +10,7 @@ import { useParams } from "next/navigation"
 import { LyricsEditor } from "@/components/studio/LyricsEditor"
 import { LyricsVersionHistory } from "@/components/studio/LyricsVersionHistory"
 import { VoiceMemoButton } from "@/components/studio/VoiceMemoButton"
+import { ReadWordsButton } from "@/components/studio/ReadWordsButton"
 import {
   ConversationPanel,
   type ChatTurn,
@@ -85,6 +86,12 @@ export default function IdeaRoomPage() {
     const next = currentLyricsRef.current + prefix + section + content
     setEditorContent(next)
     currentLyricsRef.current = next
+  }
+
+  /** Frank speaks in the conversation, and remembers having said it. */
+  function sayAsFrank(content: string) {
+    setTurns((t) => [...t, { id: crypto.randomUUID(), role: "assistant", content }])
+    historyRef.current.push({ role: "assistant", content })
   }
 
   async function handleSend(message: string) {
@@ -197,6 +204,12 @@ export default function IdeaRoomPage() {
         isThinking={isThinking}
         placeholder="Ask for a rhyme, a line, a chorus…"
         inputAccessory={
+          <div className="flex flex-col">
+          <ReadWordsButton
+            projectId={projectId}
+            getWords={() => currentLyricsRef.current}
+            onSay={sayAsFrank}
+          />
           <VoiceMemoButton
             projectId={projectId}
             onTranscription={(text) => {
@@ -226,6 +239,7 @@ export default function IdeaRoomPage() {
               ])
             }}
           />
+          </div>
         }
       />
     </div>

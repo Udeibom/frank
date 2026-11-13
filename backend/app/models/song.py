@@ -110,6 +110,53 @@ class MelodySketch(BaseModel):
     fit: Optional[float] = None  # share of the hum's sung frames the notes explain (0..1)
 
 
+# ─── Reading a song's words (start-from-any-input spec 02, requirement 2) ───
+
+SECTION_NAMES: tuple[str, ...] = ("intro", "verse", "pre-chorus", "chorus", "bridge", "outro")
+TEMPO_FEELS: tuple[str, ...] = ("steady", "building", "floating", "driving")
+MODES: tuple[str, ...] = ("minor", "major")
+SECTION_FEELINGS: tuple[str, ...] = ("sorrowful", "warm", "mixed")
+
+
+class LyricSection(BaseModel):
+    """A stretch of the lyrics. Lines are numbered 1..N counting only non-empty lines."""
+
+    name: str
+    first_line: int
+    last_line: int
+    feeling: Optional[str] = None     # "sorrowful", "warm" or "mixed": how this stretch feels
+
+
+class LyricsFeeling(BaseModel):
+    summary: str = ""
+    themes: list[str] = Field(default_factory=list)
+    imagery: list[str] = Field(default_factory=list)
+    emotional_arc: Optional[str] = None
+
+
+class LyricsHints(BaseModel):
+    """What the words suggest for the music. Only used when `confidence` is high enough."""
+
+    energy_level: Optional[float] = None
+    density: Optional[float] = None
+    tempo_feel: Optional[str] = None
+    mode: Optional[str] = None
+    confidence: float = 0.0
+
+
+class LyricsReading(BaseModel):
+    ok: bool
+    line_count: int = 0
+    feeling: Optional[LyricsFeeling] = None
+    sections: list[LyricSection] = Field(default_factory=list)
+    hints: Optional[LyricsHints] = None
+    question: Optional[str] = None
+    reason: Optional[str] = None      # a plain reason when ok is False
+    from_model: bool = False          # False when only the stanza-based structure could be built
+    truncated: bool = False           # True when the song was too long and only the first part was read
+    based_on: Optional[str] = None    # fingerprint of the exact words that were read
+
+
 class RestoreFacetRequest(BaseModel):
     version_id: str
 

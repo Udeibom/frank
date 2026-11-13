@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
+from app.db import feel as feel_db
 from app.db import jobs as jobs_db
+from app.db import lyrics as lyrics_db
+from app.db import projects as projects_db
 from app.db import song as song_db
 from app.models.feel import JobResponse
-from app.models.song import FacetVersionResponse, MelodySketch
+from app.models.song import FacetVersionResponse, LyricsReading, MelodySketch
+from app.services.intake import lyrics as lyrics_svc
+from app.services.intake import merge as merge_svc
+from app.services.llm.groq_client import chat_json
 from app.services.intake.hints import fingerprint_hints
 from app.services.jobs.intake_runner import run_hum_intake_job
 from app.services.song import store
@@ -127,3 +136,129 @@ async def reject_melody(project_id: str, version_id: str) -> dict:
         },
     )
     return {"ok": True}
+
+
+# ─── Reading the words ───────────────────────
+
+log = logging.getLogger("frank.intake")
+
+# Songs being read right now. Each read is one request to a rate-limited model, so a second press
+# (a double click, a second tab) is turned away instead of doubling the cost.
+_reading_now: set[str] = set()
+
+TRUNCATED_NOTE = " Your song is longer than I can read in one go, so I read the first part."
+
+
+class ReadLyricsRequest(BaseModel):
+    content: Optional[str] = Field(default=None, max_length=50_000)   # the words as on screen; defaults to the saved lyrics
+
+
+class ReadLyricsResponse(BaseModel):
+    ok: bool
+    message: str                      # what Frank says, in plain words
+    reading: Optional[LyricsReading] = None
+    filled: list[str] = []            # parts of the song's direction that the words filled in
+    asked: Optional[str] = None       # the one question Frank is asking, if any
+    reused: bool = False              # True when these exact words were already read
+
+
+async def _already_read(project_id: str, fingerprint: str) -> Optional[tuple[str, Optional[str]]]:
+    """If the active feeling and structure were both made from exactly these words, return (summary, question)."""
+    active = await song_db.get_active_map(project_id)
+    ids = [active.get("feeling"), active.get("structure")]
+    if not all(ids):
+        return None
+    by_id = {v.id: v for v in await song_db.get_versions(project_id, [i for i in ids if i])}
+    feeling, structure = by_id.get(active["feeling"]), by_id.get(active["structure"])
+    if feeling is None or structure is None:
+        return None
+    if feeling.content.get("lyrics_fingerprint") != fingerprint or structure.content.get("lyrics_fingerprint") != fingerprint:
+        return None
+    return str(feeling.content.get("summary", "")), (feeling.content.get("question") or None)
+
+
+@router.post("/lyrics", response_model=ReadLyricsResponse)
+async def read_lyrics_route(project_id: str, body: ReadLyricsRequest) -> ReadLyricsResponse:
+    """
+    Read the song's words for their feeling and structure. Fills the feeling and structure parts of
+    the song record, and lets the words suggest a direction for the music without changing anything
+    the person already settled. A disagreement becomes one question, not a silent choice.
+    """
+    if project_id in _reading_now:
+        raise HTTPException(status_code=409, detail="I'm already reading your words. Give me a moment.")
+    _reading_now.add(project_id)
+    try:
+        return await _read_lyrics(project_id, body)
+    finally:
+        _reading_now.discard(project_id)
+
+
+async def _read_lyrics(project_id: str, body: ReadLyricsRequest) -> ReadLyricsResponse:
+    text = body.content
+    if text is None:
+        state = await projects_db.get_project_active_state(project_id) or {}
+        active = await lyrics_db.get_version(state["active_lyrics_id"]) if state.get("active_lyrics_id") else None
+        text = (active or {}).get("content") or ""
+
+    # The exact words that would be read (a very long song is cut on a line break).
+    kept, was_cut = lyrics_svc.cut_to_fit(text)
+    if not lyrics_svc.too_little(kept):
+        seen = await _already_read(project_id, lyrics_svc.fingerprint_of(kept))
+        if seen is not None:
+            summary, question = seen
+            note = TRUNCATED_NOTE if was_cut else ""
+            return ReadLyricsResponse(
+                ok=True, message=f"{summary}{(' ' + question) if question else ''}{note}", asked=question, reused=True,
+            )
+
+    try:
+        reading = await asyncio.to_thread(lyrics_svc.read_lyrics, text, chat_json)
+    except Exception as exc:  # noqa: BLE001  (a dropped connection, a rate limit, ...)
+        log.warning("reading lyrics failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="I couldn't read your words just now. Your lyrics are safe. Want to try again?") from exc
+
+    if not reading.ok:
+        return ReadLyricsResponse(ok=False, message=reading.reason or "I need a few more lines to read.")
+
+    # What the words suggest for the music, and the one question to ask (a disagreement beats a vague doubt).
+    hints = lyrics_svc.lyrics_hints(reading)
+    conflict_q: Optional[str] = None
+    merged: Optional[dict] = None
+    filled: list[str] = []
+    latest: Optional[dict] = None
+    if hints:
+        latest = await feel_db.get_latest_fingerprint(project_id)
+        merged, filled, conflicts = merge_svc.merge_fingerprint((latest or {}).get("fingerprint"), hints)
+        conflict_q = merge_svc.conflict_question(conflicts, "words")
+    asked = conflict_q or reading.question
+
+    based_on = {"lyrics_fingerprint": reading.based_on, "truncated": reading.truncated}
+    if reading.feeling is not None:
+        await store.write_facet(
+            project_id, "feeling", {**reading.feeling.model_dump(), "question": asked, **based_on},
+            author="frank", operation="read_lyrics", label="Feeling of the words",
+        )
+    await store.write_facet(
+        project_id, "structure",
+        {"sections": [s.model_dump() for s in reading.sections], "from_model": reading.from_model, **based_on},
+        author="frank", operation="read_lyrics", label="Shape of the song",
+    )
+
+    # The suggested direction is a bonus. If saving it fails, the reading itself still succeeded.
+    if filled and merged is not None:
+        try:
+            saved = await feel_db.save_fingerprint(project_id, merged, (latest or {}).get("conversation_summary"))
+            await projects_db.update_project_active_state(project_id, {"active_fingerprint_id": saved["id"]})
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not save the direction suggested by the words: %s", type(exc).__name__)
+            filled = []
+
+    note = TRUNCATED_NOTE if reading.truncated else ""
+    if reading.feeling is not None:
+        message = f"{reading.feeling.summary}{(' ' + asked) if asked else ''}{note}"
+    else:
+        message = (
+            "I've marked out the verses and choruses from how you laid the words out. "
+            "I couldn't read the feeling just now, so tell me how it should feel." + note
+        )
+    return ReadLyricsResponse(ok=True, message=message, reading=reading, filled=filled, asked=asked)

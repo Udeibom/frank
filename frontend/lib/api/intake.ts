@@ -53,3 +53,17 @@ export async function confirmTune(
 export async function rejectTune(projectId: string, versionId: string): Promise<void> {
   await api.post(`/projects/${projectId}/intake/melody/${versionId}/reject`)
 }
+
+export interface ReadWordsResult {
+  ok: boolean
+  /** What Frank says: what the words feel like, and one question if it is unsure. */
+  message: string
+  /** Parts of the song's direction the words filled in (never anything already settled). */
+  filled: string[]
+  asked: string | null
+}
+
+/** Ask Frank to read the words for their feeling and shape. Sends what is on screen. */
+export async function readWords(projectId: string, content: string): Promise<ReadWordsResult> {
+  return api.post<ReadWordsResult>(`/projects/${projectId}/intake/lyrics`, { content })
+}
