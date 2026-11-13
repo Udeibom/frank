@@ -20,6 +20,8 @@ from app.routers import (
     export,
     conversation,
     jobs,
+    song,
+    intake,
 )
 
 settings = get_settings()
@@ -85,6 +87,8 @@ app.include_router(voice.router, dependencies=_owned)
 app.include_router(mix.router, dependencies=_owned)
 app.include_router(export.router, dependencies=_owned)
 app.include_router(conversation.router, dependencies=_owned)
+app.include_router(song.router, dependencies=_owned)
+app.include_router(intake.router, dependencies=_owned)
 # jobs.py checks job -> project ownership inside its route.
 app.include_router(jobs.router)
 

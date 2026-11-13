@@ -12,6 +12,9 @@ _CONTENT_TYPES = {
     "mp3": "audio/mpeg",
     "webm": "audio/webm",
     "ogg": "audio/ogg",
+    "flac": "audio/flac",
+    "m4a": "audio/mp4",
+    "mp4": "audio/mp4",
 }
 
 _MAX_UPLOAD_ATTEMPTS = 3

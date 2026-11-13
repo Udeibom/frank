@@ -43,7 +43,7 @@ export async function pollJob(
       if (!isTransientPollError(err)) throw err
       consecutiveErrors++
       if (consecutiveErrors >= MAX_CONSECUTIVE_POLL_ERRORS) {
-        throw new Error("Frank lost touch with the studio for a bit — want to try again?")
+        throw new Error("I lost the connection to the studio for a bit, so I couldn't finish. That wasn't anything you did. Want to try again?")
       }
       continue
     }
@@ -56,7 +56,7 @@ export async function pollJob(
     }
   }
 
-  throw new Error("This is taking longer than usual — give it another go in a moment.")
+  throw new Error("This is taking longer than it should. Whatever you gave me is safe. Want to give it another try?")
 }
 
 /** How long to wait before the next poll, given how long we've been waiting. */

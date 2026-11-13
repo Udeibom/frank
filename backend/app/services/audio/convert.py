@@ -4,6 +4,7 @@ The browser records WebM/Opus; most of our processing needs WAV.
 All conversion runs server-side on CPU.
 """
 
+import re
 import subprocess
 import tempfile
 import os
@@ -14,6 +15,10 @@ def to_wav(input_bytes: bytes, input_ext: str = "webm") -> bytes:
     Convert arbitrary audio bytes to 44.1kHz mono/stereo WAV using FFmpeg.
     Returns the WAV bytes. Cleans up temp files immediately.
     """
+    # The extension only names a temp file (FFmpeg works out the real format from the content),
+    # so keep it to a few letters and digits: never something that can act like a path.
+    if not re.fullmatch(r"[a-z0-9]{1,5}", input_ext.lower()):
+        input_ext = "bin"
     in_path = None
     out_path = None
     try:

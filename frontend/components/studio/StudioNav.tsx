@@ -12,6 +12,7 @@ import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/store/project"
 import { updateProject } from "@/lib/api/projects"
+import { SongSummary } from "@/components/studio/SongSummary"
 import { createClient } from "@/lib/supabase/client"
 import {
   LogOut,
@@ -213,6 +214,9 @@ export function StudioNav({ projectId }: { projectId: string }) {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* What Frank knows about the song so far */}
+      <SongSummary projectId={projectId} />
 
       {/* Log out — small and out of the way */}
       <button

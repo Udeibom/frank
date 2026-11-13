@@ -13,14 +13,13 @@ import {
   type ChatTurn,
 } from "@/components/conversation/ConversationPanel"
 import { TexturePlayer } from "@/components/audio/TexturePlayer"
-import { HumButton } from "@/components/studio/HumButton"
+import { HumIntake } from "@/components/studio/HumIntake"
 import { Button } from "@/components/ui/button"
 import {
   sendFeelMessage,
   generateTexture,
   saveFingerprint,
   getFingerprint,
-  type HumAnalysisResult,
 } from "@/lib/api/feel"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
@@ -31,7 +30,7 @@ import { Sparkles, Check } from "lucide-react"
 export default function FeelLabPage() {
   const params = useParams()
   const projectId = params.projectId as string
-  const { updateActiveState } = useProjectStore()
+  const { updateActiveState, refresh } = useProjectStore()
 
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [isThinking, setIsThinking] = useState(false)
@@ -141,7 +140,7 @@ export default function FeelLabPage() {
             ? {
                 ...turn,
                 content:
-                  "Frank couldn't find that sound just now — want to try again?",
+                  "I couldn't find that sound just now. Want me to try again?",
               }
             : turn,
         ),
@@ -193,7 +192,7 @@ export default function FeelLabPage() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: "Frank lost the thread for a second — say that again?",
+          content: "I lost the connection for a moment. Could you send that again?",
         },
       ])
     } finally {
@@ -201,22 +200,29 @@ export default function FeelLabPage() {
     }
   }
 
-  function handleHumAnalyzed(result: HumAnalysisResult) {
-    // Seed the fingerprint with the hum's hints and the stored hum reference
-    mergeFingerprint(result.analysis.fingerprint_hints)
-    fingerprintRef.current = {
-      ...fingerprintRef.current,
-      hum_reference_file: result.audio_url,
-    }
-    setTurns((t) => [
-      ...t,
-      {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: `I hear something ${describeHum(result)}. Let me find a direction that feels like that.`,
-      },
-    ])
-    // Immediately offer a texture based on the hum
+  function sayAsFrank(content: string) {
+    setTurns((t) => [...t, { id: crypto.randomUUID(), role: "assistant", content }])
+    // Frank's next reply must know what Frank just said (for example that the tune was confirmed).
+    historyRef.current.push({ role: "assistant", content })
+  }
+
+  function handleTuneConfirmed(info: {
+    hints: Partial<MusicalFingerprint>
+    description: string
+    unsureAbout: string[]
+  }) {
+    // The song now has a tune: let the rest of the studio (the sidebar summary) know.
+    refresh(projectId).catch(() => {})
+    // Only what Frank is confident about arrives here; nothing is filled in with a default.
+    mergeFingerprint(info.hints)
+    // One question at a time, the more important first. Never a list of things Frank is unsure about.
+    const question = info.unsureAbout.includes("mood")
+      ? " Does it feel bright and lifting to you, or heavier and deeper?"
+      : info.unsureAbout.includes("speed")
+        ? " Should it move along with a bit of push, or stay slow and easy?"
+        : ""
+    sayAsFrank(`Lovely, I'll build around your tune.${question} While you think, let me play you a first sound.`)
+    // Immediately offer a texture based on the tune
     runTextureGeneration()
   }
 
@@ -246,7 +252,7 @@ export default function FeelLabPage() {
       ])
       setDirectionApproved(false)
     } catch {
-      // ignore; user can retry
+      sayAsFrank("I couldn't save that direction just now. Want to try again?")
     }
   }
 
@@ -290,34 +296,13 @@ export default function FeelLabPage() {
         isThinking={isThinking}
         placeholder="Describe how it should feel…"
         inputAccessory={
-          <HumButton
+          <HumIntake
             projectId={projectId}
-            onAnalyzed={handleHumAnalyzed}
-            onError={(msg) =>
-              setTurns((t) => [
-                ...t,
-                { id: crypto.randomUUID(), role: "assistant", content: msg },
-              ])
-            }
+            onConfirmed={handleTuneConfirmed}
+            onSay={sayAsFrank}
           />
         }
       />
     </div>
   )
-}
-
-function describeHum(result: HumAnalysisResult): string {
-  const { register, pitch_movement, energy_level } = result.analysis
-  const energy = energy_level > 0.6 ? "with some energy" : "gentle and calm"
-  const movement =
-    pitch_movement === "rising"
-      ? "lifting upward"
-      : pitch_movement === "falling"
-        ? "settling down"
-        : pitch_movement === "wandering"
-          ? "wandering and searching"
-          : "steady"
-  const reg =
-    register === "low" ? "low and warm" : register === "high" ? "bright" : "in the middle"
-  return `${reg}, ${movement}, ${energy}`
 }
