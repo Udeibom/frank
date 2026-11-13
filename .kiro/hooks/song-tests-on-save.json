@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Song record tests when its code is saved",
+      "trigger": "PostFileSave",
+      "description": "Runs the song-record property tests (about 12 seconds) whenever the code they protect is saved.",
+      "matcher": "backend/app/(services/song/|models/song\\.py|db/song\\.py|routers/song\\.py)",
+      "action": {
+        "type": "command",
+        "command": "cd backend && venv/bin/python -m pytest tests/test_properties_song.py -q",
+        "timeout": 120
+      }
+    }
+  ]
+}

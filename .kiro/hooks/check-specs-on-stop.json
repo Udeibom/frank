@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Specs match the code when an agent run ends",
+      "trigger": "Stop",
+      "description": "Fails loudly if a task is ticked for a file that does not exist, a parent task disagrees with its children, or the roadmap status disagrees with the tasks.",
+      "action": {
+        "type": "command",
+        "command": "python3 scripts/check_specs.py",
+        "timeout": 30
+      }
+    }
+  ]
+}

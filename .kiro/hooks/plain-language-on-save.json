@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "No music jargon in screens when a screen file is saved",
+      "trigger": "PostFileSave",
+      "description": "Scans every screen file for music jargon each time one is saved, so jargon is caught as it is written instead of in a later audit.",
+      "matcher": "frontend/(app|components)/.*\\.tsx$",
+      "action": {
+        "type": "command",
+        "command": "python3 scripts/check_plain_language.py",
+        "timeout": 30
+      }
+    }
+  ]
+}

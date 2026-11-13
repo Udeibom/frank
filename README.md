@@ -114,4 +114,12 @@ Both services deploy from `main` — frontend to Vercel, backend to Render. All 
 
 ---
 
+## How Kiro was used
+
+See [KIRO_USAGE.md](KIRO_USAGE.md) for the full account. In short: specs written before code
+(`.kiro/specs`, with `_roadmap.md` as the index), steering documents (`.kiro/steering`) including the
+specialist team design, hooks that run real checks (`.kiro/hooks`), custom agents (`.kiro/agents`),
+three MCP servers (`.kiro/settings/mcp.json.example`) and property-based tests whose strength is checked
+by breaking the code on purpose.
+
 Built with [Kiro](https://kiro.dev) for Kiroween 2026.

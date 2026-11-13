@@ -125,9 +125,9 @@ planned — caught two places where the old specs had drifted from reality:
 
 Each converted spec also carries its real "deferred, with reasoning" list — the
 follow-ups from the code-review passes — so the tasks reflect what's done, what's
-intentionally postponed, and why. The `auth` spec folder is deliberately empty:
-it's the one feature we haven't built yet, and we'll run it through the native
-requirements → design → tasks flow from the start rather than back-filling it.
+intentionally postponed, and why. The `auth` spec was the one feature built through the native
+requirements → design → tasks flow from the start (see "Auth, built through the native spec
+flow" below); it is complete.
 
 ---
 
@@ -362,9 +362,8 @@ writing code (`.kiro/specs/auth/`). The spec had real consequences:
 
 ### Not done / limits (also in `auth/tasks.md`)
 
-- **Audio files are still publicly readable by URL.** Only the `exports` bucket is
-  private. URLs are unguessable but not secret; fixing it means signed URLs everywhere
-  audio plays.
+- **(Fixed later by the `private-audio` spec; see below.)** Audio files were publicly readable
+  by URL at this point; every bucket is now private and played through signed links.
 - **Existing songs are orphaned.** They belong to the old dev user id, so no real
   account sees them until they are reassigned.
 - Not tested: token refresh mid-session, and `AUTH_REQUIRED=false` against a running
@@ -491,3 +490,58 @@ against the live backend: **3 of 3 succeeded** (150–190 s each), each saved al
 section files, and the beat plays through a signed link. Each run hit one or two
 failed status polls on this connection and rode them out. Before the polling fix in
 the previous round, the app would have reported each of those runs as failed.
+
+## Nov 11 to 12: the vision reset, and an honest account of how Kiro was used
+
+The founder compared Frank with what the project was meant to be and found a gap. What we did,
+and what we did not do well, in order.
+
+### What worked
+- **Research before building.** Four `context-gatherer` sub-agents ran in parallel to audit the
+  conversation layer, the music engine, the voice/mix/export pipeline and the Kiro setup itself.
+  The audit found the engine was deterministic and flat (same input, same audio; five fingerprint
+  fields did nothing; the chorus was barely louder than the verse). `backend/scripts/baseline_audit.py`
+  then proved those claims by rendering five beats and measuring them. One claim was wrong
+  ("repeated sections are byte-identical"); the measurement corrected it.
+- **Specs before code.** `.kiro/specs/_roadmap.md` maps all 13 planned specs, with a coverage
+  matrix tying every founder decision, team role, demo story and audit finding to the spec that
+  owns it. Specs `song-record`, `start-from-any-input`, `listener` and `song-engine` were written
+  with requirements, design and tasks before any code, then built in that order.
+- **Property tests that are proven able to fail.** 85+ new properties. Every one was checked by
+  breaking the code on purpose and watching the test fail; three tests turned out too weak that way
+  (a tuning test passed with tuning switched off) and were strengthened. One property compares the
+  fast pitch tracker with librosa's own, bit for bit, including on real hums.
+- **Real-world checks beat unit tests.** The browser run found that the "Your tune" tick did not
+  update after confirming; timing the summary request found it made eight database calls in a row.
+
+### What we got wrong, and said so
+- **The Kiro setup stood still.** For most of the session the four custom agents were not used at
+  all, no new agent or hook was added, and the spec for Kiro craft stayed an outline. The founder
+  asked about it directly; the response is below.
+- **Three of five hooks never fired** (spec progress, component scaffolder, import cleanup). They
+  were deleted, not defended.
+- **Tuning by ear took several rounds** because the first listening files were hard to judge
+  (a piano exposes every small mistake). The founder's ears found what measurements could not.
+
+### Agents run in parallel on the uncommitted work
+Three existing agents reviewed the same change set at the same time, read-only:
+
+| Agent | What it found | Fixed |
+|---|---|---|
+| Frank Code Reviewer | Memory grew with hum length (one long hum could crash a small server); confirm could write a version and then fail; an unused function broke the append-only rule | Yes: 60 s cap, one analysis at a time, smaller tables, validate-before-write, function removed |
+| Frank Integration Tester | Two parallel first writes left a facet with two roots (7 of 8 runs, reproduced in the live database); confirming twice added duplicate versions | Yes: migration 004 adds a one-root index and refuses edits; writes retry; confirm is idempotent. Live re-run: 8 of 8 correct |
+| Plain Language Auditor | 23 findings; the worst were rejection messages that blamed the user when a microphone or connection was the cause | Yes: reworded; the screen now says when the connection dropped and that the hum is safe |
+
+### New Kiro pieces
+- **Hooks that do something:** `check-specs-on-stop` (specs vs code), `song-tests-on-save`
+  (12-second property tests when song code is saved), `plain-language-on-save` (jargon scan when a
+  screen file is saved). Its first run found two tasks ticked for files that never existed and two
+  parent/child disagreements, which were corrected.
+- **Agents for work done by hand:** `Spec Keeper`, `Listening Lab` (blind comparisons for a founder
+  who judges by ear), `Database Steward` (additive migrations, checks the data first, proves the result).
+- **`mcp.json.example`** is committed so the MCP setup is visible without exposing the token.
+
+### Still to do for Kiro craft
+Role steering that doubles as runtime prompts for the specialists; the audio-analysis MCP server
+that lets Kiro check its own renders (after the Listener exists); property tests for the frontend;
+CI that runs the tests; a spec-first versus retrofit comparison in the write-up.

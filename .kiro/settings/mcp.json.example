@@ -1,0 +1,48 @@
+{
+  "_note": "Copy to .kiro/settings/mcp.json and fill in the <placeholders>. The real file is git-ignored because it holds a token. Servers: context7 (current library docs), supabase (database advisors and checks), playwright (drives a real browser to test the studio screens).",
+  "mcpServers": {
+    "context7": {
+      "command": "node",
+      "args": [
+        "<path-to-global-node-modules>/@upstash/context7-mcp/dist/index.js"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "resolve-library-id",
+        "get-library-docs"
+      ]
+    },
+    "supabase": {
+      "command": "node",
+      "args": [
+        "<path-to-global-node-modules>/@supabase/mcp-server-supabase/dist/cli.js",
+        "--read-only",
+        "--project-ref=<your-supabase-project-ref>"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "<set-me>"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "list_tables",
+        "list_extensions",
+        "list_migrations",
+        "execute_sql"
+      ]
+    },
+    "playwright": {
+      "command": "node",
+      "args": [
+        "<path-to-global-node-modules>/@playwright/mcp/cli.js"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "browser_navigate",
+        "browser_snapshot",
+        "browser_click",
+        "browser_type",
+        "browser_take_screenshot"
+      ]
+    }
+  }
+}
