@@ -545,3 +545,43 @@ Three existing agents reviewed the same change set at the same time, read-only:
 Role steering that doubles as runtime prompts for the specialists; the audio-analysis MCP server
 that lets Kiro check its own renders (after the Listener exists); property tests for the frontend;
 CI that runs the tests; a spec-first versus retrofit comparison in the write-up.
+
+## Nov 13: reading a song's words, and the new agents' first real runs
+
+### What was built
+`services/intake/lyrics.py` reads a song's words for feeling and structure, `merge.py` lets the
+words suggest a direction for the music without overriding anything the person settled, and the Idea
+Room got a "Tell me what you hear in my words" button.
+
+### A design decision the data forced
+The first version asked the model for one overall mood. On the same grandmother lyric it said "bright"
+in 1 of 5 runs, even at temperature 0, with 0.85 confidence. So the model now labels how each
+*section* feels, and plain code decides the mood from those labels and sets how sure to be (less sure
+the more the song is split, or "both at once"). Over 15 later readings it was never confidently wrong:
+the happy song stayed warm, the funeral-laughter song stayed unsure, and the grandmother song always
+asked "Should the song feel more like gentle comfort or like quiet grief?". The model interprets; the
+code decides.
+
+### The new agents, used for real
+- **Spec Keeper** (first run) found that four ticked tasks had no evidence: a route that was never built
+  (separate routes per kind were built instead), a merge rule that only exists on paper, and a "tests can
+  fail" claim that covered only some tests. It unticked them, rewrote the stale parts of `design.md`, and
+  found one test failing on a timing limit. Result: the task list now says what is true.
+- **Frank Code Reviewer** found five must-fix problems in the words reader, which were fixed:
+  model text reaching the screen unfiltered (lyrics are in the same conversation, so a lyric could ask for a
+  link or music jargon), a long song cut mid-line without saying so, no protection against repeated presses
+  on a rate-limited model, a failed side-save that would look like a failed read, and a button that vanished
+  while working (stranding keyboard focus).
+- A live run against the real model then found a bug no reviewer or fake-model test could see: the pinned
+  Groq library takes `max_tokens`, not `max_completion_tokens`, so every read failed. A contract test now
+  binds our calls to the installed library's signature.
+
+### Honest notes
+- The flaky tests were my test generator, not the product: it threw away ~95% of random tunes and Hypothesis
+  sometimes refused to run. It now builds valid tunes directly.
+- A bulk text replacement once matched the wrong place and mangled a file; it was caught immediately by the
+  tests and repaired by hand. Edits are now anchored and asserted (the pattern must match exactly once).
+- One decision is left for the founder: requirement 6.4 says an earlier value is replaced by a *more
+  confident* new one. The merge only fills gaps and asks when inputs disagree, which matches the founder's
+  rule that perception and the person's own words win. Either the requirement is reworded to match, or
+  per-value confidence is stored.
