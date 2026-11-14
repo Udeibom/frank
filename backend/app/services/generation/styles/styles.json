@@ -1,0 +1,169 @@
+{
+  "_note": "Styles are data, not code (song-engine spec, requirement 4.2). A style only lists what differs from _default. Drum lanes are 16 steps per bar: x hit, o open hat, g ghost snare, . nothing. Patterns are [beat, length] for chords and [beat, kind, length] for bass; kinds are root, third, fifth, octave, approach. General MIDI programs: 0 piano, 4 electric piano, 11 vibraphone, 16-19 organ, 24 nylon guitar, 25 steel guitar, 27 clean guitar, 29 overdriven guitar, 32 acoustic bass, 33 finger bass, 34 pick bass, 38 synth bass, 40 violin, 42 cello, 46 harp, 48 strings, 49 slow strings, 52 choir, 53 oohs, 54 synth voice, 56 trumpet, 65 sax, 73 flute, 81 saw lead, 89 warm pad, 90 polysynth, 91 choir pad, 94 halo pad.",
+
+  "_default": {
+    "keywords": [],
+    "mood": {"energy": 0.5, "warmth": 0.5, "brightness": 0.5},
+    "instruments": {"keys": [0, 4], "bass": 33, "melody": 24, "pad": 89, "strings": 48, "arp": 46},
+    "drums": {
+      "kick": "x.......x.x.....",
+      "snare": "....x.......x...",
+      "hat": "x.x.x.x.x.x.x.x.",
+      "ghost": "...g.......g..g.",
+      "half_kick": "x.........x.....",
+      "half_snare": "........x.......",
+      "half_hat": "x...x...x...x..."
+    },
+    "half_time_below": 0.38,
+    "swing": 0.0,
+    "extension": 0.2,
+    "fill": 0.5,
+    "drum_gain": 1.0,
+    "keys": {
+      "sparse": [[0, 3.9]],
+      "medium": [[0, 1.4], [1.5, 1.0], [3, 0.9]],
+      "busy": [[0, 0.9], [1, 0.4], [1.5, 0.9], [2.5, 0.4], [3, 0.9]]
+    },
+    "bass": {
+      "sparse": [[0, "root", 3.8]],
+      "medium": [[0, "root", 1.9], [2, "fifth", 1.4], [3.5, "approach", 0.4]],
+      "busy": [[0, "root", 0.9], [1.5, "root", 0.4], [2, "fifth", 0.9], [3, "octave", 0.4], [3.5, "approach", 0.4]]
+    },
+    "extra_layers": []
+  },
+
+  "soul": {
+    "keywords": ["soul", "r&b", "rnb", "neo-soul", "neo soul", "motown", "funk"],
+    "mood": {"energy": 0.4, "warmth": 0.85, "brightness": 0.35},
+    "instruments": {"keys": [4, 0], "bass": 33, "melody": 11, "pad": 89, "strings": 49, "arp": 46},
+    "drums": {"hat": "x.x.x.x.x.x.x.x.", "ghost": "...g..g....g..g."},
+    "swing": 0.14,
+    "extension": 0.65,
+    "keys": {
+      "sparse": [[0, 3.9]],
+      "medium": [[0, 1.0], [1.5, 0.9], [3, 0.9]],
+      "busy": [[0, 0.8], [0.75, 0.5], [1.5, 0.8], [2.5, 0.4], [3, 0.8]]
+    },
+    "bass": {
+      "sparse": [[0, "root", 3.8]],
+      "medium": [[0, "root", 1.4], [1.5, "fifth", 0.9], [3, "approach", 0.8]],
+      "busy": [[0, "root", 0.7], [0.75, "root", 0.4], [1.5, "fifth", 0.7], [2.5, "third", 0.4], [3.25, "approach", 0.6]]
+    }
+  },
+
+  "gospel": {
+    "keywords": ["gospel", "worship", "church", "praise", "hymn", "spiritual"],
+    "mood": {"energy": 0.45, "warmth": 0.9, "brightness": 0.5},
+    "instruments": {"keys": [0, 19], "bass": 33, "melody": 53, "pad": 52, "strings": 48, "arp": 46},
+    "drums": {"hat": "x...x...x...x...", "ghost": "................"},
+    "half_time_below": 0.5,
+    "extension": 0.5,
+    "drum_gain": 0.8,
+    "fill": 0.6
+  },
+
+  "pop": {
+    "keywords": ["pop", "dance pop", "indie pop", "synth pop", "synthpop"],
+    "mood": {"energy": 0.65, "warmth": 0.55, "brightness": 0.7},
+    "instruments": {"keys": [0, 4], "bass": 33, "melody": 27, "pad": 94, "strings": 48, "arp": 46},
+    "extension": 0.25,
+    "fill": 0.7
+  },
+
+  "lofi": {
+    "keywords": ["lo-fi", "lofi", "lo fi", "chillhop", "chill", "study"],
+    "mood": {"energy": 0.3, "warmth": 0.8, "brightness": 0.25},
+    "instruments": {"keys": [4, 4], "bass": 33, "melody": 11, "pad": 89, "strings": 49, "arp": 46},
+    "drums": {"kick": "x.......x..x....", "hat": "x.x.x.x.x.x.x.x.", "ghost": "...g......g...g."},
+    "half_time_below": 0.5,
+    "swing": 0.2,
+    "extension": 0.85,
+    "drum_gain": 0.78,
+    "fill": 0.25
+  },
+
+  "rock": {
+    "keywords": ["rock", "punk", "grunge", "metal", "alternative", "indie rock", "emo"],
+    "mood": {"energy": 0.85, "warmth": 0.35, "brightness": 0.6},
+    "instruments": {"keys": [0, 18], "bass": 34, "melody": 29, "pad": 89, "strings": 48, "arp": 27},
+    "drums": {"kick": "x.......x.x.x...", "snare": "....x.......x...", "hat": "x.x.x.x.x.x.x.x."},
+    "half_time_below": 0.2,
+    "extension": 0.05,
+    "drum_gain": 1.15,
+    "fill": 0.85,
+    "bass": {
+      "sparse": [[0, "root", 3.8]],
+      "medium": [[0, "root", 0.9], [1, "root", 0.9], [2, "fifth", 0.9], [3, "approach", 0.9]],
+      "busy": [[0, "root", 0.45], [0.5, "root", 0.45], [1, "root", 0.45], [1.5, "root", 0.45], [2, "fifth", 0.45], [2.5, "root", 0.45], [3, "octave", 0.45], [3.5, "approach", 0.4]]
+    }
+  },
+
+  "ambient": {
+    "keywords": ["ambient", "atmospheric", "cinematic", "dream", "shoegaze", "new age", "soundscape", "drone"],
+    "mood": {"energy": 0.2, "warmth": 0.5, "brightness": 0.5},
+    "instruments": {"keys": [0, 0], "bass": 33, "melody": 46, "pad": 94, "strings": 49, "arp": 46},
+    "drums": {"kick": "x...............", "snare": "................", "hat": "................", "ghost": "................", "half_kick": "x...............", "half_snare": "................", "half_hat": "................"},
+    "half_time_below": 1.0,
+    "extension": 0.75,
+    "drum_gain": 0.6,
+    "fill": 0.0
+  },
+
+  "folk": {
+    "keywords": ["folk", "acoustic", "country", "singer-songwriter", "singer songwriter", "americana", "bluegrass"],
+    "mood": {"energy": 0.4, "warmth": 0.75, "brightness": 0.5},
+    "instruments": {"keys": [24, 25], "bass": 32, "melody": 73, "pad": 89, "strings": 42, "arp": 24},
+    "drums": {"kick": "x.......x.......", "hat": "x.x.x.x.x.x.x.x.", "ghost": "................"},
+    "half_time_below": 0.3,
+    "swing": 0.05,
+    "extension": 0.1,
+    "drum_gain": 0.8,
+    "fill": 0.3
+  },
+
+  "hiphop": {
+    "keywords": ["hip hop", "hip-hop", "hiphop", "rap", "trap", "boom bap", "drill"],
+    "mood": {"energy": 0.6, "warmth": 0.4, "brightness": 0.35},
+    "instruments": {"keys": [4, 4], "bass": 38, "melody": 4, "pad": 89, "strings": 48, "arp": 11},
+    "drums": {"kick": "x..x..x...x.x...", "snare": "........x.......", "hat": "x.x.x.x.x.x.xxxx", "ghost": "...............g", "half_kick": "x..x..x...x.x...", "half_snare": "........x.......", "half_hat": "x.x.x.x.x.x.x.x."},
+    "half_time_below": 1.0,
+    "swing": 0.1,
+    "extension": 0.45,
+    "fill": 0.4,
+    "bass": {
+      "sparse": [[0, "root", 3.8]],
+      "medium": [[0, "root", 1.2], [1.5, "root", 0.6], [2.5, "fifth", 1.0]],
+      "busy": [[0, "root", 0.9], [0.75, "root", 0.5], [1.5, "root", 0.4], [2.5, "fifth", 0.4], [3, "root", 0.8]]
+    }
+  },
+
+  "electronic": {
+    "keywords": ["electronic", "edm", "house", "techno", "synthwave", "dance", "trance", "disco"],
+    "mood": {"energy": 0.8, "warmth": 0.3, "brightness": 0.8},
+    "instruments": {"keys": [90, 5], "bass": 38, "melody": 81, "pad": 94, "strings": 50, "arp": 90},
+    "drums": {"kick": "x...x...x...x...", "snare": "....x.......x...", "hat": "..o...o...o...o.", "ghost": "................"},
+    "half_time_below": 0.15,
+    "extension": 0.3,
+    "fill": 0.6
+  },
+
+  "_hints": [
+    {"words": ["soft drums", "brushes", "light drums", "gentle drums", "quiet drums"], "drum_gain_mult": 0.75},
+    {"words": ["heavy drums", "big drums", "hard drums", "loud drums", "pounding"], "drum_gain_mult": 1.2},
+    {"words": ["electric guitar", "distorted guitar", "overdriven"], "instruments": {"melody": 29}},
+    {"words": ["acoustic guitar", "steel guitar", "guitar"], "instruments": {"keys": 25, "melody": 24, "arp": 24}},
+    {"words": ["electric piano", "e-piano", "epiano", "rhodes", "wurlitzer"], "instruments": {"keys": 4}},
+    {"words": ["piano", "grand piano"], "instruments": {"keys": 0}},
+    {"words": ["organ"], "instruments": {"keys": 19}},
+    {"words": ["strings", "string section", "violin", "cello", "orchestra", "orchestral"], "instruments": {"strings": 48}, "layers": ["strings"]},
+    {"words": ["harp"], "instruments": {"arp": 46}, "layers": ["arp"]},
+    {"words": ["vibraphone", "vibes"], "instruments": {"melody": 11}},
+    {"words": ["flute"], "instruments": {"melody": 73}},
+    {"words": ["saxophone", "sax"], "instruments": {"melody": 65}},
+    {"words": ["trumpet", "brass", "horns", "horn"], "instruments": {"melody": 56}},
+    {"words": ["choir", "voices", "oohs", "ooh", "backing vocals"], "instruments": {"pad": 52}},
+    {"words": ["synth", "synths", "synthesizer", "pad", "pads", "atmosphere", "atmospheric"], "instruments": {"pad": 94}},
+    {"words": ["bass", "bassline"]},
+    {"words": ["drums", "percussion", "beat"]}
+  ]
+}

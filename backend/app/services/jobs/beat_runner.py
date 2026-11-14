@@ -14,6 +14,7 @@ sections can be addressed individually later.
 
 from __future__ import annotations
 import asyncio
+import json
 
 import numpy as np
 
@@ -24,12 +25,20 @@ from app.services.storage.files import upload_audio
 from app.services.generation import beat as beat_engine
 from app.services.generation import renderer
 from app.services.generation.renderer import to_mp3_bytes
+from app.services.generation.rng import derive_seed
+from app.services.generation.styles import pick_style
 
 
-def _arrangement_params(sections: list[beat_engine.SectionPlan], fp: dict) -> dict:
+def _arrangement_params(
+    sections: list[beat_engine.SectionPlan], fp: dict, seed: int
+) -> dict:
     """Serialize the arrangement into JSON for beat_versions.params."""
+    style = pick_style(fp)
     return {
         "fingerprint": fp,
+        "seed": seed,
+        "style": style.name,
+        "unsupported_hints": style.unsupported,
         "sections": [
             {
                 "index": s.index,
@@ -46,7 +55,7 @@ def _arrangement_params(sections: list[beat_engine.SectionPlan], fp: dict) -> di
 
 
 def _render_and_persist_sync(
-    project_id: str, fingerprint: dict, label: str
+    project_id: str, fingerprint: dict, label: str, seed: int
 ) -> dict:
     """
     The entire heavy job, run in ONE worker thread: render the beat, encode MP3,
@@ -56,9 +65,9 @@ def _render_and_persist_sync(
     thread avoids interleaving sync HTTP calls with the event loop, which was
     causing connection races in the storage client. Returns the version dict.
     """
-    sections, mixes, full = beat_engine.render_full_beat(fingerprint)
+    sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed)
     fp = beat_engine.fp_utils.normalize(fingerprint)
-    return _persist_sync(project_id, sections, mixes, full, fp, label)
+    return _persist_sync(project_id, sections, mixes, full, fp, label, seed)
 
 
 def _rerender_and_persist_sync(
@@ -66,10 +75,11 @@ def _rerender_and_persist_sync(
     sections: list[beat_engine.SectionPlan],
     fp: dict,
     label: str,
+    seed: int,
 ) -> dict:
     """Re-render an edited arrangement and persist it, all in one thread."""
-    mixes, full = beat_engine.rerender_all(sections, fp)
-    return _persist_sync(project_id, sections, mixes, full, fp, label)
+    mixes, full = beat_engine.rerender_all(sections, fp, seed)
+    return _persist_sync(project_id, sections, mixes, full, fp, label, seed)
 
 
 def _persist_sync(
@@ -79,6 +89,7 @@ def _persist_sync(
     full_audio: np.ndarray,
     fp: dict,
     label: str,
+    seed: int,
 ) -> dict:
     """
     Upload the assembled render + one mixed file per section, and write records.
@@ -92,7 +103,7 @@ def _persist_sync(
     render_url = upload_audio("beats", full_mp3, extension="mp3", name_prefix="beat")
 
     version = beat_db.create_beat_version_sync(
-        project_id, render_url, label, _arrangement_params(sections, fp)
+        project_id, render_url, label, _arrangement_params(sections, fp, seed)
     )
 
     for section, mix in zip(sections, section_mixes):
@@ -116,10 +127,13 @@ async def run_full_beat_job(
 
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
+        # A new version gets a new seed, so asking for another one gives a different song, while
+        # the same fingerprint and the same count always give the same song (repeatable).
+        seed = derive_seed(json.dumps(fingerprint, sort_keys=True, default=str), count)
 
         # Entire heavy job (render + encode + upload + records) in one thread
         version = await asyncio.to_thread(
-            _render_and_persist_sync, project_id, fingerprint, label
+            _render_and_persist_sync, project_id, fingerprint, label, seed
         )
 
         await projects_db.update_project_active_state(
@@ -140,9 +154,9 @@ async def run_full_beat_job(
         raise exc
 
 
-async def _load_active_arrangement(project_id: str) -> tuple[list, dict, str]:
+async def _load_active_arrangement(project_id: str) -> tuple[list, dict, int]:
     """
-    Load the active beat version's arrangement. Returns (sections, fp, label).
+    Load the active beat version's arrangement. Returns (sections, fp, seed).
     Raises if there is no active beat to edit.
     """
     state = await projects_db.get_project_active_state(project_id)
@@ -151,7 +165,10 @@ async def _load_active_arrangement(project_id: str) -> tuple[list, dict, str]:
         raise ValueError("No active beat to edit")
     version = await beat_db.get_beat_version(version_id)
     sections, fp = beat_engine.sections_from_params(version["params"])
-    return sections, fp, version.get("label", "Beat")
+    seed = version["params"].get("seed")
+    if not isinstance(seed, int):
+        seed = beat_engine.default_seed(fp)   # beats saved before seeds existed
+    return sections, fp, seed
 
 
 async def run_edit_section_job(
@@ -166,7 +183,7 @@ async def run_edit_section_job(
     """
     try:
         await jobs_db.mark_processing(job_id)
-        sections, fp, _ = await _load_active_arrangement(project_id)
+        sections, fp, seed = await _load_active_arrangement(project_id)
 
         for s in sections:
             if s.index == section_index:
@@ -176,7 +193,7 @@ async def run_edit_section_job(
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
         version = await asyncio.to_thread(
-            _rerender_and_persist_sync, project_id, sections, fp, label
+            _rerender_and_persist_sync, project_id, sections, fp, label, seed
         )
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}
@@ -208,7 +225,7 @@ async def run_mute_stem_job(
     """
     try:
         await jobs_db.mark_processing(job_id)
-        sections, fp, _ = await _load_active_arrangement(project_id)
+        sections, fp, seed = await _load_active_arrangement(project_id)
 
         for s in sections:
             if section_index is None or s.index == section_index:
@@ -218,7 +235,7 @@ async def run_mute_stem_job(
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
         version = await asyncio.to_thread(
-            _rerender_and_persist_sync, project_id, sections, fp, label
+            _rerender_and_persist_sync, project_id, sections, fp, label, seed
         )
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}
@@ -249,7 +266,7 @@ async def run_add_stem_job(
     """
     try:
         await jobs_db.mark_processing(job_id)
-        sections, fp, _ = await _load_active_arrangement(project_id)
+        sections, fp, seed = await _load_active_arrangement(project_id)
 
         for s in sections:
             if section_index is None or s.index == section_index:
@@ -259,7 +276,7 @@ async def run_add_stem_job(
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
         version = await asyncio.to_thread(
-            _rerender_and_persist_sync, project_id, sections, fp, label
+            _rerender_and_persist_sync, project_id, sections, fp, label, seed
         )
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}

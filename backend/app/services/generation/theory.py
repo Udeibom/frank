@@ -29,13 +29,13 @@ SCALE_INTERVALS: dict[str, list[int]] = {
 # chosen per mood. Each entry is a list of scale-degree roots.
 PROGRESSIONS: dict[str, list[list[int]]] = {
     # minor-key progressions
-    "minor_sad":      [[0, 5, 2, 6], [0, 3, 6, 4]],       # i-VI-III-VII, i-iv-VII-v
-    "minor_tense":    [[0, 1, 4, 0], [0, 6, 3, 4]],       # i-ii-v-i
-    "minor_driving":  [[0, 6, 5, 4], [0, 0, 5, 6]],       # i-VII-VI-v
+    "minor_sad":      [[0, 5, 2, 6], [0, 3, 6, 4], [0, 2, 5, 6], [0, 6, 5, 3]],   # i-VI-III-VII, i-iv-VII-v, i-III-VI-VII, i-VII-VI-iv
+    "minor_tense":    [[0, 1, 4, 0], [0, 6, 3, 4], [0, 3, 0, 4], [0, 5, 1, 4]],   # i-ii-v-i, i-VII-iv-v, i-iv-i-v, i-VI-ii-v
+    "minor_driving":  [[0, 6, 5, 4], [0, 0, 5, 6], [0, 2, 6, 5], [0, 5, 6, 0]],   # i-VII-VI-v, i-i-VI-VII, i-III-VII-VI, i-VI-VII-i
     # major-key progressions
-    "major_warm":     [[0, 4, 5, 3], [0, 5, 3, 4]],       # I-V-vi-IV (the "pop" progression)
-    "major_bright":   [[0, 3, 4, 0], [0, 4, 0, 3]],       # I-IV-V-I
-    "major_floating": [[0, 3, 5, 4], [0, 2, 3, 4]],       # I-IV-vi-V
+    "major_warm":     [[0, 4, 5, 3], [0, 5, 3, 4], [0, 3, 0, 4], [5, 3, 0, 4]],   # I-V-vi-IV, I-vi-IV-V, I-IV-I-V, vi-IV-I-V
+    "major_bright":   [[0, 3, 4, 0], [0, 4, 0, 3], [0, 5, 3, 4], [0, 4, 5, 3]],   # I-IV-V-I, I-V-I-IV, I-vi-IV-V, I-V-vi-IV
+    "major_floating": [[0, 3, 5, 4], [0, 2, 3, 4], [0, 4, 5, 3], [3, 0, 4, 5]],   # I-IV-vi-V, I-iii-IV-V, I-V-vi-IV, IV-I-V-vi
 }
 
 
@@ -100,6 +100,58 @@ def triad_for_degree(root: int, mode: str, degree: int, octave: int = 3) -> list
     return chord
 
 
+def chord_for_degree(root: int, mode: str, degree: int, octave: int = 3, seventh: bool = False) -> list[int]:
+    """A triad on the given scale degree, plus the seventh above it when asked. Stays inside the key."""
+    intervals = SCALE_INTERVALS.get(mode, SCALE_INTERVALS["minor"])
+    n = len(intervals)
+    base = 12 * (octave + 1) + root
+    steps = (0, 2, 4, 6) if seventh else (0, 2, 4)
+    out = []
+    for step in steps:
+        idx = degree + step
+        out.append(base + intervals[idx % n] + (idx // n) * 12)
+    return out
+
+
+def _spread(notes: list[int]) -> int:
+    return max(notes) - min(notes)
+
+
+def _movement(prev: list[int], new: list[int]) -> float:
+    """How far the voices have to travel: each new note to its nearest old note, plus the centre shifting."""
+    near = sum(min(abs(n - p) for p in prev) for n in new)
+    return near + 0.5 * abs(sum(new) / len(new) - sum(prev) / len(prev))
+
+
+def _arrangements(chord: list[int]) -> list[list[int]]:
+    """Every way of playing this chord: each inversion, in a few octaves."""
+    out = []
+    notes = sorted(chord)
+    for _ in range(len(notes)):
+        for shift in (-12, 0, 12):
+            out.append(sorted(n + shift for n in notes))
+        notes = sorted(notes[1:] + [notes[0] + 12])   # next inversion
+    return out
+
+
+def voice_lead(chords: list[list[int]], centre: int = 60) -> list[list[int]]:
+    """
+    Re-voice a chord sequence so it moves smoothly, as a keyboard player would: each chord keeps its
+    notes (same pitch classes) but takes the inversion and octave nearest the one before it, and the
+    whole thing stays around `centre` so it neither climbs nor sinks over the progression.
+    """
+    voiced: list[list[int]] = []
+    for chord in chords:
+        options = [o for o in _arrangements(chord) if abs(sum(o) / len(o) - centre) <= 7 and _spread(o) <= 16]
+        options = options or _arrangements(chord)
+        if not voiced:
+            best = min(options, key=lambda o: abs(sum(o) / len(o) - centre))
+        else:
+            best = min(options, key=lambda o: _movement(voiced[-1], o))
+        voiced.append(best)
+    return voiced
+
+
 def choose_progression_family(mode: str, energy: float, tempo_feel: str) -> str:
     """
     Pick a progression family from the mood. This is an explicit, explainable
@@ -124,26 +176,40 @@ def build_progression(
     energy: float = 0.5,
     tempo_feel: str = "steady",
     variant: int = 0,
+    extension: float = 0.0,
+    seed: int = 0,
+    voice: bool = True,
 ) -> dict:
     """
-    The main entry point. Given a key and mood, produce a concrete chord
-    progression as MIDI note lists, plus the scale for melodies/basslines.
+    The main entry point. Given a key and mood, produce a concrete chord progression as MIDI note
+    lists, plus the scale for melodies and the bass notes.
 
-    Returns a dict the composer layer consumes.
+    `extension` is the chance (0..1) that a chord gets its seventh, decided per chord from `seed`, so
+    the same seed always gives the same chords. `voice` makes the chords move smoothly.
+
+    Returns a dict the composer consumes. The keys root, mode, family, degrees, chords, scale and
+    bass_notes are the ones earlier code relied on; chord_pcs and sevenths are new.
     """
+    from app.services.generation.rng import rng_for
+
     root, mode = parse_key(key)
     family = choose_progression_family(mode, energy, tempo_feel)
     options = PROGRESSIONS[family]
     degrees = options[variant % len(options)]
 
-    chords = [triad_for_degree(root, mode, d) for d in degrees]
+    sevenths = [rng_for(seed, "seventh", i, d).random() < extension for i, d in enumerate(degrees)]
+    raw = [chord_for_degree(root, mode, d, 3, sev) for d, sev in zip(degrees, sevenths)]
+    chords = voice_lead(raw) if voice else raw
 
     return {
         "root": root,
         "mode": mode,
         "family": family,
         "degrees": degrees,
-        "chords": chords,                       # list of [midi, midi, midi]
-        "scale": scale_notes(root, mode, 4),    # for melody
+        "chords": chords,                                   # list of [midi, midi, midi(, midi)]
+        "chord_pcs": [sorted({n % 12 for n in c}) for c in chords],
+        "tones": [[n % 12 for n in c] for c in raw],           # per chord: root, third, fifth (and seventh) as pitch classes, before re-voicing
+        "sevenths": sevenths,
+        "scale": scale_notes(root, mode, 4),                # for melody
         "bass_notes": [triad_for_degree(root, mode, d, octave=2)[0] for d in degrees],
     }

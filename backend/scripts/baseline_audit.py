@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.services.generation import beat as beat_svc  # noqa: E402
 from app.services.generation import composer, renderer, theory  # noqa: E402
 from app.services.generation import fingerprint as fp_utils  # noqa: E402
+from app.services.generation.styles import pick_style  # noqa: E402
 
 SR = renderer.SAMPLE_RATE
 
@@ -69,13 +70,17 @@ def digest(x: np.ndarray) -> str:
 
 
 def melody_chord_clash(fp: dict) -> tuple[int, int]:
-    """Count melody notes that are not chord tones of the bar they sit in."""
+    """Count melody notes on the strong beats (1 and 3) that are not chord tones of the bar they sit in."""
     f = fp_utils.normalize(fp)
     prog = theory.build_progression(f["key"], f["energy_level"], f["tempo_feel"], 0)
-    part = composer.compose_melody(prog, 8, f["energy_level"], f["density"])
+    ctx = composer.SectionContext(name="chorus", style=pick_style(f))
+    part = composer.compose_melody(prog, 8, f["energy_level"], f["density"], ctx)
     chords = prog["chords"]
     total = clash = 0
     for ev in part.events:
+        beat_in_bar = ev.start % 4
+        if min(abs(beat_in_bar - 0), abs(beat_in_bar - 2)) > 0.1:
+            continue
         bar = int(ev.start // 4)
         chord_pcs = {n % 12 for n in chords[bar % len(chords)]}
         total += 1
@@ -103,7 +108,7 @@ def main() -> None:
                 f"{rms_db(to_float(m)):>7.1f} {digest(m):>11}"
             )
         clash, total = melody_chord_clash(fp)
-        print(f"melody notes that are NOT chord tones: {clash}/{total}")
+        print(f"strong-beat melody notes that are NOT chord tones: {clash}/{total}")
 
     print("\n=== Claim checks ===")
     a, b = full_digests["01_sad_slow_soul"], full_digests["05_same_as_01_other_dead_fields"]

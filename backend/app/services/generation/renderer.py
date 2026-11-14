@@ -15,6 +15,7 @@ from app.services.generation.composer import Part, NoteEvent
 
 SAMPLE_RATE = 44100
 DRUM_CHANNEL = 9
+TAIL_SECONDS = 1.5          # how long the last notes of a section are allowed to ring
 
 
 def _soundfont_path() -> str:
@@ -73,7 +74,7 @@ class SynthSession:
         events.sort(key=lambda e: e[0])
 
         total_samples = _beats_to_samples(total_beats, bpm)
-        tail_samples = int(1.5 * SAMPLE_RATE)
+        tail_samples = int(TAIL_SECONDS * SAMPLE_RATE)
         out = np.zeros((total_samples + tail_samples, 2), dtype=np.int16)
         cursor = 0
 
