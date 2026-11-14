@@ -115,7 +115,7 @@ class MelodySketch(BaseModel):
 SECTION_NAMES: tuple[str, ...] = ("intro", "verse", "pre-chorus", "chorus", "bridge", "outro")
 TEMPO_FEELS: tuple[str, ...] = ("steady", "building", "floating", "driving")
 MODES: tuple[str, ...] = ("minor", "major")
-SECTION_FEELINGS: tuple[str, ...] = ("sorrowful", "warm", "mixed")
+SECTION_FEELINGS: tuple[str, ...] = ("sorrowful", "angry", "warm", "mixed")
 
 
 class LyricSection(BaseModel):
@@ -141,7 +141,8 @@ class LyricsHints(BaseModel):
     density: Optional[float] = None
     tempo_feel: Optional[str] = None
     mode: Optional[str] = None
-    confidence: float = 0.0
+    confidence: float = 0.0          # how sure the energy, density and feel are
+    mode_confidence: float = 0.0     # how sure the dark-or-warm mood is (decided in code from the sections)
 
 
 class LyricsReading(BaseModel):

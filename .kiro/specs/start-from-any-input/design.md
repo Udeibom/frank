@@ -19,7 +19,7 @@ rhythm / voice_memo / text                        -> planned (intake/rhythm.py, 
 
    lyrics     -> intake/lyrics.py   LLM (structured, validated) -> feeling, structure, fingerprint hints
    hum        -> intake/melody.py   ffmpeg->WAV -> pitch -> notes -> key, tempo -> MelodySketch
-   all built  -> intake/merge.py    fill gaps, name conflicts (no confidence replacement yet)
+   all built  -> intake/merge.py    fill gaps, name conflicts (a settled value is never replaced by a later input)
    hum        -> intake/preview.py  playback render -> "is this your tune?"
 ```
 
@@ -74,16 +74,24 @@ or two bars, return the most consistent bar as the pattern. Confidence from cons
 
 One LLM call with a strict JSON shape (Pydantic validation, one repair retry that names the problem):
 `{feeling: {summary, themes, imagery, emotional_arc}, sections: [{name, first_line, last_line,
-feeling: sorrowful|warm|mixed}], hints: {energy_level, density, tempo_feel, mode, confidence},
+feeling: sorrowful|angry|warm|mixed}], hints: {energy_level, density, tempo_feel, mode, confidence},
 question: str|null}`. Lines are numbered over non-empty lines only.
 
 Code, not the model, has the last word:
 - `repair_sections` makes the sections partition the lines exactly once, in order.
 - The overall mood (`mode`) is decided in code (`derive_mood`) from the per-section feelings, weighed
   by line count, because one overall guess from the model flipped between runs on the same words.
-  A dead heat gives no mood. `mood_confidence` caps confidence by the model's own, the margin, and the
-  share of "mixed" lines.
-- Below confidence 0.6 no hints are written (`lyrics_hints`) and the reading carries one plain question.
+  Sorrow and anger are both "dark", so a song that moves between them is clearly dark; a dead heat
+  between dark and warm gives no mood. The mood has its OWN confidence (`mode_confidence`), computed from
+  the sections alone (the margin and the share of "mixed" lines), never from the model's number, which is
+  about energy and pace and varied from 0.45 to 0.65 on identical words.
+- Two bars (`lyrics_hints`): the mood is offered only at 0.6 or more, because it shapes the whole sound.
+  Energy, busyness and pace are offered from 0.4, because they are only a soft starting point that fills
+  a gap and is refined in the Feel Lab. Doubt about the mood never throws the soft hints away.
+- Frank asks a question only when it cannot tell dark from warm (mood below 0.6), and then exactly one.
+  Anger against sorrow is not that doubt. The question is about which feeling the music should lean into,
+  uses the song's own feelings, and always offers "or should it hold both" (`allow_both`, in code): a song
+  may hold all of its feelings. See `.kiro/steering/producer-craft.md` for the evidence behind this.
 - If two attempts fail, structure comes from blank lines and repeated stanzas (`guess_sections`) and
   the feeling is left empty. A dropped connection is passed on as an error, not hidden by this fallback.
 Written as `feeling` and `structure` facet versions, keyed by a fingerprint of the lyrics text.
@@ -94,8 +102,9 @@ Written as `feeling` and `structure` facet versions, keyed by a fingerprint of t
 - Built: a hint is written only into a field that is empty. A settled value is never changed.
 - Built: conflicts (mode that differs, or energy at least 0.4 apart) are NOT written; they are returned
   and `conflict_question` turns the most important into ONE plain question.
-- NOT built yet (Requirement 6.4): replacing an earlier value with a more confident new one. Values
-  carry no stored confidence yet.
+- By design (Requirement 6.4, decided Nov 13): a settled value is never replaced by a later input, however
+  confident. A disagreement between inputs becomes one question to the person. Because of this, values do
+  not need a stored confidence; a hint is either sure enough to be offered (0.6 or more) or it is not offered.
 - The user's explicit values are protected only because nothing settled is ever overwritten.
 
 ## Frontend
@@ -113,6 +122,6 @@ Written as `feeling` and `structure` facet versions, keyed by a fingerprint of t
    (pitch within 1 semitone, onset within one grid step) at a minimum recall, across random scales and tempi.
 3. Tempo estimation is stable to small amplitude changes and to leading silence.
 4. Section repair always yields sections that partition the non-empty lines exactly once, in order.
-5. Merge: previously set higher-confidence values are never replaced by lower-confidence ones;
+5. Merge: a settled value is never replaced by any later input;
    the user's explicit values are never replaced by extracted ones; merging the same input twice is idempotent.
 6. Low-quality input (silence, white noise) is rejected rather than producing notes.

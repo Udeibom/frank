@@ -29,17 +29,19 @@ Depends on spec 01 (song-record) tasks 1-3.
     - _Requirements: 4.2, 4.3_
 
 - [ ] 4. Words
-  - [x] 4.1 Lyrics understanding call with schema validation and one repair retry (`services/intake/lyrics.py`, route `POST /intake/lyrics`; mood is decided in code from per-section labels because one overall guess flipped between runs on the same words; verified live against the model and the database, and in a browser)
+  - [x] 4.1 Lyrics understanding call with schema validation and one repair retry (`services/intake/lyrics.py`, route `POST /intake/lyrics`; mood is decided in code from per-section labels because one overall guess flipped between runs on the same words; verified live against the model and the database, and in a browser) Revised Nov 13 after the founder's own lyric (anger and sorrow together) got a needless either-or question: anger is now a feeling, sorrow and anger are one dark mood, and the mood has its own confidence from the sections
     - _Requirements: 2.1, 2.3, 2.4_
   - [x] 4.4 Safeguards on reading the words (found by the Code Reviewer, Nov 13): everything the model writes for the person is checked to be plain (no links, digits, markup or music terms) and sent back once for repair if not; the writer's words are fenced off as data; one sloppy section is dropped without losing the answer; a long song is cut on a whole line and Frank says so; only one read per song at a time; unchanged words are not read again; a failure saving the suggested direction does not turn a good read into a failure
     - _Requirements: 2.1, 2.4, 6.2, 7.1_
+  - [x] 4.5 Questions that follow how working producers listen (research: `.kiro/steering/producer-craft.md`): never an either-or ("or should it hold both" is added by code), only when dark versus warm is truly unclear, one question, in the song's own words
+    - _Requirements: 2.4, 6.2, 6.5, 7.1_
   - [x] 4.2 Deterministic section repair (partition of lines) (`repair_sections`, plus `guess_sections` from blank lines and repeated stanzas as the fallback)
     - _Requirements: 2.2_
   - [ ] 4.3 (not started) Description and voice-memo path (Whisper then text path)
     - _Requirements: 5.1, 5.2_
 
 - [ ] 5. Merge
-  - [ ] 5.1 Merge with confidence and conflict rules (UNTICKED by spec check: `merge.py:31 merge_fingerprint` only fills gaps and names mode/energy conflicts. It never replaces an earlier value with a MORE confident new one, which Requirement 6.4 asks for, and stores no per-value confidence. Confidence gating happens upstream, only at the 0.6 cut in `lyrics_hints`. The lyrics route uses it; the Feel Lab still merges hum hints in the browser, without this check)
+  - [x] 5.1 Merge: fill gaps only, name disagreements, never replace a settled value (`services/intake/merge.py`; requirement 6.4 reworded Nov 13 to say exactly this)
     - _Requirements: 6.4, 6.5_
   - [ ] 5.2 (done for the words: the route returns ONE question and the Idea Room says it; NOT done for a tune that disagrees with the words, because hum hints are merged in the browser) Conflict questions surfaced to the conversation
     - _Requirements: 6.2, 6.5_
@@ -50,12 +52,12 @@ Depends on spec 01 (song-record) tasks 1-3.
   - [x] 6.2 Playback confirmation cards; plain-language result messages (hum card done: 'Is this your tune?' with hear again / yes / not quite; verified in a real browser)
     - _Requirements: 3.4, 3.5, 7.1_
 
-- [ ] 7. Property-based tests (`backend/tests/test_properties_intake.py`)
+- [x] 7. Property-based tests (`backend/tests/test_properties_intake.py`)
   - [x] 7.1 Key transposition equivariance
   - [x] 7.2 Melody round-trip recall within tolerance
   - [x] 7.3 Tempo stability (covers leading silence and a jittered steady pulse; the 'small amplitude changes' part of design property 3 has no test)
   - [x] 7.4 Section partition after repair
-  - [ ] 7.5 Merge confidence, user-priority, idempotence (UNTICKED by spec check: `test_properties_lyrics.py` covers never-changes-settled, idempotence, inputs untouched and conflicts named, and passes, but there is no 'higher confidence replaces lower' behaviour to test; see 5.1)
+  - [x] 7.5 Merge properties: settled values never change, merging twice changes nothing, inputs untouched, disagreements named, a modal direction is not a disagreement (`test_properties_lyrics.py`; broken on purpose to check each can fail)
   - [x] 7.6 Rejection of silence and noise
   - [x] 7.7 Prove each test can fail. Done by breaking the code on purpose and watching a test fail: hum tests (dip splitting, tuning, key, too-few-notes, octave rules, extension safety, length cap, confirm, race retry, brief), lyrics tests (21 breaks: section repair, repair idempotence, repair attempt, fallback, confidence, mood decision, mixed share, dead heat, plain-language filter, fenced words, sloppy sections, line-boundary cut, truncation flag, modal, size limit), fast tracker (3 breaks, on synthetic, breathy and real hums), model-call contract. Three tests were found too weak by this and strengthened (tuning, long-song line lengths, mixed share).
   - [x] 7.8 Model-call contract: our calls are checked against the installed Groq library's real signature (`tests/test_llm_client_contract.py`), because a fake model answer cannot notice a wrong argument name (it broke every read once, caught only by a live run)

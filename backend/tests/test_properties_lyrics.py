@@ -217,14 +217,28 @@ def reading_with(hints: LyricsHints | None) -> LyricsReading:
     return LyricsReading(ok=True, line_count=2, feeling=LyricsFeeling(summary="x"), sections=[], hints=hints)
 
 
+@given(st.floats(0, ly.HINT_CONFIDENCE - 0.001))
+def test_a_reading_unsure_of_energy_and_pace_suggests_neither(conf):
+    out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=0.9, density=0.9, tempo_feel="driving", mode="major", confidence=conf, mode_confidence=1.0)))
+    assert set(out) <= {"mode"}
+
+
 @given(st.floats(0, ly.CONFIDENT - 0.001))
-def test_an_unsure_reading_suggests_nothing(conf):
-    assert ly.lyrics_hints(reading_with(LyricsHints(energy_level=0.9, density=0.9, tempo_feel="driving", mode="major", confidence=conf))) == {}
+def test_a_reading_unsure_whether_the_song_is_dark_or_warm_suggests_no_mood(mode_conf):
+    out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=0.9, density=0.9, tempo_feel="driving", mode="major", confidence=1.0, mode_confidence=mode_conf)))
+    assert "mode" not in out
+
+
+@given(st.floats(0, ly.CONFIDENT - 0.001))
+def test_doubt_about_the_mood_does_not_throw_away_how_intense_and_busy_the_song_is(mode_conf):
+    # Whether a song is sad or angry says nothing about how intense it is: that stays useful.
+    out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=0.8, density=0.6, tempo_feel="building", mode=None, confidence=0.85, mode_confidence=mode_conf)))
+    assert out == {"energy_level": 0.8, "density": 0.6, "tempo_feel": "building"}
 
 
 @given(st.floats(ly.CONFIDENT, 1.0), st.floats(0, 1), st.floats(0, 1))
 def test_a_sure_reading_suggests_only_known_fields_in_range(conf, e, d):
-    out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=e, density=d, tempo_feel="floating", mode="minor", confidence=conf)))
+    out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=e, density=d, tempo_feel="floating", mode="minor", confidence=conf, mode_confidence=conf)))
     assert set(out) <= {"energy_level", "density", "tempo_feel", "mode"}
     assert 0 <= out["energy_level"] <= 1 and 0 <= out["density"] <= 1
 
@@ -313,9 +327,9 @@ def sections_with(feelings: list[str | None], sizes: list[int] | None = None) ->
 def test_the_mood_follows_whichever_feeling_has_more_lines(feelings, sizes):
     secs = sections_with(feelings, sizes)
     mood = ly.derive_mood(secs)
-    sorrow = sum(s.last_line - s.first_line + 1 for s in secs if s.feeling == "sorrowful")
+    dark = sum(s.last_line - s.first_line + 1 for s in secs if s.feeling in ("sorrowful", "angry"))
     warm = sum(s.last_line - s.first_line + 1 for s in secs if s.feeling == "warm")
-    assert mood.mode == (None if sorrow == warm else ("minor" if sorrow > warm else "major"))
+    assert mood.mode == (None if dark == warm else ("minor" if dark > warm else "major"))
     assert 0.0 <= mood.margin <= 1.0 and 0.0 <= mood.mixed_share <= 1.0 and mood.labelled
 
 
@@ -376,14 +390,18 @@ def test_the_sections_win_over_the_models_own_overall_guess(n, model_mode):
 
 
 @given(feeling_lists, st.sampled_from(["minor", "major"]), st.floats(0, 1))
-def test_an_unsure_reading_always_comes_with_a_question_and_never_with_hints_to_act_on(feelings, mode, conf):
+def test_frank_asks_one_question_exactly_when_it_cannot_tell_dark_from_warm(feelings, mode, conf):
     r = ly.parse_reading(answer_with_feelings(feelings, mode, conf), 4 * len(feelings))
-    if r.hints.confidence < ly.CONFIDENT:
+    sure_of_mood = r.hints.mode_confidence >= ly.CONFIDENT
+    if sure_of_mood:
+        assert r.question is None
+        assert ly.lyrics_hints(r).get("mode") == r.hints.mode
+    else:
         assert r.question and r.question.count("?") == 1
-        assert ly.lyrics_hints(r) == {}
+        assert "mode" not in ly.lyrics_hints(r)
 
 
-@given(st.sampled_from(["", "joyful", "SORROWFUL", "angry", "x" * 20]))
+@given(st.sampled_from(["", "joyful", "SORROWFUL", "furious", "x" * 20]))
 def test_an_unknown_section_feeling_is_dropped_not_guessed(label):
     secs = ly.repair_sections([LyricSection(name="verse", first_line=1, last_line=4, feeling=label)], 4)
     assert secs[0].feeling is None
@@ -530,7 +548,8 @@ def test_the_reading_says_when_only_the_first_part_was_read():
 # A dead heat among labelled sections stores no mood at all.
 def test_a_dead_heat_leaves_no_mood_stored_rather_than_the_models_guess():
     r = ly.parse_reading(answer_with_feelings(["sorrowful", "warm"], "minor", 0.9), 8)
-    assert r.hints.mode is None and ly.lyrics_hints(r) == {}
+    assert r.hints.mode is None
+    assert "mode" not in ly.lyrics_hints(r)
 
 
 # A direction marked 'modal' is not a disagreement with minor or major.
@@ -561,3 +580,102 @@ def test_the_request_body_has_a_size_limit():
     with pytest.raises(ValidationError):
         intake_router.ReadLyricsRequest(content="x" * 50_001)
     assert intake_router.ReadLyricsRequest(content="x" * 50_000)
+
+
+# ─── Anger is dark too (the founder's own lyric, Nov 13) ─
+
+@given(st.integers(1, 8), st.integers(1, 8))
+def test_a_song_that_moves_between_sorrow_and_anger_is_clearly_dark_not_split(sorrowful, angry):
+    mood = ly.derive_mood(sections_with(["sorrowful"] * sorrowful + ["angry"] * angry))
+    assert mood.mode == "minor" and mood.margin == 1.0
+
+
+@given(st.integers(1, 8), st.integers(1, 8))
+def test_a_dark_song_gets_no_question_whether_it_is_sad_angry_or_both(sorrowful, angry):
+    feelings = ["sorrowful"] * sorrowful + ["angry"] * angry
+    r = ly.parse_reading(answer_with_feelings(feelings, "minor", 0.5), 4 * len(feelings))
+    assert r.question is None and r.hints.mode == "minor" and r.hints.mode_confidence >= ly.CONFIDENT
+
+
+@given(st.integers(1, 6), st.integers(1, 6))
+def test_angry_against_warm_is_a_real_doubt_and_gets_one_question(angry, warm):
+    feelings = ["angry"] * angry + ["warm"] * warm
+    r = ly.parse_reading(answer_with_feelings(feelings, "minor", 1.0), 4 * len(feelings))
+    if angry == warm:
+        assert r.hints.mode is None and r.question
+    if r.hints.mode_confidence < ly.CONFIDENT:
+        assert r.question and r.question.count("?") == 1
+
+
+@given(st.floats(0, 1), st.floats(0, 1))
+def test_the_mood_confidence_comes_from_the_sections_alone_not_the_models_number(model_a, model_b):
+    # The model's own confidence is about energy and pace and wobbled between 0.45 and 0.65 on the same
+    # words. It must not move the mood, or the same lyric would sometimes get a question and sometimes not.
+    feelings = ["sorrowful", "angry", "angry", "angry", "mixed"]
+    a = ly.parse_reading(answer_with_feelings(feelings, "minor", model_a), 20)
+    b = ly.parse_reading(answer_with_feelings(feelings, "minor", model_b), 20)
+    assert a.hints.mode_confidence == b.hints.mode_confidence
+    assert a.hints.mode == b.hints.mode == "minor"
+    assert (a.question is None) == (b.question is None)
+
+
+@given(st.floats(ly.HINT_CONFIDENCE, 1.0), st.floats(0, 1), st.floats(0, 1))
+def test_intensity_and_pace_are_offered_once_the_model_is_moderately_sure_of_them(conf, e, d):
+    out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=e, density=d, tempo_feel="driving", confidence=conf)))
+    assert set(out) == {"energy_level", "density", "tempo_feel"}
+
+
+# The bars themselves are part of the product's behaviour, so they are pinned here as plain numbers
+# (a test that reads the bar from the code would move with it and never notice a change).
+@pytest.mark.parametrize("sure, offered", [(0.0, False), (0.3, False), (0.39, False), (0.5, True), (0.85, True), (1.0, True)])
+def test_the_bar_for_offering_intensity_and_pace_is_about_four_in_ten(sure, offered):
+    out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=0.8, density=0.6, tempo_feel="building", confidence=sure)))
+    assert bool(out) is offered
+
+
+@pytest.mark.parametrize("sure, offered", [(0.0, False), (0.5, False), (0.59, False), (0.7, True), (1.0, True)])
+def test_the_bar_for_deciding_dark_or_warm_is_about_six_in_ten(sure, offered):
+    out = ly.lyrics_hints(reading_with(LyricsHints(mode="minor", confidence=0.0, mode_confidence=sure)))
+    assert ("mode" in out) is offered
+
+
+# ─── A question about which feeling to lean into is never an either-or ─
+
+QUESTIONS = st.text(alphabet="abcdefg ,", min_size=2, max_size=40).filter(lambda t: t.strip()).map(lambda t: t.strip() + "?")
+
+
+@given(QUESTIONS)
+def test_a_question_always_offers_both_and_stays_one_question(q):
+    out = ly.allow_both(q)
+    assert out.endswith("?") and out.count("?") == 1
+    assert ly._BOTH.search(out)
+
+
+@given(QUESTIONS)
+def test_offering_both_twice_changes_nothing(q):
+    once = ly.allow_both(q)
+    assert ly.allow_both(once) == once
+
+
+@pytest.mark.parametrize("already", ["Should it hold both?", "Lean into the loss, the laughing, or all of them?", "Which, or everything?"])
+def test_a_question_that_already_offers_both_is_left_alone(already):
+    assert ly.allow_both(already) == already
+
+
+def test_it_reads_naturally():
+    assert ly.allow_both("Should the music lean more into the dark humor or the gentle remembrance?") == (
+        "Should the music lean more into the dark humor or the gentle remembrance, or should it hold both?"
+    )
+
+
+def test_a_reading_from_the_model_gets_it_too():
+    # a song that really is both dark and warm, so Frank is genuinely unsure and keeps the question
+    ans = good_answer(
+        question="Should the music lean more into the grief or the humor?",
+        sections=[{"name": "verse", "first_line": 1, "last_line": 2, "feeling": "mixed"}],
+    )
+    assert "both" in ly.parse_reading(json.dumps(ans), 2).question
+
+
+def test_the_fixed_question_offers_both_too():
+    assert ly._BOTH.search(ly.UNSURE_QUESTION) and ly.UNSURE_QUESTION.count("?") == 1

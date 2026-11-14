@@ -84,7 +84,7 @@ recordings with several sounds or long silences are out of scope for this versio
 1. THE SYSTEM SHALL attach a confidence to every extracted value.
 2. WHEN confidence is low THEN THE SYSTEM SHALL ask or play something back instead of assuming.
 3. THE SYSTEM SHALL NOT fall back to a silent default (such as a fixed 90 tempo) without telling the user.
-4. WHEN several inputs are given THEN THE SYSTEM SHALL merge them, keeping earlier values unless the new one is more confident or the user asked for a change.
+4. WHEN several inputs are given THEN THE SYSTEM SHALL merge them by filling gaps only. A value that is already settled SHALL NOT be replaced by a later input, however confident that input is. Only the person can change a settled value, by saying so or by answering a question. (Decided Nov 13: the person's own choices outrank anything Frank works out.)
 5. WHEN two inputs conflict (for example a sad lyric and a bright hum) THEN THE SYSTEM SHALL name the tension and ask which should lead, and SHALL NOT silently pick one.
 6. THE SYSTEM SHALL store every extraction as a facet version (spec 01) with the original input kept.
 

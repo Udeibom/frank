@@ -585,3 +585,21 @@ code decides.
   confident* new one. The merge only fills gaps and asks when inputs disagree, which matches the founder's
   rule that perception and the person's own words win. Either the requirement is reworded to match, or
   per-value confidence is stored.
+
+### Nov 13, later: the founder tried it, and the research that followed
+The founder pasted a real lyric into the Idea Room (anger and sorrow together) and Frank asked "more like
+defiant anger or deep sorrow?", a question with no right answer, since the song is both. Two things came
+out of that:
+- **A fix, from a real user's real words.** Anger became a feeling of its own; sorrow and anger count as
+  one dark mood; the mood got its own confidence (computed from the sections, because the model's number
+  varied from 0.45 to 0.65 on identical words and was deciding whether Frank asked). The same lyric now
+  reads the same way on every run and gets no question. Five old tests described rules that had
+  deliberately changed; each was rewritten on purpose, not edited until it passed, and a bar that the test
+  had been reading from the code was pinned as plain numbers after a break survived.
+- **Research instead of assumption.** The founder said, correctly, that nobody on the team is a producer
+  and that Frank should not assume what a good producer question is. Web search and fetch found and read
+  Rick Rubin (CBS *60 Minutes*), Dan Wilson and Teddy Geiger (*Switched on Pop*) and Jack Antonoff (GRAMMY.com).
+  The write-up (`.kiro/steering/producer-craft.md`) separates what was read from what could only be seen
+  as a paywalled opening or a search snippet, says plainly that no list of producers' exact questions was
+  found, and flags one conflict with an earlier decision: two working songwriters call the "sounds like"
+  game a trap, which bears on the Creative Director idea. That one is left to the founder.

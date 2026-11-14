@@ -3,7 +3,8 @@ Putting what Frank learned from one input together with what it already knew
 (start-from-any-input spec 02, requirement 6).
 
 Rules:
-  - What the person already settled is never changed. A hint only fills a gap.
+  - What the person already settled is never changed by any later input, however sure that input is.
+    A hint only fills a gap. (Requirement 6.4, decided Nov 13.)
   - When a hint disagrees with something already settled, nothing is changed; the disagreement is
     named so Frank can ask which should lead.
   - Merging the same hints again changes nothing.
@@ -63,7 +64,7 @@ def conflict_question(conflicts: list[Conflict], source: str = "words") -> Optio
         old = "brighter" if c.suggested == "minor" else "heavier"
         return (
             f"Your {source} feel {new} than the sound we've settled on so far, which feels {old}. "
-            f"Which should lead the song: the feeling of your {source}, or what we have?"
+            f"Which should the music lean into most: the feeling of your {source}, what we have so far, or both?"
         )
     if "energy_level" in by_field:
         c = by_field["energy_level"]

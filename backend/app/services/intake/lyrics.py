@@ -39,7 +39,9 @@ from app.models.song import (
 
 MAX_CHARS = 8000          # a song is a couple of thousand characters; this is generous
 MIN_LINES = 2
-CONFIDENT = 0.6
+CONFIDENT = 0.6           # sure enough to decide the mood (dark or warm), which shapes the whole sound
+HINT_CONFIDENCE = 0.4     # sure enough to offer a soft starting point for energy, busyness and pace.
+                          # These only ever fill a gap and are refined in the Feel Lab, so the bar is lower.
 _ALIASES = {
     "refrain": "chorus", "hook": "chorus", "pre chorus": "pre-chorus", "prechorus": "pre-chorus",
     "pre-chorus": "pre-chorus", "verse": "verse", "chorus": "chorus", "bridge": "bridge",
@@ -181,6 +183,22 @@ def is_plain(text: str) -> bool:
     return not (_URL.search(text) or any(c.isdigit() for c in text) or _JARGON.search(text) or "<" in text or "`" in text)
 
 
+_BOTH = re.compile(r"\b(both|all of (them|it)|everything)\b", re.I)
+
+
+def allow_both(question: str) -> str:
+    """
+    A song may hold all of its feelings, so a question about which one to lean into must never be an
+    either-or. If the model's question does not already offer "both", add it to the same question
+    (still exactly one question mark). Working producers describe a song as holding the whole range of
+    what it is like to be alive at that moment; forcing one pick would be wrong for the writer.
+    """
+    q = question.strip()
+    if not q or _BOTH.search(q) or not q.endswith("?"):
+        return q
+    return q[:-1].rstrip(" ,") + ", or should it hold both?"
+
+
 def sentence(text: str) -> str:
     """A line the model wrote, finished like a sentence, so it reads well with a question after it."""
     text = text.strip()
@@ -285,17 +303,25 @@ def parse_reading(raw_text: str, line_count: int, based_on: Optional[str] = None
             mode=mode if mode in MODES else None,
             confidence=_unit(h.get("confidence")) or 0.0,
         )
-    question = question_text or None
+    question = allow_both(question_text) or None
     sections = repair_sections(_clean_sections(raw.sections), line_count)
 
     # The mood is decided here, from how each section feels, not taken from one overall guess.
     mood = derive_mood(sections)
-    if hints is not None and mood.labelled:
-        hints.mode = mood.mode          # None on a dead heat: no mood is better than a coin toss
-        hints.confidence = mood_confidence(hints.confidence, mood)
-    # Unsure about the feeling? Then Frank asks, in plain words, instead of assuming.
-    if hints is not None and hints.confidence < CONFIDENT and not question:
-        question = UNSURE_QUESTION
+    if hints is not None:
+        if mood.labelled:
+            hints.mode = mood.mode      # None on a dead heat: no mood is better than a coin toss
+            # Decided by the sections alone. The model's own number is about something else (energy)
+            # and varied from 0.45 to 0.65 on the same words, so it must not decide the mood.
+            hints.mode_confidence = mood_confidence(1.0, mood)
+        else:
+            hints.mode_confidence = hints.confidence
+        # Frank asks only when it truly cannot tell dark from warm. Anger against sorrow is not that
+        # doubt (both are dark), so a clear dark song gets no question; an unclear one gets exactly one.
+        if hints.mode_confidence >= CONFIDENT:
+            question = None
+        elif not question:
+            question = UNSURE_QUESTION
     return LyricsReading(
         ok=True, line_count=line_count, feeling=feeling, sections=sections, hints=hints,
         question=question, from_model=True, based_on=based_on,
@@ -304,7 +330,7 @@ def parse_reading(raw_text: str, line_count: int, based_on: Optional[str] = None
 
 # ─── Deciding the mood in code ───────────────
 
-UNSURE_QUESTION = "Does this song feel more sad to you, or more hopeful?"
+UNSURE_QUESTION = "I hear more than one feeling in this. Which should the music lean into most, or should it hold all of them?"
 
 
 @dataclass(frozen=True)
@@ -317,18 +343,19 @@ class Mood:
 
 def derive_mood(sections: list[LyricSection]) -> Mood:
     """
-    The overall mood from how each section feels, weighed by how many lines it has.
-    A dead heat gives no mood: none is better than a coin toss.
+    The overall mood from how each section feels, weighed by how many lines it has. Sorrow and anger
+    are both dark, so a song that moves between them is still clearly dark. A dead heat between dark
+    and warm gives no mood: none is better than a coin toss.
     """
-    def lines(label: str) -> int:
-        return sum(s.last_line - s.first_line + 1 for s in sections if s.feeling == label)
+    def lines(*labels: str) -> int:
+        return sum(s.last_line - s.first_line + 1 for s in sections if s.feeling in labels)
 
-    sorrowful, warm, mixed = lines("sorrowful"), lines("warm"), lines("mixed")
-    total = sorrowful + warm + mixed
+    dark, warm, mixed = lines("sorrowful", "angry"), lines("warm"), lines("mixed")
+    total = dark + warm + mixed
     if total == 0:
         return Mood(None, 0.0, 0.0, False)
-    margin = abs(sorrowful - warm) / total
-    mode = None if sorrowful == warm else ("minor" if sorrowful > warm else "major")
+    margin = abs(dark - warm) / total
+    mode = None if dark == warm else ("minor" if dark > warm else "major")
     return Mood(mode, margin, mixed / total, True)
 
 
@@ -352,16 +379,19 @@ def lyrics_hints(reading: LyricsReading) -> dict:
     A weak guess is left out, never turned into a default.
     """
     h = reading.hints
-    if not reading.ok or h is None or h.confidence < CONFIDENT:
+    if not reading.ok or h is None:
         return {}
     out: dict = {}
-    if h.energy_level is not None:
-        out["energy_level"] = round(h.energy_level, 2)
-    if h.density is not None:
-        out["density"] = round(h.density, 2)
-    if h.tempo_feel in TEMPO_FEELS:
-        out["tempo_feel"] = h.tempo_feel
-    if h.mode in MODES:
+    # How intense and how busy the song is does not depend on whether it is sad or angry, so a
+    # doubt about the mood must not throw these away.
+    if h.confidence >= HINT_CONFIDENCE:
+        if h.energy_level is not None:
+            out["energy_level"] = round(h.energy_level, 2)
+        if h.density is not None:
+            out["density"] = round(h.density, 2)
+        if h.tempo_feel in TEMPO_FEELS:
+            out["tempo_feel"] = h.tempo_feel
+    if h.mode in MODES and h.mode_confidence >= CONFIDENT:
         out["mode"] = h.mode
     return out
 
@@ -381,7 +411,7 @@ Reply with ONE JSON object and nothing else:
     "emotional_arc": "how the feeling moves from start to end, in one short plain sentence, or null"
   },
   "sections": [ {"name": "verse|chorus|pre-chorus|bridge|intro|outro", "first_line": 1, "last_line": 4,
-                 "feeling": "sorrowful|warm|mixed"} ],
+                 "feeling": "sorrowful|angry|warm|mixed"} ],
   "hints": {
     "energy_level": 0.0 to 1.0   (0 = hushed and still, 1 = loud and urgent),
     "density": 0.0 to 1.0        (0 = very sparse, 1 = full and busy),
@@ -396,12 +426,18 @@ Rules:
 - Lines are numbered. Sections must cover every line exactly once, in order. A stanza that comes back
   is usually the chorus.
 - "feeling" on each section says how THAT stretch feels. "sorrowful" is loss, grief, longing, regret,
-  loneliness or heaviness. "warm" is joy, thanks, love, hope or celebration. "mixed" is both at once.
+  loneliness or heaviness. "angry" is anger, defiance, bitterness, rebellion or not caring. "warm" is
+  joy, thanks, love, hope or celebration. "mixed" is a dark feeling and a warm one at the same time.
   Judge each section on its own words.
-- "mode" is your overall pick, "minor" for sorrowful and "major" for warm.
-- "confidence" is 0.8 or more only when the song feels one way almost all the way through. If it
-  clearly holds two feelings at once (laughing at a sad moment, love mixed with anger), confidence
-  must be 0.5 or lower, and "question" must ask which feeling should lead, in everyday words.
+- "mode" is your overall pick, "minor" for sorrowful or angry and "major" for warm.
+- "confidence" is only about energy_level, density and tempo_feel. Anger and sorrow are different
+  feelings, but both can be clear, so do not lower it just because a song moves between them.
+- If a song clearly holds a dark feeling and a warm one at the same time (laughing at a sad moment,
+  love mixed with anger), label those sections "mixed" and set "question" to ONE plain question about
+  which of those feelings the music should lean into most. A song may hold all of its feelings, so never
+  make it an either-or: for example "I hear both the laughing and the loss. Which should the music
+  lean into most, or should it hold both?". If the song is dark all the way (sorrow, anger or both),
+  or warm all the way, "question" is null.
 - In "summary", "themes", "emotional_arc" and "question" use everyday words only. Never use music
   terms (no tempo, key, chord, major, minor, beat, melody, rhythm).
 - Never judge, grade or fix the writing. Never rewrite their words.
