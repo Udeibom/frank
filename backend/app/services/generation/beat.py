@@ -23,7 +23,7 @@ from typing import Optional
 
 import numpy as np
 
-from app.services.generation import composer, fingerprint as fp_utils, theory
+from app.services.generation import composer, fingerprint as fp_utils, moments as moments_mod, theory
 from app.services.generation.renderer import SAMPLE_RATE, TAIL_SECONDS, SynthSession
 from app.services.generation.rng import derive_seed
 from app.services.generation.styles import StyleChoice, pick_style
@@ -61,7 +61,11 @@ MAX_GAIN_DB = 24.0
 MIN_GAIN_DB = -18.0
 
 # How loud each part is against the others before the section is set to its level.
-PART_GAIN = {"drums": 1.0, "bass": 1.0, "keys": 0.75, "melody": 0.9, "pad": 0.55, "strings": 0.5, "arp": 0.5}
+PART_GAIN = {
+    "drums": 1.0, "bass": 1.0, "keys": 0.75, "melody": 0.9, "pad": 0.55, "strings": 0.5, "arp": 0.5,
+    "color": 0.6, "color_once": 0.6, "riser": 0.45, "sweep": 0.4,
+    "finale_keys": 0.8, "finale_pad": 0.5, "finale_bass": 1.0, "finale_drums": 1.0,
+}
 
 PEAK_TARGET = 0.89
 FADE_OUT_SECONDS = 1.5
@@ -169,6 +173,7 @@ def plan_contexts(
                 extension=style.extension,
                 seed=derive_seed(seed, "voicing", s.name),
             )
+    planned = moments_mod.plan_moments(moments_mod.facts_from(sections), seed, fp["warmth"], fp["brightness"])
     contexts: list[composer.SectionContext] = []
     for i, s in enumerate(sections):
         nxt = sections[i + 1] if i + 1 < len(sections) else None
@@ -182,6 +187,7 @@ def plan_contexts(
                 style=style,
                 next_name=nxt.name if nxt else None,
                 next_energy=nxt.energy if nxt else None,
+                moments=planned.get(s.index, []),
             )
         )
     return style, contexts, progressions

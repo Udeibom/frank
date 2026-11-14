@@ -300,3 +300,138 @@ def test_style_file_is_valid():
         for table in (choice.keys, choice.bass):
             counts = [len(table[t]) for t in TIERS]
             assert counts == sorted(counts), (name, counts)
+
+
+# ── moments: the one-off things that make it feel arranged ────────────────
+
+from app.services.generation import moments as mo  # noqa: E402
+from app.services.generation import touches  # noqa: E402
+
+FULL = [("intro", 4), ("verse", 8), ("chorus", 8), ("verse", 8), ("chorus", 8), ("bridge", 4), ("chorus", 8), ("outro", 4)]
+song_shapes = st.lists(st.tuples(st.sampled_from(SECTIONS), st.integers(1, 12)), min_size=1, max_size=10)
+
+
+def facts_for(shape):
+    sections, _ = beat.build_beat_plan({}, shape)
+    return sections, mo.facts_from(sections)
+
+
+@given(song_shapes, seeds, unit, unit)
+@settings(max_examples=60, deadline=None)
+def test_moments_are_planned_inside_their_section(shape, seed, warmth, brightness):
+    sections, facts = facts_for(shape)
+    plan = mo.plan_moments(facts, seed, warmth, brightness)
+    for f in facts:
+        for m in plan[f.index]:
+            assert 0 <= m.bar and m.bar + m.bars <= f.bars if m.kind in ("dropout", "late_entry") else m.bar == 0
+            if m.kind in ("dropout", "late_entry"):
+                assert f.bars >= 8
+
+
+@given(song_shapes, seeds)
+@settings(max_examples=60, deadline=None)
+def test_a_song_has_one_ending_and_at_most_one_one_off(shape, seed):
+    sections, facts = facts_for(shape)
+    plan = mo.plan_moments(facts, seed, 0.6, 0.4)
+    kinds = [(f.index, m.kind) for f in facts for m in plan[f.index]]
+    assert [i for i, k in kinds if k == "ending"] == [facts[-1].index]
+    assert sum(1 for _, k in kinds if k == "one_off") <= 1
+    has_place = any(f.name == "bridge" or (f.name == "chorus" and f.final) for f in facts)
+    assert sum(1 for _, k in kinds if k == "one_off") == (1 if has_place else 0)
+
+
+@given(song_shapes, seeds, st.integers(0, 9))
+@settings(max_examples=40, deadline=None)
+def test_changing_one_sections_length_does_not_move_the_others_moments(shape, seed, which):
+    which %= len(shape)
+    other = list(shape)
+    name, bars = other[which]
+    other[which] = (name, bars + 1)
+    a = mo.plan_moments(facts_for(shape)[1], seed, 0.6, 0.4)
+    b = mo.plan_moments(facts_for(other)[1], seed, 0.6, 0.4)
+    for i in range(len(shape)):
+        if i != which and i != which - 1:                # the section before may change what it leads into
+            assert a[i] == b[i]
+
+
+def full_song_parts(seed: int, fp=None):
+    fp = fp or {**BASE_FP, "genre_proximity": ["soul"]}
+    sections, f = beat.build_beat_plan(fp, FULL)
+    _, contexts, progs = beat.plan_contexts(sections, f, seed)
+    out = []
+    for s, ctx in zip(sections, contexts):
+        parts = composer.compose_section(s.name, progs[s.name], s.bars, s.energy, s.density, layers=s.layers, ctx=ctx)
+        out.append((s, ctx, progs[s.name], parts))
+    return out
+
+
+@given(seeds)
+@settings(max_examples=25, deadline=None)
+def test_the_song_ends_on_one_held_chord_with_a_crash(seed):
+    s, ctx, prog, parts = full_song_parts(seed)[-1]
+    lo = s.bars * 4.0 - 4.0
+    for p in parts:
+        if p.name.startswith("finale"):
+            continue
+        assert not [e for e in p.events if e.start >= lo], p.name
+    names = {p.name for p in parts}
+    assert {"finale_keys", "finale_drums", "finale_bass"} <= names
+    assert any(e.note == composer.CRASH for p in parts if p.name == "finale_drums" for e in p.events)
+
+
+@given(seeds)
+@settings(max_examples=25, deadline=None)
+def test_a_stop_leaves_the_last_beat_silent_and_a_late_entry_waits(seed):
+    for s, ctx, prog, parts in full_song_parts(seed):
+        end = s.bars * 4.0
+        kinds = {m.kind for m in ctx.moments}
+        if "stop" in kinds and "ending" not in kinds:
+            for p in parts:
+                assert not [e for e in p.events if e.start >= end - 1.0], p.name
+        for m in ctx.moments:
+            if m.kind == "late_entry":
+                for p in parts:
+                    if p.name in m.parts:
+                        assert not [e for e in p.events if e.start < m.bar * 4.0 - 0.001]
+
+
+@given(seeds)
+@settings(max_examples=25, deadline=None)
+def test_answers_are_notes_of_the_chord_playing(seed):
+    for s, ctx, prog, parts in full_song_parts(seed):
+        for p in parts:
+            if p.name != "color":
+                continue
+            for e in p.events:
+                pcs = {n % 12 for n in prog["chords"][int(e.start // 4) % len(prog["chords"])]}
+                assert e.note % 12 in pcs
+
+
+@given(seeds)
+@settings(max_examples=25, deadline=None)
+def test_the_one_time_sound_plays_in_one_section_only(seed):
+    where = [s.index for s, ctx, prog, parts in full_song_parts(seed) if any(p.name == "color_once" for p in parts)]
+    assert len(where) == 1
+
+
+@given(seeds)
+@settings(max_examples=15, deadline=None)
+def test_moments_never_break_the_playing_rules(seed):
+    for s, ctx, prog, parts in full_song_parts(seed):
+        for p in parts:
+            for e in p.events:
+                assert 0 <= e.note <= 127 and 1 <= e.velocity <= 127 and e.start >= 0 and e.duration > 0
+                assert e.start < s.bars * 4.0
+            if not p.is_drums:
+                by_pitch: dict[int, list] = {}
+                for e in p.events:
+                    by_pitch.setdefault(e.note, []).append(e)
+                for events in by_pitch.values():
+                    events.sort(key=lambda e: e.start)
+                    for a, b in zip(events, events[1:]):
+                        assert a.start + a.duration <= b.start + 1e-9
+
+
+def test_different_kinds_of_section_get_different_sounds():
+    sounds = {mo._colour(11, n, True) for n in ("verse", "chorus", "bridge", "outro")}
+    assert len(sounds) == 4

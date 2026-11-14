@@ -78,6 +78,7 @@ class SectionContext:
     style: StyleChoice = field(default_factory=default_choice)
     next_name: Optional[str] = None
     next_energy: Optional[float] = None
+    moments: list = field(default_factory=list)   # planned one-off moments for this section (moments.py)
 
 
 # ─────────────────────────────────────────────
@@ -536,4 +537,7 @@ def compose_section(
         parts.append(compose_strings(progression, bars, energy, ctx))
     if "arp" in active:
         parts.append(compose_arp(progression, bars, energy, ctx))
+    if ctx.moments:
+        from app.services.generation import touches   # imported here: touches builds on this module
+        parts = touches.apply_moments(parts, ctx.moments, progression, bars, ctx)
     return [_trim_overlaps(p) for p in parts]
