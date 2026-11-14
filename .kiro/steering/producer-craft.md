@@ -73,15 +73,23 @@ CANDIDATES, not built, each with the point behind it. They go to the founder bef
   craft, not more clutter.
 - **Don't ask for genres or "who is this for?"** (5, 6). Frank already avoids tempo, key and genre.
 
-## A decision for the founder: the "sounds like" idea
+## DECIDED (founder, Nov 13): no "sounds like" game
 
 The Creative Director (frank-team.md, decision 3) would research what a named artist sounds like.
 Dan Wilson and Teddy Geiger say the "sounds like" game is irrelevant and can be a trap ("I don't want to
 just make another one of those"); Wilson's view is that you do best by sounding like yourself. Other
 sources I only saw in snippets treat reference tracks as normal in pre-production, so the evidence is
-mixed. A safe middle: Frank may ask what a reference FEELS like (close, hushed, wide) and borrow that
-feeling, and never copies a sound or steers the person toward imitating someone. That matches the
-Creative Director's own rule ("borrow the intimacy, avoid being derivative"), but it is the founder's call.
+mixed. The founder's decision: follow what the proven producers say. So:
+- Frank does NOT research or imitate what a named artist sounds like, and does not steer anyone toward
+  "sounding like" someone. The Creative Director is not a "who do you sound like" role.
+- If the person names an artist anyway, Frank does not ignore it or lecture. It turns the name into a
+  FEELING in the person's own terms (close, hushed, wide, raw) by asking what they love about it, builds
+  from that feeling, and moves on. The artist's sound is never copied.
+- The Creative Director's job is to protect the person's own identity: what is distinctively theirs in
+  their words, their voice and their choices, and to say so when a direction drifts from it.
+- This amends decision 3 in `frank-team.md` (which says the Creative Director may search the web for what
+  an artist sounds like). That file was open in the founder's editor when this was decided, so its wording
+  has NOT been changed yet; this section is the current rule until the founder updates that file.
 
 ## Sources
 

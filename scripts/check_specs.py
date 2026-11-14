@@ -11,6 +11,7 @@ Rules:
         DONE with open tasks -> error;  BUILDING with nothing done -> warning;
         SPEC / OUTLINE with done tasks -> warning.
   S5  Every roadmap row that has moved past OUTLINE points at a real folder. -> error
+  S6  Every numbered roadmap row can be read by this checker.               -> error
 
 Exit code 1 if any error. Usage:  python3 scripts/check_specs.py [--json]
 """
@@ -87,6 +88,9 @@ def main() -> int:
         for line_no, line in enumerate(ROADMAP.read_text().splitlines(), start=1):
             m = ROW.match(line)
             if not m:
+                if re.match(r"^\|\s*\d+\s*\|", line):
+                    # A numbered roadmap row the checker cannot read would be skipped silently.
+                    findings.append({"rule": "S6", "level": "error", "where": f".kiro/specs/_roadmap.md:{line_no}", "msg": "roadmap row not in the form | # | name | description | needs | STATUS |"})
                 continue
             _num, name, status = m.groups()
             where = f".kiro/specs/_roadmap.md:{line_no}"
