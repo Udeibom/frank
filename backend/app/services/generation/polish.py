@@ -23,7 +23,7 @@ from typing import Optional
 import numpy as np
 
 SAMPLE_RATE = 44100
-CEILING_DB = -1.5            # nothing in the song goes above this
+CEILING_DB = -1.0            # nothing in the song goes above this (matches the song's final peak level)
 END_FADE_SECONDS = 0.12      # a reverb tail cut at the end of a buffer must not click
 
 

@@ -336,7 +336,7 @@ def test_a_song_has_one_ending_and_at_most_one_one_off(shape, seed):
     kinds = [(f.index, m.kind) for f in facts for m in plan[f.index]]
     assert [i for i, k in kinds if k == "ending"] == [facts[-1].index]
     assert sum(1 for _, k in kinds if k == "one_off") <= 1
-    has_place = any(f.name == "bridge" or (f.name == "chorus" and f.final) for f in facts)
+    has_place = any((f.name == "bridge" or (f.name == "chorus" and f.final)) and not (f is facts[-1] and f.bars < 3) for f in facts)
     assert sum(1 for _, k in kinds if k == "one_off") == (1 if has_place else 0)
 
 
@@ -488,7 +488,7 @@ def test_the_song_pass_never_goes_over_the_ceiling():
     loud = np.clip(noise(44100 * 3, 5, 12000.0), -32000, 32000)
     out = polish.treat_song(loud)
     assert out.shape == loud.shape
-    assert np.abs(out).max() <= 32768 * 10 ** (-1.4 / 20)
+    assert np.abs(out).max() <= 32768 * 10 ** (polish.CEILING_DB / 20) + 1
 
 
 def test_the_chain_changes_the_sound_but_not_the_timing():
@@ -517,3 +517,35 @@ def test_every_part_goes_through_the_chain_when_it_is_on_and_none_when_off(monke
     beat.render_song(sections, f, 9, mix_chain=True)
     wanted = sum(len(composer.compose_section(s.name, theory.build_progression(f["key"], f["energy_level"], f["tempo_feel"]), s.bars, s.energy, s.density, layers=s.layers)) for s in sections)
     assert len(seen) >= wanted - 1 and {"drums", "bass", "keys"} <= set(seen)
+
+
+# ── review fixes ──────────────────────────────────────────
+
+@given(seeds)
+@settings(max_examples=40, deadline=None)
+def test_the_one_time_sound_is_never_planned_where_the_ending_would_erase_it(seed):
+    shape = [("intro", 4), ("verse", 8), ("chorus", 2)]          # last section is too short to keep it
+    facts = facts_for(shape)[1]
+    plan = mo.plan_moments(facts, seed, 0.6, 0.4)
+    last = facts[-1].index
+    assert not any(m.kind == "one_off" for m in plan[last])
+
+
+def test_an_empty_section_stays_silent_instead_of_being_boosted():
+    sections, f = beat.build_beat_plan({**BASE_FP}, [("verse", 2), ("chorus", 2)])
+    sections[0].layers = []
+    mixes, full = beat.render_song(sections, f, 3, mix_chain=False)
+    assert db(mixes[0]) < -60.0
+
+
+def test_the_ceiling_in_the_chain_matches_the_final_peak_level():
+    assert abs(10 ** (polish.CEILING_DB / 20.0) - beat.PEAK_TARGET) < 0.02
+
+
+def test_fetch_script_rejects_a_file_that_is_not_a_soundfont(tmp_path):
+    import subprocess
+    from pathlib import Path
+    script = Path(__file__).resolve().parent.parent / "scripts" / "fetch_soundfont.sh"
+    text = script.read_text()
+    assert "RIFF" in text and "sfbk" in text and ".part" in text and "curl -fsSL" in text
+    assert "file \"$SF_PATH\"" not in text            # the `file` command is not in the slim image

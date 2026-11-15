@@ -57,7 +57,8 @@ ROLE_VARIANT = {"intro": 0, "verse": 0, "pre-chorus": 1, "chorus": 1, "bridge": 
 CHORUS_RMS_DB = -18.0
 LOUDNESS_OFFSET_DB = {"intro": -5.0, "verse": -2.5, "pre-chorus": -1.2, "chorus": 0.0, "bridge": -3.5, "outro": -6.0}
 LATER_CHORUS_BONUS_DB = 0.7
-MAX_GAIN_DB = 24.0
+MAX_GAIN_DB = 12.0
+SILENCE_RMS = 4.0            # on the int16 scale: below this a section is treated as silent, not boosted
 MIN_GAIN_DB = -18.0
 
 # How loud each part is against the others before the section is set to its level.
@@ -68,6 +69,7 @@ PART_GAIN = {
 }
 
 PEAK_TARGET = 0.89
+ENGINE_VERSION = 3          # bumps when a change would make an old beat sound different if re-rendered
 FADE_OUT_SECONDS = 1.5
 EQ_MIN_DB = 0.25
 
@@ -257,7 +259,7 @@ def render_song(
                 del stem
             body = acc[: end - start]
             rms = float(np.sqrt(np.mean(np.square(body, dtype=np.float64)))) if body.size else 0.0
-            if rms > 0:
+            if rms > SILENCE_RMS:
                 wanted = _target_db(s)
                 gain_db = wanted - 20.0 * np.log10(rms / 32768.0)
                 gain_db = max(MIN_GAIN_DB, min(MAX_GAIN_DB, gain_db))

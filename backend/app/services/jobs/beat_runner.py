@@ -29,6 +29,11 @@ from app.services.generation.rng import derive_seed
 from app.services.generation.styles import pick_style
 
 
+# One beat is built at a time. A render holds a large SoundFont and several minutes of audio in memory,
+# so several at once could use more than a small server has. Others simply wait their turn.
+_one_at_a_time = asyncio.Semaphore(1)
+
+
 def _arrangement_params(
     sections: list[beat_engine.SectionPlan], fp: dict, seed: int
 ) -> dict:
@@ -36,6 +41,8 @@ def _arrangement_params(
     style = pick_style(fp)
     return {
         "fingerprint": fp,
+        "engine": beat_engine.ENGINE_VERSION,
+        "mix_chain": True,
         "seed": seed,
         "style": style.name,
         "unsupported_hints": style.unsupported,
@@ -132,9 +139,10 @@ async def run_full_beat_job(
         seed = derive_seed(json.dumps(fingerprint, sort_keys=True, default=str), count)
 
         # Entire heavy job (render + encode + upload + records) in one thread
-        version = await asyncio.to_thread(
-            _render_and_persist_sync, project_id, fingerprint, label, seed
-        )
+        async with _one_at_a_time:
+            version = await asyncio.to_thread(
+                _render_and_persist_sync, project_id, beat_engine.fp_utils.normalize(fingerprint), label, seed
+            )
 
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}
@@ -192,9 +200,10 @@ async def run_edit_section_job(
 
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
-        version = await asyncio.to_thread(
-            _rerender_and_persist_sync, project_id, sections, fp, label, seed
-        )
+        async with _one_at_a_time:
+            version = await asyncio.to_thread(
+                _rerender_and_persist_sync, project_id, sections, fp, label, seed
+            )
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}
         )
@@ -234,9 +243,10 @@ async def run_mute_stem_job(
 
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
-        version = await asyncio.to_thread(
-            _rerender_and_persist_sync, project_id, sections, fp, label, seed
-        )
+        async with _one_at_a_time:
+            version = await asyncio.to_thread(
+                _rerender_and_persist_sync, project_id, sections, fp, label, seed
+            )
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}
         )
@@ -275,9 +285,10 @@ async def run_add_stem_job(
 
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
-        version = await asyncio.to_thread(
-            _rerender_and_persist_sync, project_id, sections, fp, label, seed
-        )
+        async with _one_at_a_time:
+            version = await asyncio.to_thread(
+                _rerender_and_persist_sync, project_id, sections, fp, label, seed
+            )
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}
         )
