@@ -117,6 +117,7 @@ steps_strategy = st.lists(st.integers(1, 3), min_size=14, max_size=30)
 
 
 @given(st.integers(70, 130), steps_strategy, st.floats(0.0, 3.0))
+@settings(deadline=None)   # the speed finder takes a variable time on a busy machine; only the answer matters
 def test_tempo_ignores_how_much_silence_comes_first(bpm, steps, lead):
     rng = np.random.default_rng(1)
     jitter = rng.uniform(-0.012, 0.012, len(steps))
@@ -126,6 +127,7 @@ def test_tempo_ignores_how_much_silence_comes_first(bpm, steps, lead):
 
 
 @given(st.integers(70, 130), steps_strategy)
+@settings(deadline=None)   # the speed finder takes a variable time on a busy machine; only the answer matters
 def test_a_steady_pulse_is_found_or_its_double_or_half(bpm, steps):
     rng = np.random.default_rng(2)
     jitter = rng.uniform(-0.012, 0.012, len(steps))
