@@ -19,7 +19,7 @@ What makes this sound like music and not a loop:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from app.services.generation import theory
 from app.services.generation.rng import rng_for
@@ -65,6 +65,7 @@ class Part:
     preset: int                     # GM program number (ignored for drums)
     is_drums: bool
     events: list[NoteEvent] = field(default_factory=list)
+    lead: bool = False              # True when this part is the person's own tune
 
 
 @dataclass
@@ -79,6 +80,7 @@ class SectionContext:
     next_name: Optional[str] = None
     next_energy: Optional[float] = None
     moments: list = field(default_factory=list)   # planned one-off moments for this section (moments.py)
+    lead: Any = None                               # the person's own tune (lead.Lead), when this section plays it
 
 
 # ─────────────────────────────────────────────
@@ -530,7 +532,11 @@ def compose_section(
     if "drums" in active:
         parts.append(compose_drums(bars, energy, density, ctx))
     if "melody" in active:
-        parts.append(compose_melody(progression, bars, energy, density, ctx))
+        if ctx.lead is not None:
+            from app.services.generation import lead as lead_mod   # imported here: lead builds on this module
+            parts.append(Part("melody", lead_mod.LEAD_PROGRAM, False, lead_mod.lead_events(ctx.lead, bars, energy, ctx.seed, ctx.index), lead=True))
+        else:
+            parts.append(compose_melody(progression, bars, energy, density, ctx))
     if "pad" in active:
         parts.append(compose_pad(progression, bars, energy, ctx))
     if "strings" in active:

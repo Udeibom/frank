@@ -32,7 +32,7 @@ def _beat_summary(version: Optional[dict]) -> Optional[dict[str, Any]]:
         }
         for s in params.get("sections", [])
     ]
-    return {"label": version.get("label"), "sections": sections}
+    return {"label": version.get("label"), "sections": sections, "lead": params.get("lead_info")}
 
 
 def _vocal_summary(take_count: int, take: Optional[dict], comp: Optional[dict]) -> Optional[dict[str, Any]]:
@@ -116,6 +116,16 @@ async def get_record(project_id: str) -> SongRecord:
         mix=_mix_summary(mix_row),
         decisions=decisions,
     )
+
+
+async def active_melody(project_id: str) -> Optional[tuple[str, dict[str, Any]]]:
+    """(version id, content) of the active melody, or None when there is none."""
+    active_map = await song_db.get_active_map(project_id)
+    vid = active_map.get("melody")
+    if not vid:
+        return None
+    versions = await song_db.get_versions(project_id, [vid])
+    return (vid, versions[0].content) if versions else None
 
 
 def has_first_draft(record: SongRecord) -> bool:

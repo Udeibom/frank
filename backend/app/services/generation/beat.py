@@ -18,12 +18,13 @@ What this module is responsible for, and why:
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
 
-from app.services.generation import composer, fingerprint as fp_utils, moments as moments_mod, polish, theory
+from app.services.generation import composer, fingerprint as fp_utils, lead as lead_mod, moments as moments_mod, polish, theory
 from app.services.generation.renderer import SAMPLE_RATE, TAIL_SECONDS, SynthSession
 from app.services.generation.rng import derive_seed
 from app.services.generation.styles import StyleChoice, pick_style
@@ -68,6 +69,7 @@ PART_GAIN = {
     "finale_keys": 0.8, "finale_pad": 0.5, "finale_bass": 1.0, "finale_drums": 1.0,
 }
 
+LEAD_GAIN = 1.1              # the person's own tune sits a little in front of the other parts
 PEAK_TARGET = 0.89
 ENGINE_VERSION = 3          # bumps when a change would make an old beat sound different if re-rendered
 FADE_OUT_SECONDS = 1.5
@@ -112,11 +114,12 @@ def default_seed(fp: dict) -> int:
 
 
 def build_beat_plan(
-    fingerprint: dict, arrangement=None, seed: Optional[int] = None
+    fingerprint: dict, arrangement=None, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None
 ) -> tuple[list[SectionPlan], dict]:
     """
     Build the section plan (no audio yet) from a fingerprint.
-    Returns (sections, normalized_fingerprint).
+    When there is a tune, a section that plays it is made at least as long as the tune, so the whole tune is
+    heard. Returns (sections, normalized_fingerprint).
     """
     fp = fp_utils.normalize(fingerprint)
     style = pick_style(fp)
@@ -126,6 +129,8 @@ def build_beat_plan(
 
     sections: list[SectionPlan] = []
     for i, (name, bars) in enumerate(arrangement):
+        if lead and name in lead_mod.LEAD_SECTIONS:
+            bars = max(int(bars), lead.bars)
         mult = SECTION_ENERGY.get(name, 0.8)
         energy = _clamp(base_energy * mult)
         # Density tracks energy a bit so bigger sections feel fuller
@@ -156,7 +161,7 @@ def section_spans(sections: list[SectionPlan], bpm: float) -> list[tuple[int, in
 
 
 def plan_contexts(
-    sections: list[SectionPlan], fp: dict, seed: int
+    sections: list[SectionPlan], fp: dict, seed: int, lead: Optional[lead_mod.Lead] = None
 ) -> tuple[StyleChoice, list[composer.SectionContext], dict[str, dict]]:
     """
     Everything the composer needs per section: the style, where it sits in the song, and the chord
@@ -164,11 +169,21 @@ def plan_contexts(
     """
     style = pick_style(fp)
     offset = derive_seed(seed, "chords") % 4
+    if lead:
+        playing = [s.bars for s in sections if s.name in lead_mod.LEAD_SECTIONS]
+        if playing and min(playing) < lead.bars:
+            lead = lead_mod.fit_to(lead, min(playing))      # one consistent, whole-phrase version of the tune
     progressions: dict[str, dict] = {}
+    # When the person has hummed a tune, the whole song sits in the key of that tune.
+    key = (lead.key if lead else "") or fp["key"]
     for s in sections:
-        if s.name not in progressions:
+        if s.name in progressions:
+            continue
+        if lead and s.name in lead_mod.LEAD_SECTIONS:
+            progressions[s.name] = lead_mod.harmonize(lead, key, style.extension)
+        else:
             progressions[s.name] = theory.build_progression(
-                key=fp["key"],
+                key=key,
                 energy=fp["energy_level"],
                 tempo_feel=fp["tempo_feel"],
                 variant=(ROLE_VARIANT.get(s.name, 0) + offset) % 4,
@@ -190,6 +205,7 @@ def plan_contexts(
                 next_name=nxt.name if nxt else None,
                 next_energy=nxt.energy if nxt else None,
                 moments=planned.get(s.index, []),
+                lead=lead if (lead and s.name in lead_mod.LEAD_SECTIONS) else None,
             )
         )
     return style, contexts, progressions
@@ -220,7 +236,8 @@ def _tone_tilt(audio: np.ndarray, fp: dict) -> np.ndarray:
 
 
 def render_song(
-    sections: list[SectionPlan], fp: dict, seed: Optional[int] = None, mix_chain: bool = True
+    sections: list[SectionPlan], fp: dict, seed: Optional[int] = None, mix_chain: bool = True,
+    lead: Optional[lead_mod.Lead] = None,
 ) -> tuple[list[np.ndarray], np.ndarray]:
     """
     Render the whole song. Returns (per_section_audio, full_audio), both int16 stereo.
@@ -236,7 +253,7 @@ def render_song(
     tail = int(TAIL_SECONDS * SAMPLE_RATE)
     total = spans[-1][1]
     song = np.zeros((total + tail, 2), dtype=np.float32)
-    _, contexts, progressions = plan_contexts(sections, fp, seed)
+    _, contexts, progressions = plan_contexts(sections, fp, seed, lead)
 
     with SynthSession() as synth:
         for s, ctx, (start, end) in zip(sections, contexts, spans):
@@ -255,7 +272,8 @@ def render_song(
                 if mix_chain:
                     stem = polish.treat_part(part.name, stem.astype(np.float32), bpm)
                 n = min(stem.shape[0], acc.shape[0])
-                acc[:n] += stem[:n].astype(np.float32) * PART_GAIN.get(part.name, 0.7)
+                gain = LEAD_GAIN if part.lead else PART_GAIN.get(part.name, 0.7)
+                acc[:n] += stem[:n].astype(np.float32) * gain
                 del stem
             body = acc[: end - start]
             rms = float(np.sqrt(np.mean(np.square(body, dtype=np.float64)))) if body.size else 0.0
@@ -282,14 +300,14 @@ def render_song(
 
 
 def render_full_beat(
-    fingerprint: dict, seed: Optional[int] = None
+    fingerprint: dict, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None
 ) -> tuple[list[SectionPlan], list[np.ndarray], np.ndarray]:
     """
     Full pipeline: plan the arrangement, render the song.
     Returns (sections, per_section_audio, full_beat_audio). CPU-bound: call from a background job.
     """
-    sections, fp = build_beat_plan(fingerprint)
-    mixes, full = render_song(sections, fp, seed)
+    sections, fp = build_beat_plan(fingerprint, lead=lead)
+    mixes, full = render_song(sections, fp, seed, lead=lead)
     return sections, mixes, full
 
 
@@ -317,11 +335,42 @@ def sections_from_params(params: dict) -> tuple[list[SectionPlan], dict]:
     return sections, fp
 
 
+def lead_from_params(params: dict) -> Optional[lead_mod.Lead]:
+    """The person's tune a saved beat was built around, if any. Older beats have none."""
+    saved = params.get("lead")
+    lead = lead_mod.Lead.from_dict(saved)
+    if saved and lead is None:
+        logging.getLogger(__name__).warning("A saved tune could not be read and was left out of this beat")
+    return lead
+
+
+def lead_info(sections: list[SectionPlan], lead: Optional[lead_mod.Lead]) -> dict:
+    """
+    What happened to the person's tune in this beat, in plain facts Frank can turn into words: was it used,
+    where, and was any of it left out.
+    """
+    if lead is None:
+        return {"used": False}
+    playing = [s for s in sections if s.name in lead_mod.LEAD_SECTIONS and "melody" in s.layers]
+    if not playing:
+        return {"used": False, "reason": "no_chorus_plays_it", "key": lead.key}
+    heard = min(lead.bars, min(s.bars for s in playing))
+    return {
+        "used": True,
+        "sections": [s.index for s in playing],
+        "tune_bars": lead.bars,
+        "heard_bars": heard,
+        "cut": heard < lead.bars,
+        "key": lead.key,
+        "source": lead.source,
+    }
+
+
 def rerender_all(
-    sections: list[SectionPlan], fp: dict, seed: Optional[int] = None
+    sections: list[SectionPlan], fp: dict, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None
 ) -> tuple[list[np.ndarray], np.ndarray]:
     """Re-render every section after an edit. Returns (per_section_audio, full_beat_audio)."""
-    return render_song(sections, fp, seed)
+    return render_song(sections, fp, seed, lead=lead)
 
 
 def apply_section_instruction(

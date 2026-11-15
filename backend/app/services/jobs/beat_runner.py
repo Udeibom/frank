@@ -15,6 +15,7 @@ sections can be addressed individually later.
 from __future__ import annotations
 import asyncio
 import json
+from dataclasses import replace
 
 import numpy as np
 
@@ -25,7 +26,10 @@ from app.services.storage.files import upload_audio
 from app.services.generation import beat as beat_engine
 from app.services.generation import renderer
 from app.services.generation.renderer import to_mp3_bytes
+from app.services.generation import lead as lead_mod
 from app.services.generation.rng import derive_seed
+from app.services.intake.melody import CONFIDENT
+from app.services.song import record as song_record
 from app.services.generation.styles import pick_style
 
 
@@ -34,8 +38,13 @@ from app.services.generation.styles import pick_style
 _one_at_a_time = asyncio.Semaphore(1)
 
 
+def _lead_used(version: dict) -> bool:
+    """Whether the beat that was just made plays the person's own tune."""
+    return bool(((version.get("params") or {}).get("lead_info") or {}).get("used"))
+
+
 def _arrangement_params(
-    sections: list[beat_engine.SectionPlan], fp: dict, seed: int
+    sections: list[beat_engine.SectionPlan], fp: dict, seed: int, lead: lead_mod.Lead | None = None
 ) -> dict:
     """Serialize the arrangement into JSON for beat_versions.params."""
     style = pick_style(fp)
@@ -44,6 +53,8 @@ def _arrangement_params(
         "engine": beat_engine.ENGINE_VERSION,
         "mix_chain": True,
         "seed": seed,
+        "lead": lead.to_dict() if lead else None,
+        "lead_info": beat_engine.lead_info(sections, lead),
         "style": style.name,
         "unsupported_hints": style.unsupported,
         "sections": [
@@ -62,7 +73,7 @@ def _arrangement_params(
 
 
 def _render_and_persist_sync(
-    project_id: str, fingerprint: dict, label: str, seed: int
+    project_id: str, fingerprint: dict, label: str, seed: int, lead: lead_mod.Lead | None = None
 ) -> dict:
     """
     The entire heavy job, run in ONE worker thread: render the beat, encode MP3,
@@ -72,9 +83,9 @@ def _render_and_persist_sync(
     thread avoids interleaving sync HTTP calls with the event loop, which was
     causing connection races in the storage client. Returns the version dict.
     """
-    sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed)
+    sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed, lead)
     fp = beat_engine.fp_utils.normalize(fingerprint)
-    return _persist_sync(project_id, sections, mixes, full, fp, label, seed)
+    return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead)
 
 
 def _rerender_and_persist_sync(
@@ -83,10 +94,11 @@ def _rerender_and_persist_sync(
     fp: dict,
     label: str,
     seed: int,
+    lead: lead_mod.Lead | None = None,
 ) -> dict:
     """Re-render an edited arrangement and persist it, all in one thread."""
-    mixes, full = beat_engine.rerender_all(sections, fp, seed)
-    return _persist_sync(project_id, sections, mixes, full, fp, label, seed)
+    mixes, full = beat_engine.rerender_all(sections, fp, seed, lead)
+    return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead)
 
 
 def _persist_sync(
@@ -97,6 +109,7 @@ def _persist_sync(
     fp: dict,
     label: str,
     seed: int,
+    lead: lead_mod.Lead | None = None,
 ) -> dict:
     """
     Upload the assembled render + one mixed file per section, and write records.
@@ -110,7 +123,7 @@ def _persist_sync(
     render_url = upload_audio("beats", full_mp3, extension="mp3", name_prefix="beat")
 
     version = beat_db.create_beat_version_sync(
-        project_id, render_url, label, _arrangement_params(sections, fp, seed)
+        project_id, render_url, label, _arrangement_params(sections, fp, seed, lead)
     )
 
     for section, mix in zip(sections, section_mixes):
@@ -125,6 +138,38 @@ def _persist_sync(
     return version
 
 
+async def _fingerprint_and_lead(project_id: str, fingerprint: dict) -> tuple[dict, lead_mod.Lead | None]:
+    """
+    If the person has confirmed a hummed tune, the beat is built around it. The speed only comes from
+    the hum when nothing else has settled it (a value that is already in the fingerprint is never
+    replaced); the key always comes from the tune, because the tune is what has to fit.
+    A problem reading the tune never stops a beat from being built.
+    """
+    try:
+        found = await song_record.active_melody(project_id)
+    except Exception:  # noqa: BLE001
+        return fingerprint, None
+    if not found:
+        return fingerprint, None
+    version_id, content = found
+    lead = lead_mod.from_sketch(content, source=version_id)
+    if lead is None:
+        return fingerprint, None
+    fp = dict(fingerprint or {})
+    key, changed = lead_mod.choose_key(lead, fp.get("key") or None)
+    if key:
+        lead = replace(lead, key=key)
+        fp["key"] = key                   # the beat's real key, so everything downstream agrees with it
+    if changed:
+        fp["key_from_tune"] = True
+    try:
+        if "tempo_bpm" not in fp and float(content.get("tempo_confidence", 0)) >= CONFIDENT:
+            fp["tempo_bpm"] = int(round(float(content["tempo_bpm"])))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        fp.pop("tempo_bpm", None)           # a missing or impossible speed is simply not used
+    return fp, lead
+
+
 async def run_full_beat_job(
     job_id: str, project_id: str, fingerprint: dict
 ) -> None:
@@ -134,6 +179,7 @@ async def run_full_beat_job(
 
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
+        fingerprint, lead = await _fingerprint_and_lead(project_id, fingerprint)
         # A new version gets a new seed, so asking for another one gives a different song, while
         # the same fingerprint and the same count always give the same song (repeatable).
         seed = derive_seed(json.dumps(fingerprint, sort_keys=True, default=str), count)
@@ -141,7 +187,7 @@ async def run_full_beat_job(
         # Entire heavy job (render + encode + upload + records) in one thread
         async with _one_at_a_time:
             version = await asyncio.to_thread(
-                _render_and_persist_sync, project_id, beat_engine.fp_utils.normalize(fingerprint), label, seed
+                _render_and_persist_sync, project_id, fingerprint, label, seed, lead
             )
 
         await projects_db.update_project_active_state(
@@ -150,7 +196,7 @@ async def run_full_beat_job(
 
         await jobs_db.mark_complete(
             job_id,
-            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label},
+            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label, "lead_used": _lead_used(version)},
         )
     except Exception as exc:  # noqa: BLE001
         try:
@@ -162,9 +208,9 @@ async def run_full_beat_job(
         raise exc
 
 
-async def _load_active_arrangement(project_id: str) -> tuple[list, dict, int]:
+async def _load_active_arrangement(project_id: str) -> tuple[list, dict, int, lead_mod.Lead | None]:
     """
-    Load the active beat version's arrangement. Returns (sections, fp, seed).
+    Load the active beat version's arrangement. Returns (sections, fp, seed, lead).
     Raises if there is no active beat to edit.
     """
     state = await projects_db.get_project_active_state(project_id)
@@ -176,7 +222,7 @@ async def _load_active_arrangement(project_id: str) -> tuple[list, dict, int]:
     seed = version["params"].get("seed")
     if not isinstance(seed, int):
         seed = beat_engine.default_seed(fp)   # beats saved before seeds existed
-    return sections, fp, seed
+    return sections, fp, seed, beat_engine.lead_from_params(version["params"])
 
 
 async def run_edit_section_job(
@@ -191,7 +237,7 @@ async def run_edit_section_job(
     """
     try:
         await jobs_db.mark_processing(job_id)
-        sections, fp, seed = await _load_active_arrangement(project_id)
+        sections, fp, seed, lead = await _load_active_arrangement(project_id)
 
         for s in sections:
             if s.index == section_index:
@@ -202,14 +248,14 @@ async def run_edit_section_job(
         label = f"Beat v{count + 1}"
         async with _one_at_a_time:
             version = await asyncio.to_thread(
-                _rerender_and_persist_sync, project_id, sections, fp, label, seed
+                _rerender_and_persist_sync, project_id, sections, fp, label, seed, lead
             )
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}
         )
         await jobs_db.mark_complete(
             job_id,
-            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label},
+            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label, "lead_used": _lead_used(version)},
         )
     except Exception as exc:  # noqa: BLE001
         try:
@@ -234,7 +280,7 @@ async def run_mute_stem_job(
     """
     try:
         await jobs_db.mark_processing(job_id)
-        sections, fp, seed = await _load_active_arrangement(project_id)
+        sections, fp, seed, lead = await _load_active_arrangement(project_id)
 
         for s in sections:
             if section_index is None or s.index == section_index:
@@ -245,14 +291,14 @@ async def run_mute_stem_job(
         label = f"Beat v{count + 1}"
         async with _one_at_a_time:
             version = await asyncio.to_thread(
-                _rerender_and_persist_sync, project_id, sections, fp, label, seed
+                _rerender_and_persist_sync, project_id, sections, fp, label, seed, lead
             )
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}
         )
         await jobs_db.mark_complete(
             job_id,
-            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label},
+            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label, "lead_used": _lead_used(version)},
         )
     except Exception as exc:  # noqa: BLE001
         try:
@@ -276,7 +322,7 @@ async def run_add_stem_job(
     """
     try:
         await jobs_db.mark_processing(job_id)
-        sections, fp, seed = await _load_active_arrangement(project_id)
+        sections, fp, seed, lead = await _load_active_arrangement(project_id)
 
         for s in sections:
             if section_index is None or s.index == section_index:
@@ -287,14 +333,14 @@ async def run_add_stem_job(
         label = f"Beat v{count + 1}"
         async with _one_at_a_time:
             version = await asyncio.to_thread(
-                _rerender_and_persist_sync, project_id, sections, fp, label, seed
+                _rerender_and_persist_sync, project_id, sections, fp, label, seed, lead
             )
         await projects_db.update_project_active_state(
             project_id, {"active_beat_version_id": version["id"]}
         )
         await jobs_db.mark_complete(
             job_id,
-            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label},
+            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label, "lead_used": _lead_used(version)},
         )
     except Exception as exc:  # noqa: BLE001
         try:
