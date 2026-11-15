@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     auth_required: bool = True
 
     # Procedural music engine
-    soundfont_path: str = "assets/FluidR3Mono_GM.sf3"
+    soundfont_path: str = "assets/MuseScore_General.sf3"
 
     @property
     def allowed_origins_list(self) -> list[str]:
