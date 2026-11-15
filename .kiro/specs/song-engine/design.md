@@ -64,6 +64,16 @@ Each part is a function `(plan_part, harmony, seed) -> NoteEvents`.
 - Transitions: a Score event type `transition` (fill, riser, break, tail) placed on the bars before and
   across a join.
 
+### Key and tempo when a tune exists
+- The song's key follows a settled fingerprint key unless the tune clearly does not fit it: when the scale fit
+  of the tune in the settled key is worse than in the hum's key by more than 5 points (0.05), the hum's key is
+  used and the fingerprint gets `key_from_tune` (`lead.choose_key`, `beat_runner._fingerprint_and_lead`).
+  With no settled key, the hum's key is used.
+- Tempo is filled from the hum only when the fingerprint has none (and the hum's tempo confidence is high enough).
+  A settled tempo is never replaced (spec 02 requirement 6.4).
+- The tune plays in choruses only (`LEAD_SECTIONS`), is rounded up to 1, 2, 4, 8 or 16 bars and cut beyond 16.
+  A chorus is extended to the tune's length. Known limits: see tasks 4.8-4.12.
+
 ## Dynamics and loudness
 
 - The Score carries per-section and per-part gain. The Assembler applies them, then runs ONE loudness
