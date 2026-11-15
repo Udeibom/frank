@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     huggingface_api_key: str = ""
     replicate_api_token: str = ""
+    # Sound-quality spike (spec 05): sample-set downloads and GPU notebooks. Not used at runtime by the app.
+    hf_token: str = ""
+    kaggle_username: str = ""
+    kaggle_key: str = ""
+    modal_token_id: str = ""
+    modal_token_secret: str = ""
 
     # CORS
     allowed_origins: str = "http://localhost:3000"
