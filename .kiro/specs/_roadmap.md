@@ -14,7 +14,7 @@ Status key: OUTLINE (intent captured) / SPEC (requirements+design+tasks written)
 | 02 | start-from-any-input | Lyrics, hum, tapped rhythm, voice memo or description all fill the record; no "voice first/beat first" | 01 | BUILDING |
 | 03 | listener | The team's ears: per-section and per-part measurements reported as plain facts | 01 | SPEC |
 | 04 | song-engine | The team's hands for music: arrangement depth, transitions, real stems, seeded variation, melody that follows chords, every fingerprint field wired | 01, 02 | BUILDING |
-| 05 | sound-quality | Release-grade sound: spike comparing better SoundFonts + mixing chain vs hosted neural; decision recorded, then built | 04 | OUTLINE |
+| 05 | sound-quality | Release-grade sound: spike comparing better SoundFonts + mixing chain vs hosted neural; decision recorded, then built | 04 | BUILDING |
 | 06 | sing-it | The user sings: guide melody they follow, beat alignment, tuning to the song's key per note, bleed removal, comping, harmony | 02, 04 | OUTLINE |
 | 07 | team-conversation | Shared brief in every call, role routing, several LLM providers, bounded specialist disagreement, occasional role mentions, review-vs-creating behaviour, plain-language enforcement | 01, 03 | OUTLINE |
 | 08 | refine-loop | Diagnose with evidence, offer 2-3 directions, preview each, commit; experiments when nobody knows; branches; "give me the second version back" | 03, 04, 07 | OUTLINE |

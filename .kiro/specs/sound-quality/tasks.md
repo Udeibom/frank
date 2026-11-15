@@ -1,0 +1,33 @@
+# Sound Quality - Implementation Plan
+Evidence-only record of the spike. Depends on spec 04. Tasks are ticked only with a file, test or
+listening result behind them.
+- [ ] 1. Sample-set spike
+  - [x] 1.1 Render identical notes with three sets and build a loudness-matched blind set — _Evidence: /home/caleb/frank-listening/blind-soundfonts/ (6 wavs + ANSWER_KEY.txt with measured LUFS and gains)_
+    - _Requirements: 1.1_
+  - [x] 1.2 Founder ranks blind — _Evidence: answers in blind-soundfonts/LISTEN_FIRST.md; with ANSWER_KEY.txt: A = GeneralUser, MuseScore, current; B = MuseScore, current, GeneralUser_
+    - _Requirements: 1.2_
+  - [x] 1.3 Default switched to MuseScore General — _Evidence: config.py soundfont_path, scripts/fetch_soundfont.sh, Dockerfile line 30, commit 7d519e9; no test asserts the path_
+    - _Requirements: 1.3_
+  - [ ] 1.4 Cost figures (+12 MB memory, +2 s render) and MIT licence confirmed — _NOT DONE: the fetch script says MIT, but the licence text was not checked here and the memory/time figures were not re-measured (scratch/mem.py exists to do it)_
+    - _Requirements: 1.3_
+- [ ] 2. Neural test
+  - [x] 2.1 Re-voice a 20 s chorus on a Kaggle T4 — _Evidence: scratch/kjob/run.py, kout/frank-neural-spike.log (35.4 s and 29.9 s per 19.94 s), neural-spike/ wavs_
+    - _Requirements: 2.1, 2.2_
+  - [x] 2.2 Chord match against a control — _Evidence: scratch/chroma_check.py re-run this session: 0.55 and 0.63 against control 0.08_
+    - _Requirements: 2.2_
+  - [x] 2.3 Founder listens and decides — _Evidence: answers in neural-spike/LISTEN_FIRST.md (prefers 00, Frank's own, on all questions)_
+    - _Requirements: 2.3, 2.4_
+  - [ ] 2.4 Kaggle job reproduced from the repo — _NOT DONE: the job lives only in scratch/kjob outside the repo (embeds the excerpt as base64); it has not been re-run and is not committed_
+    - _Requirements: 2.4_
+- [ ] 3. Mixing chain
+  - [x] 3.1 Chain implemented with tests — _Evidence: polish.py; 3 chain tests passed this session (-k "polish or treat or mix_chain or chain"); test_the_chain_changes_the_sound_but_not_the_timing_
+    - _Requirements: 3.1_
+  - [x] 3.2 Blind pairs with control, founder answers — _Evidence: blind-polish/ANSWER_KEY.txt and LISTEN_FIRST.md (no difference in pairs 2 and 3; "maybe B" in the control pair 1)_
+    - _Requirements: 3.1, 3.2_
+  - [ ] 3.3 Measured effect (+8 dB at equal peak, +20 s on 185 s) — _NOT DONE: figures reported, not re-measured here; the blind pairs were matched to -21.5 LUFS, so the loudness gain was removed for listening_
+    - _Requirements: 3.3_
+  - [ ] 3.4 Founder decides: keep, make optional, or drop — _NOT DONE: OPEN. Chain is on by default (mix_chain=True) meanwhile_
+    - _Requirements: 3.4_
+- [ ] 4. Arrangement
+  - [ ] 4.1 Founder answers the v3 blind test — _NOT DONE: blind-engine-v3/LISTEN_FIRST.md has no answers yet; the moments layer is built (spec 04) but not heard_
+    - _Requirements: 4.1, 4.2, 4.3_
