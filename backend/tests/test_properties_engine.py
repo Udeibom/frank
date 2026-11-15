@@ -435,3 +435,85 @@ def test_moments_never_break_the_playing_rules(seed):
 def test_different_kinds_of_section_get_different_sounds():
     sounds = {mo._colour(11, n, True) for n in ("verse", "chorus", "bridge", "outro")}
     assert len(sounds) == 4
+
+
+# ── polish: the per-instrument mixing chain ───────────────
+
+from app.services.generation import polish  # noqa: E402
+
+noise_len = st.integers(2000, 30000)
+
+
+def noise(n: int, seed: int, level: float = 6000.0) -> np.ndarray:
+    return (np.random.default_rng(seed).standard_normal((n, 2)) * level).astype(np.float32)
+
+
+@given(st.sampled_from(sorted(polish.STRIPS)), noise_len, seeds, st.integers(50, 180))
+@settings(max_examples=30, deadline=None)
+def test_treating_a_part_keeps_its_length_and_stays_finite(name, n, seed, bpm):
+    x = noise(n, seed)
+    y = polish.treat_part(name, x, bpm)
+    assert y.shape == x.shape and y.dtype == np.float32
+    assert np.isfinite(y).all()
+
+
+def test_unknown_parts_pass_through_untouched():
+    x = noise(5000, 1)
+    assert polish.treat_part("something_new", x, 90) is x
+
+
+def test_every_alias_points_at_a_real_strip():
+    assert all(target in polish.STRIPS for target in polish.ALIASES.values())
+
+
+def test_the_bass_loses_rumble_and_the_pad_gets_space():
+    t = np.arange(44100 * 2) / 44100
+    rumble = (np.sin(2 * np.pi * 10 * t) * 8000).astype(np.float32)[:, None].repeat(2, axis=1)
+    settled = polish.treat_part("bass", rumble, 90)[44100:]          # after the filter has settled
+    assert np.abs(settled).max() < 8000 * 0.4
+    click = np.zeros((44100 * 2, 2), dtype=np.float32)
+    click[100:140] = 12000
+    out = polish.treat_part("pad", click, 90)
+    assert np.abs(out[22050:]).max() > 1.0          # a tail rings long after the click
+
+
+@given(st.floats(-1.0, 1.0, allow_nan=False))
+def test_panning_never_makes_the_sound_louder_overall(pan):
+    x = noise(4000, 3)
+    y = polish._pan(x, pan)
+    assert float(np.sum(y ** 2)) <= float(np.sum(x ** 2)) * 1.01
+
+
+def test_the_song_pass_never_goes_over_the_ceiling():
+    loud = np.clip(noise(44100 * 3, 5, 12000.0), -32000, 32000)
+    out = polish.treat_song(loud)
+    assert out.shape == loud.shape
+    assert np.abs(out).max() <= 32768 * 10 ** (-1.4 / 20)
+
+
+def test_the_chain_changes_the_sound_but_not_the_timing():
+    fixed = {**BASE_FP, "genre_proximity": ["soul"]}
+    sections, f = beat.build_beat_plan(fixed, [("verse", 2), ("chorus", 2)])
+    _, plain = beat.render_song(sections, f, 9, mix_chain=False)
+    _, polished = beat.render_song(sections, f, 9, mix_chain=True)
+    assert plain.shape == polished.shape
+    assert not np.array_equal(plain, polished)
+    assert np.abs(polished).max() <= 32767
+
+
+def test_every_part_goes_through_the_chain_when_it_is_on_and_none_when_off(monkeypatch):
+    seen: list[str] = []
+    real = polish.treat_part
+
+    def spy(name, audio, bpm):
+        seen.append(name)
+        return real(name, audio, bpm)
+
+    monkeypatch.setattr(polish, "treat_part", spy)
+    fixed = {**BASE_FP, "genre_proximity": ["soul"]}
+    sections, f = beat.build_beat_plan(fixed, [("verse", 2), ("chorus", 2)])
+    beat.render_song(sections, f, 9, mix_chain=False)
+    assert seen == []
+    beat.render_song(sections, f, 9, mix_chain=True)
+    wanted = sum(len(composer.compose_section(s.name, theory.build_progression(f["key"], f["energy_level"], f["tempo_feel"]), s.bars, s.energy, s.density, layers=s.layers)) for s in sections)
+    assert len(seen) >= wanted - 1 and {"drums", "bass", "keys"} <= set(seen)

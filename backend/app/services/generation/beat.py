@@ -23,7 +23,7 @@ from typing import Optional
 
 import numpy as np
 
-from app.services.generation import composer, fingerprint as fp_utils, moments as moments_mod, theory
+from app.services.generation import composer, fingerprint as fp_utils, moments as moments_mod, polish, theory
 from app.services.generation.renderer import SAMPLE_RATE, TAIL_SECONDS, SynthSession
 from app.services.generation.rng import derive_seed
 from app.services.generation.styles import StyleChoice, pick_style
@@ -218,7 +218,7 @@ def _tone_tilt(audio: np.ndarray, fp: dict) -> np.ndarray:
 
 
 def render_song(
-    sections: list[SectionPlan], fp: dict, seed: Optional[int] = None
+    sections: list[SectionPlan], fp: dict, seed: Optional[int] = None, mix_chain: bool = True
 ) -> tuple[list[np.ndarray], np.ndarray]:
     """
     Render the whole song. Returns (per_section_audio, full_audio), both int16 stereo.
@@ -250,6 +250,8 @@ def render_song(
             acc = np.zeros((end - start + tail, 2), dtype=np.float32)
             for part in parts:
                 stem = synth.render(part, bpm, s.bars * 4)
+                if mix_chain:
+                    stem = polish.treat_part(part.name, stem.astype(np.float32), bpm)
                 n = min(stem.shape[0], acc.shape[0])
                 acc[:n] += stem[:n].astype(np.float32) * PART_GAIN.get(part.name, 0.7)
                 del stem
@@ -264,6 +266,8 @@ def render_song(
             del acc
 
     song = _tone_tilt(song, fp)
+    if mix_chain:
+        song = polish.treat_song(song)
     peak = float(np.abs(song).max())
     if peak > 0:
         song *= (PEAK_TARGET * 32767.0) / peak
