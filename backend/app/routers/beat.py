@@ -14,6 +14,7 @@ from app.models.beat import (
 )
 from app.models.conversation import ConversationAction
 from app.services.llm.groq_client import chat_structured
+from app.services.song.record import system_with_brief
 from app.services.llm.prompts import BEAT_ROOM_SYSTEM, build_beat_room_messages
 from app.services.jobs.beat_runner import (
     run_full_beat_job,
@@ -101,8 +102,9 @@ async def beat_conversation(
     history = [{"role": m.role, "content": m.content} for m in body.history]
     messages = build_beat_room_messages(body.beat_state, history, body.message)
 
+    system = await system_with_brief(project_id, BEAT_ROOM_SYSTEM, "beat_maker")
     try:
-        result = chat_structured(BEAT_ROOM_SYSTEM, messages)
+        result = chat_structured(system, messages)
     except Exception as exc:
         raise HTTPException(
             status_code=502,

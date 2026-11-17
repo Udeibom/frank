@@ -549,3 +549,26 @@ def test_fetch_script_rejects_a_file_that_is_not_a_soundfont(tmp_path):
     text = script.read_text()
     assert "RIFF" in text and "sfbk" in text and ".part" in text and "curl -fsSL" in text
     assert "file \"$SF_PATH\"" not in text            # the `file` command is not in the slim image
+
+
+# ── a tapped rhythm changes the drums (start-from-any-input 3.2) ──
+def test_a_tapped_groove_replaces_the_kick_and_hat_lanes_and_keeps_the_snare():
+    from app.services.generation import beat, composer
+    from app.services.intake.rhythm import groove_to_style_drums
+    from app.services.generation.styles import pick_style
+    fp = {"tempo_bpm": 100, "key": "C minor", "energy_level": 0.6, "density": 0.5}
+    groove = {"kick": "x..x.x..x.......", "hat": "...........x.x.x"}
+    secs, nfp = beat.build_beat_plan({**fp, "groove": groove})
+    style, ctxs, progs = beat.plan_contexts(secs, nfp, 1)
+    assert style.drums["kick"] == groove["kick"]
+    assert style.drums["snare"] == pick_style(nfp).drums["snare"]
+    parts = composer.compose_section("verse", progs["verse"], 4, 0.6, 0.5, layers=["drums"], ctx=next(c for c in ctxs if c.name == "verse"))
+    kicks = sorted({round(e.start % 4.0, 2) for e in parts[0].events if e.note == composer.KICK and e.start % 4.0 < 3.5})
+    assert 0.0 in kicks and 0.75 in kicks                 # steps 0 and 3 of the tapped pattern
+
+
+def test_a_broken_groove_leaves_the_style_alone():
+    from app.services.intake.rhythm import groove_to_style_drums
+    base = {"kick": "x...", "half_kick": "x...", "hat": "x...", "half_hat": "x..."}
+    for bad in ({}, {"kick": "x", "hat": "x"}, {"kick": "." * 16, "hat": "." * 16}):
+        assert groove_to_style_drums(bad, base) == base

@@ -16,6 +16,7 @@ from app.models.voice import (
 )
 from app.models.conversation import ConversationAction
 from app.services.llm.groq_client import chat_structured
+from app.services.song.record import system_with_brief
 from app.services.llm.prompts import VOICE_ROOM_SYSTEM, build_voice_room_messages
 from app.services.audio.convert import to_wav
 from app.services.storage.files import upload_audio
@@ -190,8 +191,9 @@ async def voice_conversation(
     history = [{"role": m.role, "content": m.content} for m in body.history]
     messages = build_voice_room_messages(take_count, history, body.message)
 
+    system = await system_with_brief(project_id, VOICE_ROOM_SYSTEM, "vocal_producer")
     try:
-        result = chat_structured(VOICE_ROOM_SYSTEM, messages)
+        result = chat_structured(system, messages)
     except Exception as exc:
         raise HTTPException(
             status_code=502, detail="Frank stepped away for a second — try again?"

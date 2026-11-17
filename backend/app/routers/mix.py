@@ -10,6 +10,7 @@ from app.models.mix import (
 )
 from app.models.conversation import ConversationAction
 from app.services.llm.groq_client import chat_structured
+from app.services.song.record import system_with_brief
 from app.services.llm.prompts import MIX_ROOM_SYSTEM, build_mix_room_messages
 from app.services.jobs.mix_runner import run_mix_job
 from app.db import jobs as jobs_db
@@ -117,10 +118,11 @@ async def mix_conversation(
     history = [{"role": m.role, "content": m.content} for m in body.history]
     params = {**DEFAULT_MIX_PARAMS, **body.mix_params}
 
+    system = await system_with_brief(project_id, MIX_ROOM_SYSTEM, "mix_engineer")
     # First pass
     messages = build_mix_room_messages(params, history, body.message)
     try:
-        result = chat_structured(MIX_ROOM_SYSTEM, messages)
+        result = chat_structured(system, messages)
     except Exception as exc:
         raise HTTPException(
             status_code=502, detail="Frank lost the thread for a second — say that again?"
@@ -137,7 +139,7 @@ async def mix_conversation(
         analysis = await _analyze_active_mix(project_id)
         messages = build_mix_room_messages(params, history, body.message, analysis)
         try:
-            result = chat_structured(MIX_ROOM_SYSTEM, messages)
+            result = chat_structured(system, messages)
         except Exception:
             pass
         raw_actions = [

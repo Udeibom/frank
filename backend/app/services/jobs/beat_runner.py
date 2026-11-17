@@ -222,7 +222,25 @@ async def _load_active_arrangement(project_id: str) -> tuple[list, dict, int, le
     seed = version["params"].get("seed")
     if not isinstance(seed, int):
         seed = beat_engine.default_seed(fp)   # beats saved before seeds existed
-    return sections, fp, seed, beat_engine.lead_from_params(version["params"])
+    stored = beat_engine.lead_from_params(version["params"])
+    fp, lead = await _follow_newest_tune(project_id, fp, stored)
+    return sections, fp, seed, lead
+
+
+async def _follow_newest_tune(
+    project_id: str, fp: dict, stored: lead_mod.Lead | None
+) -> tuple[dict, lead_mod.Lead | None]:
+    """
+    An edit re-renders the saved arrangement. If the person has confirmed a DIFFERENT tune since that beat
+    was made, the edit follows the newer tune (the last thing they confirmed is what they want to hear),
+    instead of quietly keeping the old one. If nothing newer exists, or it cannot be read, the saved tune stays.
+    """
+    new_fp, newest = await _fingerprint_and_lead(project_id, fp)
+    if newest is None:
+        return fp, stored
+    if stored is not None and stored.source == newest.source:
+        return fp, stored
+    return new_fp, newest
 
 
 async def run_edit_section_job(

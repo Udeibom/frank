@@ -67,3 +67,34 @@ export interface ReadWordsResult {
 export async function readWords(projectId: string, content: string): Promise<ReadWordsResult> {
   return api.post<ReadWordsResult>(`/projects/${projectId}/intake/lyrics`, { content })
 }
+
+/** What the rhythm job reports. A turned-away recording is `ok: false` with a kind reason. */
+export type RhythmIntakeResult =
+  | {
+      ok: true
+      preview_url: string
+      groove: { tempo_bpm: number; tempo_confidence: number; kick: string; hat: string; confidence: number }
+    }
+  | { ok: false; reason: string }
+
+/** Send a tapped or spoken rhythm and wait for Frank to work out the pattern. */
+export async function rhythmToGroove(
+  projectId: string,
+  audioBlob: Blob,
+  fileExtension: string = "webm",
+): Promise<RhythmIntakeResult> {
+  const formData = new FormData()
+  formData.append("file", audioBlob, `rhythm.${fileExtension}`)
+  const send = () =>
+    uploadFile<{ job_id: string }>(`/projects/${projectId}/intake/rhythm`, formData)
+  let job_id: string
+  try {
+    ;({ job_id } = await send())
+  } catch (err) {
+    if (!isTransientPollError(err)) throw err
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    ;({ job_id } = await send())
+  }
+  const done = await pollJob(job_id)
+  return done.result as unknown as RhythmIntakeResult
+}

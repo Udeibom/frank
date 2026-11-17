@@ -14,6 +14,7 @@ import {
 } from "@/components/conversation/ConversationPanel"
 import { TexturePlayer } from "@/components/audio/TexturePlayer"
 import { HumIntake } from "@/components/studio/HumIntake"
+import { RhythmIntake } from "@/components/studio/RhythmIntake"
 import { Button } from "@/components/ui/button"
 import {
   sendFeelMessage,
@@ -226,6 +227,13 @@ export default function FeelLabPage() {
     runTextureGeneration()
   }
 
+  function handleRhythmConfirmed(hints: Partial<MusicalFingerprint>) {
+    const clean = Object.fromEntries(Object.entries(hints).filter(([, v]) => v !== undefined)) as Partial<MusicalFingerprint>
+    mergeFingerprint(clean)
+    sayAsFrank("Lovely, I'll build the drums around your rhythm. While you think, let me play you a first sound.")
+    runTextureGeneration()
+  }
+
   async function handleApproveAndSave() {
     // Lock in the texture the user approved as the reference for this direction
     if (lastTextureIdRef.current) {
@@ -296,11 +304,18 @@ export default function FeelLabPage() {
         isThinking={isThinking}
         placeholder="Describe how it should feel…"
         inputAccessory={
-          <HumIntake
-            projectId={projectId}
-            onConfirmed={handleTuneConfirmed}
-            onSay={sayAsFrank}
-          />
+          <>
+            <HumIntake
+              projectId={projectId}
+              onConfirmed={handleTuneConfirmed}
+              onSay={sayAsFrank}
+            />
+            <RhythmIntake
+              projectId={projectId}
+              onConfirmed={handleRhythmConfirmed}
+              onSay={sayAsFrank}
+            />
+          </>
         }
       />
     </div>

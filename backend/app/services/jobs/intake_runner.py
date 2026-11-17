@@ -101,3 +101,35 @@ async def run_hum_intake_job(job_id: str, project_id: str, audio: bytes, ext: st
         except Exception:  # noqa: BLE001
             pass
         raise exc
+
+
+def _rhythm_sync(audio: bytes, ext: str) -> dict:
+    """Blocking work: store the original, find the groove, render the drum playback."""
+    from app.services.intake import rhythm
+
+    safe = ext if ext.isalnum() and len(ext) <= 5 else "bin"
+    original_url = upload_audio("hums", audio, extension=safe, name_prefix="tapped-original")
+    try:
+        wav = to_wav(audio, ext)
+    except RuntimeError:
+        return {"ok": False, "reason": UNREADABLE, "original_url": original_url}
+    groove = rhythm.groove_from_audio(wav)
+    if not groove.ok:
+        return {"ok": False, "reason": groove.reason, "original_url": original_url}
+    preview_url = upload_audio("hums", rhythm.render_preview_mp3(groove), extension="mp3", name_prefix="tapped-heard")
+    return {"ok": True, "original_url": original_url, "preview_url": preview_url, "groove": groove.to_dict()}
+
+
+async def run_rhythm_intake_job(job_id: str, project_id: str, audio: bytes, ext: str) -> None:
+    """A tapped rhythm goes in; a groove and a drum playback come out. It is only used once the person says yes."""
+    try:
+        await jobs_db.mark_processing(job_id)
+        async with _one_at_a_time:
+            out = await asyncio.to_thread(_rhythm_sync, audio, ext)
+        await with_retries(lambda: jobs_db.mark_complete(job_id, out))
+    except Exception as exc:  # noqa: BLE001
+        try:
+            await jobs_db.mark_failed(job_id, "I couldn't work out that rhythm just now. Want to try tapping it again?")
+        except Exception:  # noqa: BLE001
+            pass
+        raise exc

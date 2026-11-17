@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 import numpy as np
@@ -168,6 +168,10 @@ def plan_contexts(
     progression for each kind of section (a verse keeps the same chords every time it comes back).
     """
     style = pick_style(fp)
+    if isinstance(fp.get("groove"), dict):
+        # the person's own tapped rhythm replaces the style's kick and hat lanes
+        from app.services.intake.rhythm import groove_to_style_drums
+        style = replace(style, drums=groove_to_style_drums(fp["groove"], style.drums))
     offset = derive_seed(seed, "chords") % 4
     if lead:
         playing = [s.bars for s in sections if s.name in lead_mod.LEAD_SECTIONS]

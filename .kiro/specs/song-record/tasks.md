@@ -37,7 +37,7 @@
     - _Requirements: 6.2, 6.3, 2.3, 5.4_
   - [x] 5.4 Prove each test can fail (revert a fix and watch it fail)
 
-- [ ] 6. Wire-in (shared with spec 07)
-  - [ ] 6.1 Idea and Feel conversations use `build_brief`
-  - [ ] 6.2 Beat, Voice, Mix conversations use `build_brief`
+- [x] 6. Wire-in (shared with spec 07)
+  - [x] 6.1 Idea and Feel conversations use `build_brief` — _Evidence: record.system_with_brief used in routers/conversation.py and feel.py; tests/test_brief_wiring.py. Not run against a live LLM or project (no network in this session)_
+  - [x] 6.2 Beat, Voice, Mix conversations use `build_brief` — _Evidence: same helper in routers/beat.py, voice.py, mix.py; tests/test_brief_wiring.py_
     - _Requirements: 6.1_

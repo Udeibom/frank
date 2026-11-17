@@ -63,6 +63,8 @@ export interface MusicalFingerprint {
   instrumentation_hints: string[]
   reference_texture_id: string | null
   hum_reference_file: string | null
+  /** The person's own tapped rhythm: 16-step lanes, x = a hit. Optional: only present once they have tapped one. */
+  groove?: { kick: string; hat: string } | null
 }
 
 export interface FeelFingerprint {

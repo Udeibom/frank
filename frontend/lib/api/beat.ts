@@ -12,6 +12,29 @@ export interface BeatSection {
   layers: string[]
 }
 
+/** What the beat did with the person's own hummed tune (from the backend's lead_info). */
+export interface LeadInfo {
+  used: boolean
+  reason?: string
+  cut?: boolean
+  tune_bars?: number
+  heard_bars?: number
+}
+
+/** Plain-language sentence about the tune, or null when there was no hummed tune to talk about. */
+export function describeLead(info: LeadInfo | undefined): string | null {
+  if (!info) return null
+  if (info.used) {
+    return info.cut
+      ? "I built the chorus around your tune. The chorus was shorter than your tune, so the end of it is left out."
+      : "I built the chorus around your tune."
+  }
+  if (info.reason === "no_chorus_plays_it") {
+    return "I have your tune, but no chorus plays it yet, so it isn't in this version."
+  }
+  return null
+}
+
 export interface BeatVersion {
   id: string
   project_id: string
@@ -20,6 +43,7 @@ export interface BeatVersion {
   params: {
     fingerprint?: Partial<MusicalFingerprint>
     sections?: BeatSection[]
+    lead_info?: LeadInfo
   }
   created_at: string
 }

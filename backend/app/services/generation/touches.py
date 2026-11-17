@@ -93,6 +93,8 @@ def _ending(parts: list[Part], progression: dict, bars: int, ctx: SectionContext
     end = bars * 4.0
     lo = end - 4.0
     for p in parts:
+        if p.lead:
+            continue        # the person's own tune is never cut: it plays out over the closing chord
         _remove(p, lo, end)
         if p.is_drums and bars >= 3:
             _remove(p, lo - 4.0, lo)

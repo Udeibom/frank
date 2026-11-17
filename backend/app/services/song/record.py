@@ -134,3 +134,21 @@ def has_first_draft(record: SongRecord) -> bool:
     has_music = record.beat is not None
     has_voice_or_tune = record.vocal is not None or bool(melody.get("confirmed"))
     return has_music and has_voice_or_tune
+
+
+async def system_with_brief(project_id: str, system: str, role: Optional[str] = None) -> str:
+    """
+    The room's system prompt plus the shared song brief, so every room speaks from the same song
+    (song-record spec 01, task 6). If the record cannot be read the room still works with its own prompt.
+    """
+    import logging
+
+    from app.services.song.brief import build_brief
+
+    try:
+        record = await get_record(project_id)
+        brief = build_brief(record, role)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).warning("could not build the song brief", exc_info=True)
+        return system
+    return f"{system}\n\n--- THE SONG SO FAR (the whole team shares this; do not contradict it) ---\n{brief}"

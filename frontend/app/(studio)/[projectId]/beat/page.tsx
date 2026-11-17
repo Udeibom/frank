@@ -25,6 +25,7 @@ import {
   setActiveBeatVersion,
   updateSection,
   previewWithVocal,
+  describeLead,
   type BeatVersion,
   type BeatSection,
 } from "@/lib/api/beat"
@@ -401,6 +402,12 @@ export default function BeatRoomPage() {
                   Hear it with my vocal
                 </Button>
               </div>
+
+              {describeLead(activeVersion?.params.lead_info) && (
+                <p className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-foreground">
+                  {describeLead(activeVersion?.params.lead_info)}
+                </p>
+              )}
 
               {/* Timeline */}
               <BeatTimeline

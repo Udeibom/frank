@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.models.conversation import IdeaConversationRequest, ConversationResponse
 from app.services.llm.groq_client import chat_structured
+from app.services.song.record import system_with_brief
 from app.services.llm.prompts import IDEA_ROOM_SYSTEM, build_idea_room_messages
 
 router = APIRouter(prefix="/projects/{project_id}/conversation", tags=["conversation"])
@@ -23,8 +24,9 @@ async def idea_conversation(
         selected_text=body.selected_text,
     )
 
+    system = await system_with_brief(project_id, IDEA_ROOM_SYSTEM, "songwriter")
     try:
-        result = chat_structured(IDEA_ROOM_SYSTEM, messages)
+        result = chat_structured(system, messages)
     except Exception as exc:
         raise HTTPException(
             status_code=502,

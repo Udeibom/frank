@@ -21,7 +21,7 @@ from app.services.intake import lyrics as lyrics_svc
 from app.services.intake import merge as merge_svc
 from app.services.llm.groq_client import chat_json
 from app.services.intake.hints import fingerprint_hints
-from app.services.jobs.intake_runner import run_hum_intake_job
+from app.services.jobs.intake_runner import run_hum_intake_job, run_rhythm_intake_job
 from app.services.song import store
 from app.services.song.versions import VersionError
 
@@ -71,6 +71,19 @@ async def start_hum_intake(
         raise HTTPException(status_code=400, detail="I didn't get any sound from that recording. Could you try once more?")
     job = await jobs_db.create_job(project_id, job_type="hum_intake")
     background.add_task(run_hum_intake_job, job["id"], project_id, raw, safe_extension(file.filename))
+    return JobResponse(job_id=job["id"])
+
+
+@router.post("/rhythm", response_model=JobResponse)
+async def start_rhythm_intake(
+    project_id: str, background: BackgroundTasks, file: UploadFile = File(...)
+) -> JobResponse:
+    """Turn tapped or spoken beats into a groove. The result waits for the person's yes: the browser then saves it in the feel."""
+    raw = await _read_limited(file)
+    if not raw:
+        raise HTTPException(status_code=400, detail="I didn't get any sound from that recording. Could you try once more?")
+    job = await jobs_db.create_job(project_id, job_type="rhythm_intake")
+    background.add_task(run_rhythm_intake_job, job["id"], project_id, raw, safe_extension(file.filename))
     return JobResponse(job_id=job["id"])
 
 

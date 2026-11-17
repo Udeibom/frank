@@ -33,11 +33,11 @@ Depends on spec 01 and spec 02 (melody, groove, structure). Spec 05's sound spik
     - _Requirements: 3.3_
   - [ ] 4.8 Founder verdict on /home/caleb/frank-listening/blind-hum-songs — _NOT DONE: no verdict yet_
     - _Requirements: 3.3_
-  - [ ] 4.9 Ending/stop can clear the last bar of a chorus when the final section is a chorus — _NOT DONE: known bug_
+  - [x] 4.9 Ending/stop can clear the last bar of a chorus when the final section is a chorus — _Evidence: touches._ending skips the lead part; test_the_ending_never_cuts_the_last_bar_of_the_tune fails without the fix (checked) and passes with it_
     - _Requirements: 3.3_
-  - [ ] 4.10 Edits keep the stored tune even if a newer hum is confirmed, with no notice — _NOT DONE: tell the person or follow the newer hum_
+  - [x] 4.10 Edits keep the stored tune even if a newer hum is confirmed, with no notice — _Evidence: beat_runner._follow_newest_tune makes edits follow the newest confirmed tune; 3 tests (an_edit_*) in test_properties_lead.py. Decision: follow the newer hum, because the last thing the person confirmed is what they want_
     - _Requirements: 3.3_
-  - [ ] 4.11 Tell the person "I built the chorus around your tune" — _NOT DONE: lead_used (job result) and lead_info (song record) are exposed, the frontend shows neither_
+  - [x] 4.11 Tell the person "I built the chorus around your tune" — _Evidence: Beat Room shows describeLead(lead_info) above the timeline (frontend/lib/api/beat.ts, beat/page.tsx); type-checks. Not seen in a browser_
     - _Requirements: 3.3_
   - [ ] 4.12 Tune plays in verses as well as choruses, and hums longer than 16 bars are not cut — _NOT DONE: LEAD_SECTIONS = ("chorus",), MAX_BARS = 16. Also xfail: a tune sitting on a diminished chord is heard as another chord_
     - _Requirements: 3.3_

@@ -919,3 +919,55 @@ def test_the_tunes_extra_volume_is_actually_applied(monkeypatch):
     monkeypatch.setattr(beat, "LEAD_GAIN", 0.2)
     quiet = render()
     assert loud.shape == quiet.shape and not np.array_equal(loud, quiet)
+
+
+# ── 4.9: the ending never cuts the person's tune ──────────────────────────
+@given(leads(min_bars=2), st.integers(0, 2**31))
+@settings(max_examples=40, deadline=None)
+def test_the_ending_never_cuts_the_last_bar_of_the_tune(lead, seed):
+    """When the final section is a chorus playing the tune, the closing chord must not erase the tune's last bar."""
+    from app.services.generation import moments as moments_mod
+    bars = lead.bars
+    f = fp_utils.normalize(BASE_FP)
+    ctx = composer.SectionContext(
+        name="chorus", index=0, repeat=0, final=True, seed=seed, style=pick_style(f), lead=lead,
+        moments=[moments_mod.Moment("ending")],
+    )
+    prog = theory.build_progression(f["key"], f["energy_level"], f["tempo_feel"], variant=0, seed=seed)
+    parts = composer.compose_section("chorus", prog, bars, f["energy_level"], f["density"], layers=LAYERS, ctx=ctx)
+    tune_tail = [(p, s) for p, s, _ in lead.notes if s >= (bars - 1) * 4.0 and s < bars * 4.0 - 0.1]
+    melody = [p for p in parts if p.name == "melody" and p.lead][0]
+    heard = [(e.note, e.start) for e in melody.events if e.start >= (bars - 1) * 4.0 - 0.05]
+    assert len(heard) >= len(tune_tail) - 1       # the overlap guard may shorten a same-pitch neighbour, never erase the bar
+    if tune_tail:
+        assert heard
+
+
+# ── 4.10: an edit follows the newest confirmed tune ───────────────────────
+def _follow(stored, found):
+    async def fake(project_id):
+        return found
+    with mock.patch.object(song_record, "active_melody", fake):
+        return asyncio.run(beat_runner._follow_newest_tune("p1", {"key": "C minor"}, stored))
+
+
+def _content(pitches):
+    return {"notes": [{"pitch_midi": p, "start_beat": i * 1.0, "dur_beats": 0.9} for i, p in enumerate(pitches)],
+            "key": "C", "mode": "minor", "confirmed": True}
+
+
+def test_an_edit_follows_a_newer_confirmed_tune():
+    old = lead_mod.from_sketch(_content([60, 62, 63, 65]), source="old")
+    fp, lead = _follow(old, ("new", _content([67, 65, 63, 62])))
+    assert lead is not None and lead.source == "new"
+
+
+def test_an_edit_keeps_the_saved_tune_when_nothing_newer_exists():
+    old = lead_mod.from_sketch(_content([60, 62, 63, 65]), source="old")
+    assert _follow(old, None)[1] is old
+    assert _follow(old, ("old", _content([60, 62, 63, 65])))[1] is old
+
+
+def test_an_edit_keeps_the_saved_tune_when_the_newer_one_is_unusable():
+    old = lead_mod.from_sketch(_content([60, 62, 63, 65]), source="old")
+    assert _follow(old, ("new", {"notes": []}))[1] is old

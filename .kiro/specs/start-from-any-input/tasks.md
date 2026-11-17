@@ -22,10 +22,10 @@ Depends on spec 01 (song-record) tasks 1-3.
   - [x] 2.6 Playback preview render ("is this your tune?") and confirm / re-record flow
     - _Requirements: 3.4, 3.5_
 
-- [ ] 3. Rhythm
-  - [ ] 3.1 Onset detection, tempo, 16-step pattern with confidence
+- [x] 3. Rhythm
+  - [x] 3.1 Onset detection, tempo, 16-step pattern with confidence — _Evidence: services/intake/rhythm.py; tests/test_properties_rhythm.py (pattern and speed recovered on 120 generated cases per property; evenly spaced taps are flagged low-confidence instead of guessing). Synthetic taps only; not tried on a person tapping a real desk_
     - _Requirements: 4.1_
-  - [ ] 3.2 Drum preview and confirmation; store as groove
+  - [x] 3.2 Drum preview and confirmation; store as groove — _Evidence: rhythm.render_preview_mp3; POST /intake/rhythm job; components/studio/RhythmIntake.tsx mounted in the Feel Lab; groove stored in the fingerprint and used by beat.plan_contexts (test_a_tapped_groove_replaces_the_kick_and_hat_lanes_and_keeps_the_snare). Not yet seen in a browser_
     - _Requirements: 4.2, 4.3_
 
 - [ ] 4. Words
