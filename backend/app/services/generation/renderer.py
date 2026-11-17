@@ -54,7 +54,10 @@ class SynthSession:
     """
 
     def __init__(self) -> None:
-        self._fs = fluidsynth.Synth(samplerate=float(SAMPLE_RATE))
+        # Dynamic sample loading: only the samples of the instruments a song actually uses are decoded into
+        # memory. Without it the whole compressed SoundFont is unpacked on load (+228 MB measured), which
+        # alone breaks the 512 MB free server (ship-it spec 13, requirement 2.1; measured Nov 17).
+        self._fs = fluidsynth.Synth(samplerate=float(SAMPLE_RATE), **{"synth.dynamic-sample-loading": 1})
         self._sfid = self._fs.sfload(_soundfont_path())
 
     def render(self, part: Part, bpm: float, total_beats: float) -> np.ndarray:

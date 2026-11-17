@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Optional
 
 from app.db import jobs as jobs_db
+from app.services.jobs.heavy import HEAVY
 from app.db.client import get_supabase
 from app.services.listener import findings
 from app.services.listener import project as listen_project
@@ -24,7 +25,9 @@ async def run_listen_job(job_id: str, project_id: str, scope: Optional[list[str]
         async def say(text: str) -> None:
             await _progress(job_id, text)
 
-        report = await listen_project.measure_song(project_id, scope, progress=say)
+        await say("Waiting for my ears to be free...")
+        async with HEAVY:
+            report = await listen_project.measure_song(project_id, scope, progress=say)
         found = findings.find_issues(report, concern)
         await jobs_db.mark_complete(job_id, {"measurements": report.model_dump(), "findings": found.model_dump()})
     except Exception as exc:  # noqa: BLE001

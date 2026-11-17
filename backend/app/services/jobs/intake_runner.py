@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 
 from app.db import jobs as jobs_db
+from app.services.jobs.heavy import HEAVY
 from app.models.song import MelodySketch
 from app.services.audio.convert import to_wav
 from app.services.intake import hints, melody, preview
@@ -23,7 +24,7 @@ UNREADABLE = "I couldn't open that recording. Want to try recording it again?"
 
 # One hum is analysed at a time. Each analysis builds large tables, so several at once could use
 # more memory than a small server has. Others simply wait their turn.
-_one_at_a_time = asyncio.Semaphore(1)
+_one_at_a_time = HEAVY          # shared with every heavy job (heavy.py)
 
 
 def _hum_sync(audio: bytes, ext: str) -> dict:

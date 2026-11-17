@@ -11,6 +11,7 @@ import asyncio
 
 from app.services.storage.signing import fetch_audio_bytes
 from app.db import jobs as jobs_db
+from app.services.jobs.heavy import run_heavy
 from app.db import export as export_db
 from app.db import mix as mix_db
 from app.services.storage.files import upload_audio_with_path
@@ -96,7 +97,7 @@ async def run_export_job(
             )
             return
 
-        result = await asyncio.to_thread(
+        result = await run_heavy(
             _export_sync,
             project_id,
             mix_version_id,

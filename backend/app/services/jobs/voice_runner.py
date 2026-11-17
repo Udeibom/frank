@@ -12,6 +12,7 @@ import asyncio
 
 from app.services.storage.signing import fetch_audio_bytes
 from app.db import jobs as jobs_db
+from app.services.jobs.heavy import run_heavy
 from app.db import voice as voice_db
 from app.db import projects as projects_db
 from app.services.storage.files import upload_audio
@@ -52,7 +53,7 @@ async def run_pitch_analysis_job(
 ) -> None:
     try:
         await jobs_db.mark_processing(job_id)
-        contour = await asyncio.to_thread(_analyze_take_sync, take_id, wav_bytes)
+        contour = await run_heavy(_analyze_take_sync, take_id, wav_bytes)
         await jobs_db.mark_complete(
             job_id, {"take_id": take_id, "contour_points": len(contour)}
         )
@@ -88,7 +89,7 @@ async def run_correction_job(
 ) -> None:
     try:
         await jobs_db.mark_processing(job_id)
-        result = await asyncio.to_thread(
+        result = await run_heavy(
             _correct_sync, project_id, take_id, audio_url, mode
         )
         await jobs_db.mark_complete(job_id, result)
@@ -119,7 +120,7 @@ async def run_comp_job(
 ) -> None:
     try:
         await jobs_db.mark_processing(job_id)
-        result = await asyncio.to_thread(_comp_sync, project_id, take_refs)
+        result = await run_heavy(_comp_sync, project_id, take_refs)
         await projects_db.update_project_active_state(
             project_id, {"active_comp_id": result["comp_id"]}
         )
@@ -172,7 +173,7 @@ async def run_harmony_job(
 ) -> None:
     try:
         await jobs_db.mark_processing(job_id)
-        result = await asyncio.to_thread(
+        result = await run_heavy(
             _harmony_sync, project_id, take_id, audio_url, harmony_type, mode
         )
         await jobs_db.mark_complete(job_id, result)

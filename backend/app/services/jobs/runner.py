@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 
 from app.db import jobs as jobs_db
+from app.services.jobs.heavy import run_heavy
 from app.db import feel as feel_db
 from app.db import projects as projects_db
 from app.services.storage.files import upload_audio
@@ -43,7 +44,7 @@ async def run_texture_job(
             return
 
         # Render off the event loop so we don't block other requests.
-        wav = await asyncio.to_thread(generate_texture_wav, fingerprint)
+        wav = await run_heavy(generate_texture_wav, fingerprint)
 
         # Store the audio, then create the texture record (the versioning step
         # for this asset) with the explicit cache key and fingerprint link.

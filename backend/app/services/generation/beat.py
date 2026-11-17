@@ -235,8 +235,8 @@ def _tone_tilt(audio: np.ndarray, fp: dict) -> np.ndarray:
         board.append(LowShelfFilter(cutoff_frequency_hz=200.0, gain_db=low_db))
     if abs(high_db) >= EQ_MIN_DB:
         board.append(HighShelfFilter(cutoff_frequency_hz=5000.0, gain_db=high_db))
-    out = board(audio.T.astype(np.float32), SAMPLE_RATE)
-    return out.T
+    polish.process_in_place(board, audio)      # in place, a chunk at a time: no whole-song copies
+    return audio
 
 
 def render_song(
@@ -298,8 +298,10 @@ def render_song(
     fade = min(int(FADE_OUT_SECONDS * SAMPLE_RATE), tail)
     if fade > 0:
         song[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=np.float32)[:, None]
-    full = np.clip(song, -32768, 32767).astype(np.int16)
-    per_section = [full[a:b].copy() for a, b in spans]
+    np.clip(song, -32768, 32767, out=song)
+    full = song.astype(np.int16)
+    del song
+    per_section = [full[a:b] for a, b in spans]      # views, not copies: callers only read them
     return per_section, full
 
 

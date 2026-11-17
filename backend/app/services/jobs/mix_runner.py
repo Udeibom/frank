@@ -14,6 +14,7 @@ import asyncio
 
 from app.services.storage.signing import fetch_audio_bytes
 from app.db import jobs as jobs_db
+from app.services.jobs.heavy import run_heavy
 from app.db import mix as mix_db
 from app.db import voice as voice_db
 from app.db import beat as beat_db
@@ -158,7 +159,7 @@ async def run_mix_job(
             )
             return
 
-        result = await asyncio.to_thread(
+        result = await run_heavy(
             _render_and_persist_sync, project_id, layers, mix_params, quality
         )
 
@@ -192,7 +193,7 @@ async def run_vocal_preview_job(
                 job_id, "Need both a beat and a vocal to hear them together."
             )
             return
-        result = await asyncio.to_thread(_render_preview_sync, layers, mix_params)
+        result = await run_heavy(_render_preview_sync, layers, mix_params)
         await jobs_db.mark_complete(job_id, result)
     except Exception as exc:  # noqa: BLE001
         try:

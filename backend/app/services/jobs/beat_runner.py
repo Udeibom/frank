@@ -20,6 +20,7 @@ from dataclasses import replace
 import numpy as np
 
 from app.db import jobs as jobs_db
+from app.services.jobs.heavy import HEAVY
 from app.db import beat as beat_db
 from app.db import projects as projects_db
 from app.services.storage.files import upload_audio
@@ -35,7 +36,7 @@ from app.services.generation.styles import pick_style
 
 # One beat is built at a time. A render holds a large SoundFont and several minutes of audio in memory,
 # so several at once could use more than a small server has. Others simply wait their turn.
-_one_at_a_time = asyncio.Semaphore(1)
+_one_at_a_time = HEAVY          # shared with every heavy job (heavy.py)
 
 
 def _lead_used(version: dict) -> bool:

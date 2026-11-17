@@ -133,7 +133,28 @@ def treat_song(song: np.ndarray) -> np.ndarray:
         Compressor(threshold_db=-14, ratio=1.8, attack_ms=30, release_ms=200),
         Limiter(threshold_db=CEILING_DB, release_ms=120),
     ])
-    y = board((song.T / 32768.0).astype(np.float32), SAMPLE_RATE).T * 32768.0
+    process_in_place(board, song)
     # The limiter reacts a moment after a sudden peak, so a rare sample can get past it. Hold the ceiling.
     ceiling = 32768.0 * 10.0 ** (CEILING_DB / 20.0)
-    return np.clip(y, -ceiling, ceiling).astype(np.float32)
+    np.clip(song, -ceiling, ceiling, out=song)
+    return song
+
+
+CHUNK_SECONDS = 5.0
+
+
+def process_in_place(board, song: np.ndarray) -> None:
+    """
+    Run a pedalboard chain over a float32 (samples, 2) buffer on the int16 scale, a few seconds at a time,
+    writing back into the same buffer. The chain keeps its state between chunks (reset=False), so the result
+    matches one long pass while memory stays at one chunk instead of several copies of the whole song.
+    """
+    if song.dtype != np.float32:
+        raise TypeError("process_in_place needs a float32 buffer")
+    step = int(CHUNK_SECONDS * SAMPLE_RATE)
+    board.reset()
+    for start in range(0, song.shape[0], step):
+        end = min(start + step, song.shape[0])
+        x = np.ascontiguousarray(song[start:end].T) / np.float32(32768.0)
+        y = board(x, SAMPLE_RATE, reset=False)
+        song[start:start + y.shape[1]] = y.T * np.float32(32768.0)
