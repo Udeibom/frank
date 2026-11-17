@@ -94,7 +94,7 @@ def clipping_share(x: Optional[np.ndarray]) -> Optional[float]:
 
 
 def noise_floor_db(x: Optional[np.ndarray], sr: int) -> Optional[float]:
-    """Level of the quietest tenth of the recording (the hiss and room tone between sounds)."""
+    """Level of the quietest tenth of the recording (the hiss and room tone between sounds). None without clear pauses."""
     if not _usable(x, sr):
         return None
     m = to_mono(x)
@@ -103,7 +103,11 @@ def noise_floor_db(x: Optional[np.ndarray], sr: int) -> Optional[float]:
     if n < 5:
         return None
     rms = np.sqrt((m[: n * frame].reshape(n, frame) ** 2).mean(axis=1))
-    return float(20 * math.log10(max(np.percentile(rms, 10), 1e-9)))
+    floor_db = 20 * math.log10(max(np.percentile(rms, 10), 1e-9))
+    loud_db = 20 * math.log10(max(np.percentile(rms, 90), 1e-9))
+    if loud_db - floor_db < 15.0:
+        return None        # no real pauses in the recording, so the quiet parts are not "room noise": cannot tell
+    return float(floor_db)
 
 
 # ── colour ───────────────────────────────────────────────────────────────

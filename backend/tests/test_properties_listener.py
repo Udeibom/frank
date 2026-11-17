@@ -233,3 +233,11 @@ def test_compare_reports_what_changed_in_plain_words():
     b = MeasurementReport(values={"section.1.loudness": -16.0, "mix.loudness": -18.2})
     diffs = service.compare(a, b)
     assert [d.id for d in diffs] == ["section.1.loudness"] and "louder" in diffs[0].plain
+
+
+def test_noise_is_only_measured_when_the_recording_has_pauses():
+    steady = noise(3, 6.0, 0.2)                                   # sound all the way through: no pauses to judge by
+    assert dsp.noise_floor_db(steady, SR) is None
+    pauses = np.concatenate([noise(4, 1.0, 0.2), noise(5, 1.0, 0.002)] * 3)   # phrases with a quiet room between them
+    floor = dsp.noise_floor_db(pauses, SR)
+    assert floor is not None and floor < -40
