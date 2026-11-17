@@ -17,4 +17,29 @@ HEAVY = asyncio.Semaphore(1)
 async def run_heavy(fn: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     """Run blocking work in a worker thread, after any other heavy job has finished."""
     async with HEAVY:
-        return await asyncio.to_thread(fn, *args, **kwargs)
+        log_memory(f"start {getattr(fn, '__name__', 'job')}")
+        try:
+            return await asyncio.to_thread(fn, *args, **kwargs)
+        finally:
+            log_memory(f"end {getattr(fn, '__name__', 'job')}")
+
+
+def memory_mb() -> tuple[int, int]:
+    """(current, peak) resident memory of this process in MB; (0, 0) where /proc is not available."""
+    cur = peak = 0
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    cur = int(line.split()[1]) // 1024
+                elif line.startswith("VmHWM:"):
+                    peak = int(line.split()[1]) // 1024
+    except OSError:
+        pass
+    return cur, peak
+
+
+def log_memory(label: str) -> None:
+    """One line in the server log per heavy step, so memory on the deployed server is measured, not guessed."""
+    cur, peak = memory_mb()
+    print(f"[memory] {label}: now {cur} MB, peak {peak} MB", flush=True)

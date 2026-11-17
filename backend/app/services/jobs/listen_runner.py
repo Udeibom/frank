@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Optional
 
 from app.db import jobs as jobs_db
-from app.services.jobs.heavy import HEAVY
+from app.services.jobs.heavy import HEAVY, log_memory
 from app.db.client import get_supabase
 from app.services.listener import findings
 from app.services.listener import project as listen_project
@@ -23,6 +23,7 @@ async def run_listen_job(job_id: str, project_id: str, scope: Optional[list[str]
         await jobs_db.mark_processing(job_id)
 
         async def say(text: str) -> None:
+            log_memory(f"listen: {text}")
             await _progress(job_id, text)
 
         await say("Waiting for my ears to be free...")

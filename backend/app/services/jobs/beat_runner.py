@@ -20,7 +20,7 @@ from dataclasses import replace
 import numpy as np
 
 from app.db import jobs as jobs_db
-from app.services.jobs.heavy import HEAVY
+from app.services.jobs.heavy import HEAVY, log_memory
 from app.db import beat as beat_db
 from app.db import projects as projects_db
 from app.services.storage.files import upload_audio
@@ -84,7 +84,9 @@ def _render_and_persist_sync(
     thread avoids interleaving sync HTTP calls with the event loop, which was
     causing connection races in the storage client. Returns the version dict.
     """
+    log_memory("beat: start render")
     sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed, lead)
+    log_memory("beat: rendered")
     fp = beat_engine.fp_utils.normalize(fingerprint)
     return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead)
 
