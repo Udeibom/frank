@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     huggingface_api_key: str = ""
     replicate_api_token: str = ""
+    # Fallback model provider (team-conversation spec 07, requirement 8): Google Gemini free tier
+    gemini_api_key: str = ""
+    # Deployment tooling only (ship-it spec 13); never used by the running app
+    render_api_key: str = ""
     # Sound-quality spike (spec 05): sample-set downloads and GPU notebooks. Not used at runtime by the app.
     hf_token: str = ""
     kaggle_username: str = ""

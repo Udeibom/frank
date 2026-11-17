@@ -1,0 +1,26 @@
+# Render blueprint for Frank's backend (ship-it spec 13). Free tier, Docker (native FluidSynth/FFmpeg/Rubber Band).
+# Secrets are set in the Render dashboard or API (sync: false), never here.
+services:
+  - type: web
+    name: frank-api
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
