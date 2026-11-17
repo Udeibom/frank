@@ -33,9 +33,7 @@ def _usable(x: Optional[np.ndarray], sr: int) -> bool:
 
 # ── level ────────────────────────────────────────────────────────────────
 
-def _k_weight(x: np.ndarray, sr: int) -> np.ndarray:
-    """ITU-R BS.1770 K-weighting: a high shelf then a high-pass, designed for any sample rate."""
-    # Shelving filter (stage 1)
+def _k_coefficients(sr: int) -> tuple[list[float], list[float], list[float], list[float]]:
     f0, g_db, q = 1681.974450955533, 3.999843853973347, 0.7071752369554196
     k = math.tan(math.pi * f0 / sr)
     vh = 10 ** (g_db / 20.0)
@@ -43,30 +41,50 @@ def _k_weight(x: np.ndarray, sr: int) -> np.ndarray:
     a0 = 1.0 + k / q + k * k
     b1 = [(vh + vb * k / q + k * k) / a0, 2.0 * (k * k - vh) / a0, (vh - vb * k / q + k * k) / a0]
     a1 = [1.0, 2.0 * (k * k - 1.0) / a0, (1.0 - k / q + k * k) / a0]
-    # High-pass (stage 2)
     f0, q = 38.13547087602444, 0.5003270373238773
     k = math.tan(math.pi * f0 / sr)
-    a1_ = [1.0, 2.0 * (k * k - 1.0) / (1.0 + k / q + k * k), (1.0 - k / q + k * k) / (1.0 + k / q + k * k)]
-    b2 = [1.0, -2.0, 1.0]
-    return signal.lfilter(b2, a1_, signal.lfilter(b1, a1, x, axis=0), axis=0)
+    a2 = [1.0, 2.0 * (k * k - 1.0) / (1.0 + k / q + k * k), (1.0 - k / q + k * k) / (1.0 + k / q + k * k)]
+    return b1, a1, [1.0, -2.0, 1.0], a2
+
+
+def _hop_energies(x: np.ndarray, sr: int, hop: int) -> np.ndarray:
+    """
+    K-weighted energy summed over channels, per hop of samples. Filtered a few seconds at a time with the
+    filter state carried across (so it is exact), never holding more than one chunk of 64-bit samples.
+    """
+    b1, a1, b2, a2 = _k_coefficients(sr)
+    ch = x.shape[1]
+    zi1 = np.zeros((2, ch))
+    zi2 = np.zeros((2, ch))
+    n_hops = x.shape[0] // hop
+    out = np.zeros(n_hops)
+    chunk = hop * 50                                    # 5 seconds at a 0.1 s hop
+    for start in range(0, n_hops * hop, chunk):
+        end = min(start + chunk, n_hops * hop)
+        seg = np.asarray(x[start:end], dtype=np.float64)
+        y, zi1 = signal.lfilter(b1, a1, seg, axis=0, zi=zi1)
+        y, zi2 = signal.lfilter(b2, a2, y, axis=0, zi=zi2)
+        e = (y * y).sum(axis=1)
+        out[start // hop: end // hop] = e.reshape(-1, hop).sum(axis=1)
+    return out
 
 
 def loudness(x: Optional[np.ndarray], sr: int) -> Optional[float]:
     """Gated, K-weighted integrated loudness in LUFS-like units. None when silent or too short."""
     if not _usable(x, sr):
         return None
-    x = np.asarray(x, dtype=np.float64)
+    x = np.asarray(x)
     if x.ndim == 1:
         x = x[:, None]
-    block, hop = int(0.4 * sr), int(0.1 * sr)
-    if x.shape[0] < block:
+    hop = int(0.1 * sr)
+    block_hops = 4                                       # 400 ms blocks, 75% overlap (BS.1770)
+    if x.shape[0] < block_hops * hop:
         return None
-    z = _k_weight(x, sr)
-    n_blocks = 1 + (z.shape[0] - block) // hop
-    # mean square per block per channel via a cumulative sum (low memory, no block copies)
-    cs = np.vstack([np.zeros((1, z.shape[1])), np.cumsum(z * z, axis=0)])
-    starts = np.arange(n_blocks) * hop
-    ms = ((cs[starts + block] - cs[starts]) / block).sum(axis=1)
+    e = _hop_energies(x, sr, hop)
+    cs = np.concatenate([[0.0], np.cumsum(e)])
+    n_blocks = len(e) - block_hops + 1
+    starts = np.arange(n_blocks)
+    ms = (cs[starts + block_hops] - cs[starts]) / (block_hops * hop)
     with np.errstate(divide="ignore"):
         lk = -0.691 + 10 * np.log10(np.maximum(ms, 1e-12))
     keep = lk > SILENCE_DB

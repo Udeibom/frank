@@ -106,7 +106,7 @@ async def measure_song(project_id: str, scope: Optional[list[str]] = None, progr
     await _say(progress, "Comparing the parts...")
     report = await asyncio.to_thread(
         service.measure_audio, sections, bpm,
-        beat=beat_audio, vocal=vocal_audio, mix=mix_audio, key=fp.get("key"), score=score, scope=scope, vocal_contour=contour,
+        beat=beat_audio, vocal=vocal_audio, mix=mix_audio, sr=service.LISTEN_SR, key=fp.get("key"), score=score, scope=scope, vocal_contour=contour,
     )
     report.audio_versions = versions
     await asyncio.to_thread(_cache_put, key, report)

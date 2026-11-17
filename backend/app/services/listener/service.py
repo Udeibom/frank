@@ -204,15 +204,29 @@ def measure_audio(
 
 # ── loading audio for a project ──────────────────────────────────────────
 
-def decode(data: bytes) -> np.ndarray:
-    """Any stored audio file to mono float at 44.1 kHz."""
-    import soundfile as sf
+LISTEN_SR = 22050               # plenty for loudness, colour, notes and timing; half the memory of 44.1 kHz
 
-    from app.services.audio.convert import to_wav
 
-    x, sr = sf.read(io.BytesIO(to_wav(data, "mp3")), dtype="float32")
-    assert sr == SR
-    return x if x.ndim == 1 else x.mean(axis=1)
+def decode(data: bytes, sr: int = LISTEN_SR) -> np.ndarray:
+    """Any stored audio file to mono float32 at `sr`, decoded by FFmpeg straight to raw samples (one copy)."""
+    import os
+    import subprocess
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+        f.write(data)
+        path = f.name
+    try:
+        out = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", str(sr), "-f", "s16le", "-"],
+            capture_output=True, timeout=120,
+        )
+    finally:
+        os.remove(path)
+    if out.returncode != 0:
+        raise RuntimeError(f"could not decode audio: {out.stderr.decode(errors='replace')[-200:]}")
+    # 16-bit out, like the rest of Frank's conversions: FFmpeg's float downmix sums channels at a different level
+    return np.frombuffer(out.stdout, dtype=np.int16).astype(np.float32) / np.float32(32768.0)
 
 
 def compare(a: MeasurementReport, b: MeasurementReport) -> list[Difference]:
