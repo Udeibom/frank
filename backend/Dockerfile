@@ -34,7 +34,7 @@ COPY . .
 # Fetch the SoundFont at build time (not committed to the repo)
 RUN bash scripts/fetch_soundfont.sh
 # Compile librosa's numba code now, not on the first request
-RUN python scripts/warm_numba.py
+RUN PYTHONPATH=/app python scripts/warm_numba.py
 
 # Render provides $PORT at runtime
 ENV PORT=8000
