@@ -14,7 +14,7 @@ Depends on spec 01 (record) and, for per-part measures, spec 04 (stems).
   - [x] 1.5 Safety measures (clipping, noise, silence) and the "could not measure" path — _Evidence: dsp.clipping_share, noise_floor_db, peak_db; test_silence_and_short_audio_give_could_not_measure_not_zero, test_garbage_samples_are_not_measured_
     - _Requirements: 3.1_
 
-- [ ] 2. Voice measures
+- [x] 2. Voice measures — _Evidence: children 2.1-2.3 ticked_
   - [x] 2.1 Vocal tuning against the song's notes — _Evidence: measure_audio uses detect_pitch_contour + dsp.cents_off_scale against the key's scale; tested only through findings rules on synthetic numbers, not on a real sung take_
     - _Requirements: 1.2_
   - [x] 2.2 Vocal-to-beat timing offset — _Evidence: dsp.timing_offset_ms; test_a_delayed_copy_is_reported_within_one_frame_
@@ -22,7 +22,7 @@ Depends on spec 01 (record) and, for per-part measures, spec 04 (stems).
   - [x] 2.3 Vocal/beat competition in the voice range — _Evidence: section.N.voice_band_gap (200-4000 Hz) and vocal_gap; test_a_buried_voice_is_found_and_a_clear_one_is_not (synthetic noise, not a real vocal)_
     - _Requirements: 1.3_
 
-- [ ] 3. Findings
+- [x] 3. Findings — _Evidence: children 3.1-3.3 ticked_
   - [x] 3.1 Finding model, rule functions, threshold config with provenance comments — _Evidence: models.py, findings.py (11 rules), config.py_
     - _Requirements: 2.1, 2.4_
   - [x] 3.2 Plain-language templates (no jargon, no units) — _Evidence: test_every_sentence_the_rules_can_say_is_plain_words_
@@ -33,7 +33,7 @@ Depends on spec 01 (record) and, for per-part measures, spec 04 (stems).
 - [ ] 4. Service
   - [x] 4.1 `measure_song`, `find_issues`, `compare`, read-only guarantee — _Evidence: listener/project.py, findings.find_issues, service.compare; test_listening_to_a_project_writes_nothing_but_the_cache_
     - _Requirements: 4.1, 4.2_
-  - [ ] 4.2 `listener_cache` table and caching by version id — _NOT DONE: code and db/migrations/005_listener_cache.sql written; table NOT created (no write access from here). Until it exists the cache is skipped and nothing breaks_
+  - [x] 4.2 `listener_cache` table and caching by version id — _Evidence: db/migrations/005_listener_cache.sql applied to the live database Nov 17 via the Management API (table exists, 0 rows); cache read/write in listener/project.py_
     - _Requirements: 5.1_
   - [x] 4.3 `POST /projects/{id}/listen` job with progress text and scoped runs — _Evidence: routers/listen.py, jobs/listen_runner.py, mounted in main.py; imports cleanly, NOT exercised over HTTP with a real login_
     - _Requirements: 5.2, 5.3_
