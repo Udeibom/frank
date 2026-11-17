@@ -17,6 +17,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+# Memory on the 512 MB free server (ship-it spec 13): a warm, CPU-independent numba cache baked into the image,
+# and fewer malloc arenas so worker threads don't each keep their own heap.
+ENV NUMBA_CACHE_DIR=/app/.numba_cache \
+    NUMBA_CPU_NAME=generic \
+    MALLOC_ARENA_MAX=2
 
 # Install Python deps first (better layer caching)
 COPY requirements.txt .
@@ -28,6 +33,8 @@ COPY . .
 
 # Fetch the SoundFont at build time (not committed to the repo)
 RUN bash scripts/fetch_soundfont.sh
+# Compile librosa's numba code now, not on the first request
+RUN python scripts/warm_numba.py
 
 # Render provides $PORT at runtime
 ENV PORT=8000
