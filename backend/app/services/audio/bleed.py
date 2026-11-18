@@ -147,7 +147,7 @@ def remove(take: np.ndarray, beat: np.ndarray, sr: int, voiced: np.ndarray | Non
     out /= np.maximum(weight, 1e-6)
 
     report = judge(take, out, b, voiced, sr)
-    report.lag_ms = lag / sr * 1000
+    report.lag_ms = round(float(lag / sr * 1000), 1)
     if not report.accepted:
         return take.copy(), report
     return out, report
@@ -175,4 +175,4 @@ def judge(before: np.ndarray, after: np.ndarray, beat: np.ndarray, voiced: np.nd
     voice_change = _db(after[sung]) - 10 * np.log10(voice_alone)
     ok = reduction >= ACCEPT_REDUCTION_DB and voice_change > -ACCEPT_VOICE_DROP_DB
     reason = "" if ok else ("the beat was hardly in there" if reduction < ACCEPT_REDUCTION_DB else "it would have changed your voice too much")
-    return BleedReport(ok, round(float(reduction), 1), round(float(voice_change), 1), 0.0, reason)
+    return BleedReport(bool(ok), round(float(reduction), 1), round(float(voice_change), 1), 0.0, reason)

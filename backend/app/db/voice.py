@@ -4,6 +4,37 @@ from typing import Optional, Any
 from app.db.client import get_supabase
 
 
+def json_safe(value: Any) -> Any:
+    """Numbers from audio analysis arrive as numpy types; the database wants plain JSON."""
+    import json
+    import math
+
+    import numpy as np
+
+    def conv(o: Any) -> Any:
+        if isinstance(o, np.bool_):
+            return bool(o)
+        if isinstance(o, np.integer):
+            return int(o)
+        if isinstance(o, (np.floating, float)):
+            f = float(o)
+            return f if math.isfinite(f) else None
+        if isinstance(o, np.ndarray):
+            return [conv(x) for x in o.tolist()]
+        raise TypeError(type(o).__name__)
+
+    def walk(o: Any) -> Any:
+        if isinstance(o, dict):
+            return {str(k): walk(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [walk(v) for v in o]
+        if isinstance(o, (np.generic, np.ndarray, float)):
+            return conv(o)
+        return o
+
+    return json.loads(json.dumps(walk(value), default=conv))
+
+
 # ─── Vocal takes ─────────────────────────────
 
 def create_take_sync(
@@ -16,7 +47,7 @@ def create_take_sync(
     beat taken out, harmony) is its own row with `parent_take_id`, so the take it came from never changes.
     """
     row: dict[str, Any] = {"project_id": project_id, "audio_url": audio_url, "label": label, "kind": kind,
-                           "is_harmony": is_harmony, "params": params or {}, "facts": facts or {}}
+                           "is_harmony": bool(is_harmony), "params": json_safe(params or {}), "facts": json_safe(facts or {})}
     if parent_take_id:
         row["parent_take_id"] = parent_take_id
     result = get_supabase().table("vocal_takes").insert(row).execute()
@@ -52,7 +83,7 @@ async def get_take(take_id: str) -> Optional[dict]:
 def update_take_sync(take_id: str, updates: dict[str, Any]) -> dict:
     supabase = get_supabase()
     result = (
-        supabase.table("vocal_takes").update(updates).eq("id", take_id).execute()
+        supabase.table("vocal_takes").update(json_safe(updates)).eq("id", take_id).execute()
     )
     return result.data[0]
 
@@ -89,7 +120,7 @@ def create_comp_sync(
     result = (
         supabase.table("vocal_comps")
         .insert(
-            {"project_id": project_id, "audio_url": audio_url, "segments": segments}
+            {"project_id": project_id, "audio_url": audio_url, "segments": json_safe(segments)}
         )
         .execute()
     )

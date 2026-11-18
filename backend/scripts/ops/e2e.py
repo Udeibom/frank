@@ -65,12 +65,12 @@ def job(h: dict, job_id: str, label: str) -> dict:
         time.sleep(3)
 
 
-def sung_take() -> bytes:
+def sung_take(detune: float = 0.0) -> bytes:
     sr = 44100
     segs = []
     for n in [57, 60, 64, 62, 60, 57, 59, 57]:
         t = np.arange(int(0.9 * sr)) / sr
-        f = 440 * 2 ** ((n + 12 - 69) / 12)
+        f = 440 * 2 ** ((n + 12 + detune - 69) / 12)
         y = sum(a * np.sin(2 * np.pi * f * k * t + 0.4 * np.sin(2 * np.pi * 5 * t)) for k, a in ((1, .5), (2, .25), (3, .1)))
         segs += [y * np.hanning(t.size) * 0.5, np.zeros(int(0.25 * sr))]
     buf = io.BytesIO()
@@ -82,7 +82,7 @@ def sing_story(h: dict, pid: str, beat_id: str) -> str:
     """Demo story 1's vocal session (spec 06). Returns the id of the take to mix."""
     beat = next(v for v in call(h, "GET", f"/projects/{pid}/beat/versions") if v["id"] == beat_id)
     beat_audio, sr = sf.read(io.BytesIO(c.get(beat["render_url"]).content), dtype="float32", always_2d=True)
-    take = sung_take()
+    take = sung_take(detune=0.35)                                 # a little sharp, so tuning has something to do
     voice, _ = sf.read(io.BytesIO(take), dtype="float32")
     lead_in = 0.4                                                  # the recording ran 0.4 s before the beat came in
     placed = np.concatenate([np.zeros(int(lead_in * 44100), dtype=np.float32), voice])
