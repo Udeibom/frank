@@ -296,14 +296,55 @@ def _tone_tilt(audio: np.ndarray, fp: dict) -> np.ndarray:
     return audio
 
 
+def _render_section(synth, s: SectionPlan, ctx, progression: dict, bpm: float, length: int, mix_chain: bool) -> np.ndarray:
+    """One section's audio (float32, its bars plus the ringing tail), set to the loudness its job in the song asks for."""
+    parts = composer.compose_section(
+        section=s.name, progression=progression, bars=s.bars, energy=s.energy, density=s.density, layers=s.layers, ctx=ctx,
+    )
+    acc = np.zeros((length + int(TAIL_SECONDS * SAMPLE_RATE), 2), dtype=np.float32)
+    for part in parts:
+        stem = synth.render(part, bpm, s.bars * 4)
+        if mix_chain:
+            stem = polish.treat_part(part.name, stem.astype(np.float32), bpm)
+        n = min(stem.shape[0], acc.shape[0])
+        gain = LEAD_GAIN if part.lead else PART_GAIN.get(part.name, 0.7)
+        acc[:n] += stem[:n].astype(np.float32) * gain
+        del stem
+    body = acc[:length]
+    rms = float(np.sqrt(np.mean(np.square(body, dtype=np.float64)))) if body.size else 0.0
+    if rms > SILENCE_RMS:
+        gain_db = _target_db(s) - 20.0 * np.log10(rms / 32768.0)
+        acc *= float(10.0 ** (max(MIN_GAIN_DB, min(MAX_GAIN_DB, gain_db)) / 20.0))
+    return acc
+
+
+def _finish(song: np.ndarray, fp: dict, mix_chain: bool, song_gain: Optional[float], report: Optional[dict]) -> np.ndarray:
+    """Tone, glue, one level for the whole song, fade, int16. A preview passes the full song's gain so it plays at the same level."""
+    song = _tone_tilt(song, fp)
+    if mix_chain:
+        song = polish.treat_song(song)
+    if song_gain is None:
+        peak = float(np.abs(song).max())
+        song_gain = (PEAK_TARGET * 32767.0) / peak if peak > 0 else 1.0
+    song *= np.float32(song_gain)
+    if report is not None:
+        report["song_gain"] = float(song_gain)
+    fade = min(int(FADE_OUT_SECONDS * SAMPLE_RATE), song.shape[0])
+    if fade > 0:
+        song[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=np.float32)[:, None]
+    np.clip(song, -32768, 32767, out=song)
+    return song.astype(np.int16)
+
+
 def render_song(
     sections: list[SectionPlan], fp: dict, seed: Optional[int] = None, mix_chain: bool = True,
-    lead: Optional[lead_mod.Lead] = None,
+    lead: Optional[lead_mod.Lead] = None, report: Optional[dict] = None,
 ) -> tuple[list[np.ndarray], np.ndarray]:
     """
     Render the whole song. Returns (per_section_audio, full_audio), both int16 stereo.
     The per-section slices are exactly the section's bars long; the full audio also holds the final
     ringing tail. Memory stays bounded: one float32 song buffer plus one section at a time.
+    `report`, when given, receives the song-level gain so previews can be played at the same level.
     """
     if not sections:
         empty = np.zeros((0, 2), dtype=np.int16)
@@ -312,66 +353,73 @@ def render_song(
     bpm = float(fp["tempo_bpm"])
     spans = section_spans(sections, bpm)
     tail = int(TAIL_SECONDS * SAMPLE_RATE)
-    total = spans[-1][1]
-    song = np.zeros((total + tail, 2), dtype=np.float32)
+    song = np.zeros((spans[-1][1] + tail, 2), dtype=np.float32)
     _, contexts, progressions = plan_contexts(sections, fp, seed, lead)
-
     with SynthSession() as synth:
         for s, ctx, (start, end) in zip(sections, contexts, spans):
-            parts = composer.compose_section(
-                section=s.name,
-                progression=progressions[s.name],
-                bars=s.bars,
-                energy=s.energy,
-                density=s.density,
-                layers=s.layers,
-                ctx=ctx,
-            )
-            acc = np.zeros((end - start + tail, 2), dtype=np.float32)
-            for part in parts:
-                stem = synth.render(part, bpm, s.bars * 4)
-                if mix_chain:
-                    stem = polish.treat_part(part.name, stem.astype(np.float32), bpm)
-                n = min(stem.shape[0], acc.shape[0])
-                gain = LEAD_GAIN if part.lead else PART_GAIN.get(part.name, 0.7)
-                acc[:n] += stem[:n].astype(np.float32) * gain
-                del stem
-            body = acc[: end - start]
-            rms = float(np.sqrt(np.mean(np.square(body, dtype=np.float64)))) if body.size else 0.0
-            if rms > SILENCE_RMS:
-                wanted = _target_db(s)
-                gain_db = wanted - 20.0 * np.log10(rms / 32768.0)
-                gain_db = max(MIN_GAIN_DB, min(MAX_GAIN_DB, gain_db))
-                acc *= float(10.0 ** (gain_db / 20.0))
+            acc = _render_section(synth, s, ctx, progressions[s.name], bpm, end - start, mix_chain)
             song[start : start + acc.shape[0]] += acc            # the tail rings over the next section
             del acc
-
-    song = _tone_tilt(song, fp)
-    if mix_chain:
-        song = polish.treat_song(song)
-    peak = float(np.abs(song).max())
-    if peak > 0:
-        song *= (PEAK_TARGET * 32767.0) / peak
-    fade = min(int(FADE_OUT_SECONDS * SAMPLE_RATE), tail)
-    if fade > 0:
-        song[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=np.float32)[:, None]
-    np.clip(song, -32768, 32767, out=song)
-    full = song.astype(np.int16)
+    full = _finish(song, fp, mix_chain, None, report)
     del song
     per_section = [full[a:b] for a, b in spans]      # views, not copies: callers only read them
     return per_section, full
 
 
+PREVIEW_GAP_SECONDS = 0.6
+
+
+def render_excerpt(
+    sections: list[SectionPlan], indices: list[int], fp: dict, seed: int, lead: Optional[lead_mod.Lead] = None,
+    song_gain: Optional[float] = None, mix_chain: bool = True,
+) -> np.ndarray:
+    """
+    A quick preview of some sections of a plan (song-engine requirement 7.4, refine-loop requirement 2.2). The whole
+    plan decides each section's chords, moments and neighbours, exactly as the full render would; only the chosen
+    sections are synthesised. Runs of neighbouring sections play joined; separate runs get a short gap. With the full
+    song's `song_gain` the preview plays at the level the committed song will have.
+    """
+    chosen = sorted({i for i in indices if 0 <= i < len(sections)})
+    if not chosen:
+        return np.zeros((0, 2), dtype=np.int16)
+    bpm = float(fp["tempo_bpm"])
+    spans = section_spans(sections, bpm)
+    tail = int(TAIL_SECONDS * SAMPLE_RATE)
+    _, contexts, progressions = plan_contexts(sections, fp, seed, lead)
+    runs: list[list[int]] = []
+    for i in chosen:
+        if runs and runs[-1][-1] == i - 1:
+            runs[-1].append(i)
+        else:
+            runs.append([i])
+    gap = int(PREVIEW_GAP_SECONDS * SAMPLE_RATE)
+    total = sum(spans[r[-1]][1] - spans[r[0]][0] + tail for r in runs) + gap * (len(runs) - 1)
+    out = np.zeros((total, 2), dtype=np.float32)
+    pos = 0
+    with SynthSession() as synth:
+        for r in runs:
+            origin = spans[r[0]][0]
+            for i in r:
+                start, end = spans[i]
+                acc = _render_section(synth, sections[i], contexts[i], progressions[sections[i].name], bpm, end - start, mix_chain)
+                at = pos + start - origin
+                n = min(acc.shape[0], out.shape[0] - at)
+                out[at : at + n] += acc[:n]
+                del acc
+            pos += spans[r[-1]][1] - origin + tail + gap
+    return _finish(out, fp, mix_chain, song_gain, None)
+
+
 def render_full_beat(
     fingerprint: dict, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None,
-    structure: Optional[dict] = None,
+    structure: Optional[dict] = None, report: Optional[dict] = None,
 ) -> tuple[list[SectionPlan], list[np.ndarray], np.ndarray]:
     """
     Full pipeline: plan the arrangement (from the words' structure when there is one), render the song.
     Returns (sections, per_section_audio, full_beat_audio). CPU-bound: call from a background job.
     """
     sections, fp = build_beat_plan(fingerprint, arrangement_from_structure(structure), lead=lead)
-    mixes, full = render_song(sections, fp, seed, lead=lead)
+    mixes, full = render_song(sections, fp, seed, lead=lead, report=report)
     return sections, mixes, full
 
 
@@ -433,7 +481,8 @@ def lead_info(sections: list[SectionPlan], lead: Optional[lead_mod.Lead]) -> dic
 
 
 def rerender_all(
-    sections: list[SectionPlan], fp: dict, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None
+    sections: list[SectionPlan], fp: dict, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None,
+    report: Optional[dict] = None,
 ) -> tuple[list[np.ndarray], np.ndarray]:
     """Re-render every section after an edit. Returns (per_section_audio, full_beat_audio)."""
-    return render_song(sections, fp, seed, lead=lead)
+    return render_song(sections, fp, seed, lead=lead, report=report)

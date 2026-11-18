@@ -88,10 +88,11 @@ def _render_and_persist_sync(
     causing connection races in the storage client. Returns the version dict.
     """
     log_memory("beat: start render")
-    sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed, lead, structure)
+    report: dict = {}
+    sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed, lead, structure, report=report)
     log_memory("beat: rendered")
     fp = beat_engine.fp_utils.normalize(fingerprint)
-    return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead)
+    return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead, song_gain=report.get("song_gain"))
 
 
 def _rerender_and_persist_sync(
@@ -105,8 +106,11 @@ def _rerender_and_persist_sync(
     operations: list[dict] | None = None,
 ) -> dict:
     """Re-render an edited arrangement and persist it, all in one thread."""
-    mixes, full = beat_engine.rerender_all(sections, fp, seed, lead)
-    return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead, changes, operations)
+    report: dict = {}
+    mixes, full = beat_engine.rerender_all(sections, fp, seed, lead, report=report)
+    return _persist_sync(
+        project_id, sections, mixes, full, fp, label, seed, lead, changes, operations, song_gain=report.get("song_gain")
+    )
 
 
 def _persist_sync(
@@ -120,6 +124,7 @@ def _persist_sync(
     lead: lead_mod.Lead | None = None,
     changes: list[str] | None = None,
     operations: list[dict] | None = None,
+    song_gain: float | None = None,
 ) -> dict:
     """
     Upload the assembled render + one mixed file per section, and write records.
@@ -136,6 +141,8 @@ def _persist_sync(
     if changes:
         params["changes"] = changes            # what this version changed, in plain words
         params["operations"] = operations or []
+    if song_gain is not None:
+        params["song_gain"] = song_gain        # previews of later changes play at this level
     version = beat_db.create_beat_version_sync(project_id, render_url, label, params)
 
     for section, mix in zip(sections, section_mixes):
