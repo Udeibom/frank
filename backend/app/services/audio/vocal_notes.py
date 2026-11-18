@@ -17,8 +17,8 @@ FMIN, FMAX = 70.0, 1000.0
 MIN_VOICED_PROB = 0.35
 NOTE_JUMP = 0.7              # semitones: a bigger move starts a new note
 MIN_NOTE_S = 0.09
-PHRASE_GAP = 0.25
-ABSOLUTE_FLOOR_DB = -55.0            # seconds of silence that count as a breath (design "Phrase split")
+PHRASE_GAP = 0.25            # seconds of silence that count as a breath (design "Phrase split")
+ABSOLUTE_FLOOR_DB = -55.0    # quieter than this is room hiss, never singing
 
 
 @dataclass

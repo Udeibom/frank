@@ -11,6 +11,11 @@ class VocalTakeResponse(BaseModel):
     pitch_data: Optional[list[dict[str, Any]]] = None
     label: Optional[str] = None
     created_at: str
+    kind: str = "take"                      # take | tuned | lined_up | cleaned | harmony
+    parent_take_id: Optional[str] = None
+    is_harmony: bool = False
+    params: dict[str, Any] = Field(default_factory=dict)
+    facts: dict[str, Any] = Field(default_factory=dict)
 
 
 class UploadTakeResponse(BaseModel):
@@ -20,8 +25,12 @@ class UploadTakeResponse(BaseModel):
 
 class CorrectPitchRequest(BaseModel):
     mode: Literal["light", "moderate", "full"] = "light"
+
+
 class AlignRequest(BaseModel):
     mode: Literal["moderate", "full"] = "moderate"     # the gentlest setting never moves timing
+
+
 class SwapRequest(BaseModel):
     phrase_index: int = Field(ge=0)
     take_id: str
