@@ -145,6 +145,7 @@ def pcs_in_key(key: str) -> set[int]:
 
 # ── (1) from_sketch: when there is a tune ─────────────────────────────────
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(early_note, min_size=3, max_size=12))
 def test_from_sketch_needs_confirmed(notes):
     """Req 1: an unconfirmed (or missing/falsy 'confirmed') melody is never a lead."""
@@ -155,6 +156,7 @@ def test_from_sketch_needs_confirmed(notes):
     assert lead_mod.from_sketch(sketch(notes)) is not None
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(early_note, max_size=2), garbage_notes)
 def test_from_sketch_needs_three_valid_notes(few, junk):
     """Req 1: fewer than 3 VALID notes is no tune, however much garbage surrounds them."""
@@ -170,6 +172,7 @@ def test_from_sketch_needs_three_valid_notes(few, junk):
     assert lead_mod.from_sketch(sketch(bad)) is None
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(early_note, min_size=3, max_size=12), st.lists(st.sampled_from([
     {"pitch_midi": 60, "start_beat": -0.25, "dur_beats": 1.0},
     {"pitch_midi": 60, "start_beat": 1.0, "dur_beats": 0.0},
@@ -194,6 +197,7 @@ def test_from_sketch_never_raises_on_garbage(notes, confirmed, key, mode, source
     assert result is None or isinstance(result, Lead)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(json_finite)
 def test_from_sketch_never_raises_on_any_content(content):
     """Req 1: the content itself can be any JSON value."""
@@ -233,6 +237,7 @@ def test_infinite_pitch_does_not_crash_from_sketch(pitch):
 
 # ── (2) the tune is preserved ─────────────────────────────────────────────
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(sung_note, min_size=3, max_size=14))
 def test_tune_is_preserved_except_octaves_and_the_16_bar_cut(notes):
     """Req 2: pitch differs by whole octaves, start and duration unchanged (except the 16-bar cut)."""
@@ -249,6 +254,7 @@ def test_tune_is_preserved_except_octaves_and_the_16_bar_cut(notes):
         assert d == wd
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(sung_note, min_size=3, max_size=14))
 def test_every_octave_shift_is_the_same_for_the_whole_tune(notes):
     """Req 2: the tune moves as one block, so the shape of the tune (intervals between notes) is untouched."""
@@ -259,6 +265,7 @@ def test_every_octave_shift_is_the_same_for_the_whole_tune(notes):
     assert len(shifts) == 1
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(early_note, min_size=3, max_size=12), st.integers(1, 20))
 def test_a_tune_longer_than_16_bars_is_cut(notes, extra):
     """Req 2: a note starting at or after beat 64 is dropped; a note crossing beat 64 is shortened to end there."""
@@ -286,6 +293,7 @@ def test_extreme_range_breaks_whole_octave_rule():
 
 # ── (3) placement and length ──────────────────────────────────────────────
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(sung_note, min_size=3, max_size=14))
 def test_middle_of_the_tune_sits_in_the_lead_range(notes):
     """Req 3: the middle pitch of the tune lands in 62..76."""
@@ -295,6 +303,7 @@ def test_middle_of_the_tune_sits_in_the_lead_range(notes):
     assert 62 <= middle <= 76
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(sung_note, min_size=3, max_size=14))
 def test_bars_is_a_phrase_length_that_covers_the_last_note(notes):
     """Req 3: bars is one of PHRASE_BARS and the tune fits inside it."""
@@ -304,6 +313,7 @@ def test_bars_is_a_phrase_length_that_covers_the_last_note(notes):
     assert result.bars * 4.0 >= max(s + d for _, s, d in result.notes) - 1e-9
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(sung_note, min_size=3, max_size=14))
 def test_bars_is_the_smallest_phrase_that_covers_the_tune(notes):
     """Req 3: not longer than needed (a tune of 3 bars becomes 4, not 8)."""
@@ -459,6 +469,7 @@ def test_the_tune_is_not_dropped_or_invented(lead, bars, seed):
     assert sorted(got) == sorted(want)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(2, 4), st.integers(0, 2**31))
 def test_a_repeat_that_does_not_fit_is_cut_at_the_section_end(extra, seed):
     """Req 6: with a 4-bar tune in a 6-bar section, the second repeat stops at bar 6, even mid-note."""
@@ -595,6 +606,7 @@ def test_plan_contexts_without_a_lead_is_the_old_behaviour(arr):
     assert (progs["chorus"] if "chorus" in progs else None) == (progs2["chorus"] if "chorus" in progs2 else None)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(leads(), st.one_of(st.none(), st.text(max_size=12)))
 def test_lead_round_trips_through_dict_and_json(lead, source):
     """Req 8: to_dict / from_dict (and a JSON trip, as saved in beat_versions.params) loses nothing."""
@@ -611,6 +623,7 @@ def test_from_dict_returns_none_or_a_lead_on_garbage(data):
     assert result is None or isinstance(result, Lead)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.sampled_from([None, 5, "x", [], [1, 2]]) | st.fixed_dictionaries({}, optional={
     "notes": json_finite, "bars": json_finite, "key": json_finite}))
 def test_from_dict_garbage_dicts_are_none(data):
@@ -619,6 +632,7 @@ def test_from_dict_garbage_dicts_are_none(data):
     assert result is None or isinstance(result, Lead)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.dictionaries(st.text(max_size=6).filter(lambda k: k != "lead"), json_values, max_size=5))
 def test_lead_from_params_is_none_for_old_params(params):
     """Req 8: a beat saved before leads existed has no 'lead' key and gets no lead."""
@@ -626,6 +640,7 @@ def test_lead_from_params_is_none_for_old_params(params):
     assert beat.lead_from_params({**params, "lead": None}) is None
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(leads())
 def test_lead_from_params_restores_the_saved_lead(lead):
     """Req 8: the lead stored by _arrangement_params comes back equal."""
@@ -674,6 +689,7 @@ good_notes = st.lists(early_note, min_size=3, max_size=8)
 tempo_values = st.floats(40, 200, allow_nan=False)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints_st)
 def test_no_melody_leaves_the_fingerprint_alone(fingerprint):
     """Req 9: with no active melody, the fingerprint comes back unchanged and there is no lead."""
@@ -683,6 +699,7 @@ def test_no_melody_leaves_the_fingerprint_alone(fingerprint):
     assert json.dumps(fingerprint, sort_keys=True, default=str) == before
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints_st, st.sampled_from([Exception("db down"), RuntimeError("x"), KeyError("k"), ValueError("v"), OSError("net")]))
 def test_a_failing_lookup_never_stops_the_beat(fingerprint, error):
     """Req 9: if reading the melody raises, the beat is built without it."""
@@ -690,6 +707,7 @@ def test_a_failing_lookup_never_stops_the_beat(fingerprint, error):
     assert lead is None and fp == fingerprint
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints_st, good_notes, tempo_values, unit)
 def test_an_unconfirmed_melody_is_ignored(fingerprint, notes, tempo, conf):
     """Req 9: an unconfirmed melody gives no lead and never touches the speed."""
@@ -698,6 +716,7 @@ def test_an_unconfirmed_melody_is_ignored(fingerprint, notes, tempo, conf):
     assert lead is None and fp == fingerprint
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints_st, st.lists(early_note, max_size=2), tempo_values)
 def test_an_unusable_tune_gives_no_lead_and_no_tempo(fingerprint, few, tempo):
     """Req 9: a confirmed but too-short tune is dropped, and its tempo is not used either."""
@@ -706,6 +725,7 @@ def test_an_unusable_tune_gives_no_lead_and_no_tempo(fingerprint, few, tempo):
     assert lead is None and fp == fingerprint
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(good_notes, tempo_values, st.floats(CONFIDENT, 1.0, allow_nan=False), st.sampled_from(["v1", "abc"]))
 def test_tempo_is_filled_when_absent_and_confident(notes, tempo, conf, vid):
     """Req 9: no tempo_bpm in the fingerprint plus a confident hum tempo: the hum's tempo is used and the lead is built."""
@@ -717,6 +737,7 @@ def test_tempo_is_filled_when_absent_and_confident(notes, tempo, conf, vid):
     assert "tempo_bpm" not in original                      # the caller's dict is not mutated
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(good_notes, tempo_values, st.floats(0.0, CONFIDENT - 1e-6, allow_nan=False))
 def test_tempo_is_not_filled_when_not_confident(notes, tempo, conf):
     """Req 9: a hesitant tempo is never used."""
@@ -725,6 +746,7 @@ def test_tempo_is_not_filled_when_not_confident(notes, tempo, conf):
     assert "tempo_bpm" not in fp
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(good_notes, tempo_values, unit, json_values)
 def test_an_existing_tempo_is_never_replaced(notes, tempo, conf, existing):
     """Req 9: whatever tempo_bpm the fingerprint already holds (even None or garbage) survives."""
@@ -842,6 +864,7 @@ def test_a_tune_in_the_relative_key_does_not_overrule_a_settled_key():
     assert lead_mod.choose_key(lead, "F# major")[1] is True
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(-3, 40), st.sampled_from([0, 1, 3, 17, 32]))
 def test_a_saved_tune_with_a_bad_length_or_too_few_notes_is_not_used(bars, n):
     notes = [[60 + i, float(i), 1.0] for i in range(n)]

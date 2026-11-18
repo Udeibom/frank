@@ -110,6 +110,7 @@ takes = st.one_of(
 comps = st.one_of(st.none(), st.fixed_dictionaries({"audio_url": urls}))
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(comps, takes)
 def test_resolution_returns_one_of_the_available_urls_or_none(comp, take):
     result = resolve_vocal_url(comp, take)
@@ -123,6 +124,7 @@ def test_resolution_returns_one_of_the_available_urls_or_none(comp, take):
         assert result is None
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(takes)
 def test_with_no_comp_the_tuned_take_always_wins(take):
     result = resolve_vocal_url(None, take)
@@ -130,6 +132,7 @@ def test_with_no_comp_the_tuned_take_always_wins(take):
         assert result == (take.get("processed_url") or take["audio_url"])
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(comps, takes)
 def test_an_available_vocal_is_never_silently_dropped(comp, take):
     if comp or take:

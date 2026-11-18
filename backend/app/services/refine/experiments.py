@@ -126,6 +126,19 @@ def experiment_menu(
     if keys:
         menu.append(("keys", _beat("Warmer keys", "Only the sound of the keys changes, to a softer, warmer one.",
                                    {"op": "swap_sound", "part": "keys", "sound": "electric piano", "section": keys})))
+    # More single changes, so there are always at least two to hear even when the ones above change nothing
+    # (a chorus already as big as it goes, keys already on that sound; found by a property test, Nov 18).
+    verse_drums = _with(sections, verses, "drums")
+    if verse_drums:
+        menu.append(("verse", _beat("Simpler drums in the verses", "Only the verse drums change: they play less.",
+                                    {"op": "sparser", "part": "drums", "section": verse_drums})))
+    before_chorus = [i - 1 for i in choruses if i > 0 and "drums" in sections[i - 1].layers]
+    if before_chorus:
+        menu.append(("chorus", _beat("A drum fill into the chorus", "Only one thing is added: a drum roll that announces the chorus.",
+                                     {"op": "add_fill", "section": before_chorus})))
+    if keys:
+        menu.append(("keys", _beat("Brighter keys", "Only the sound of the keys changes, to a brighter piano.",
+                                   {"op": "swap_sound", "part": "keys", "sound": "bright piano", "section": keys})))
     if has_mix:
         menu.append(("voice", _mix("More space around your voice", "Only your voice changes: it sounds like a bigger room.",
                                    {"type": "apply_effect", "params": {"target": "vocal", "effect": "space", "on": True}})))

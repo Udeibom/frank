@@ -45,6 +45,7 @@ raw_sections = st.lists(
 
 # ─── Repairing the section list ──────────────
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(raw_sections, st.integers(0, 40))
 def test_repaired_sections_cover_every_line_exactly_once_in_order(raw, n):
     out = ly.repair_sections(raw, n)
@@ -52,12 +53,14 @@ def test_repaired_sections_cover_every_line_exactly_once_in_order(raw, n):
     assert all(s.name in SECTION_NAMES for s in out)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(raw_sections, st.integers(0, 40))
 def test_repairing_twice_changes_nothing(raw, n):
     once = ly.repair_sections(raw, n)
     assert ly.repair_sections(once, n) == once
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(1, 30), st.data())
 def test_an_already_valid_list_is_left_alone(n, data):
     cuts = sorted(set(data.draw(st.lists(st.integers(1, n - 1), max_size=6)))) if n > 1 else []
@@ -71,6 +74,7 @@ def test_an_already_valid_list_is_left_alone(n, data):
 
 # ─── Structure from the page alone ───────────
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(songs)
 def test_stanza_structure_covers_the_page_and_follows_the_blank_lines(stanzas):
     text = text_of(stanzas)
@@ -80,6 +84,7 @@ def test_stanza_structure_covers_the_page_and_follows_the_blank_lines(stanzas):
     assert [b - a + 1 for a, b in spans] == [len(s) for s in stanzas]
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(stanza, stanza, st.integers(2, 4))
 def test_a_stanza_that_comes_back_is_called_the_chorus(chorus, verse, times):
     hook = chorus
@@ -106,6 +111,7 @@ def good_answer(**over) -> dict:
     return base
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(allow_nan=True, allow_infinity=True), st.floats(allow_nan=True, allow_infinity=True), st.floats(-5, 5))
 def test_numbers_from_the_model_are_pulled_into_range_and_never_nan(e, d, c):
     ans = good_answer(hints={"energy_level": e, "density": d, "tempo_feel": "steady", "mode": "major", "confidence": c})
@@ -116,6 +122,7 @@ def test_numbers_from_the_model_are_pulled_into_range_and_never_nan(e, d, c):
     assert 0.0 <= reading.hints.confidence <= 1.0
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.text(max_size=12), st.text(max_size=12))
 def test_unknown_feels_and_modes_are_dropped_not_guessed(feel, mode):
     ans = good_answer(hints={"energy_level": 0.5, "density": 0.5, "tempo_feel": feel, "mode": mode, "confidence": 0.9})
@@ -124,6 +131,7 @@ def test_unknown_feels_and_modes_are_dropped_not_guessed(feel, mode):
     assert h.mode in (None, "minor", "major")
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.sampled_from(["", "not json", "[]", "null", "42", '{"sections": []}', '{"feeling": {"summary": ""}, "sections": []}', "{}"]))
 def test_an_unusable_reply_is_refused_with_a_reason(bad):
     with pytest.raises(ly.ReadingError) as err:
@@ -131,6 +139,7 @@ def test_an_unusable_reply_is_refused_with_a_reason(bad):
     assert str(err.value)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(raw_sections, st.integers(1, 30))
 def test_whatever_sections_the_model_proposes_the_reading_covers_the_lines(raw, n):
     ans = good_answer(sections=[s.model_dump() for s in raw] or [{"name": "verse", "first_line": 1, "last_line": 1}])
@@ -192,6 +201,7 @@ def test_a_dropped_connection_is_passed_on_not_hidden_by_the_fallback():
         ly.read_lyrics(TEXT, Asker(ConnectionError("down")))
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.text(alphabet="x \n", max_size=6))
 def test_too_few_lines_is_answered_kindly_without_asking_the_model(text):
     assume(len(ly.lines_of(text)) < ly.MIN_LINES)
@@ -217,18 +227,21 @@ def reading_with(hints: LyricsHints | None) -> LyricsReading:
     return LyricsReading(ok=True, line_count=2, feeling=LyricsFeeling(summary="x"), sections=[], hints=hints)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(0, ly.HINT_CONFIDENCE - 0.001))
 def test_a_reading_unsure_of_energy_and_pace_suggests_neither(conf):
     out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=0.9, density=0.9, tempo_feel="driving", mode="major", confidence=conf, mode_confidence=1.0)))
     assert set(out) <= {"mode"}
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(0, ly.CONFIDENT - 0.001))
 def test_a_reading_unsure_whether_the_song_is_dark_or_warm_suggests_no_mood(mode_conf):
     out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=0.9, density=0.9, tempo_feel="driving", mode="major", confidence=1.0, mode_confidence=mode_conf)))
     assert "mode" not in out
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(0, ly.CONFIDENT - 0.001))
 def test_doubt_about_the_mood_does_not_throw_away_how_intense_and_busy_the_song_is(mode_conf):
     # Whether a song is sad or angry says nothing about how intense it is: that stays useful.
@@ -236,6 +249,7 @@ def test_doubt_about_the_mood_does_not_throw_away_how_intense_and_busy_the_song_
     assert out == {"energy_level": 0.8, "density": 0.6, "tempo_feel": "building"}
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(ly.CONFIDENT, 1.0), st.floats(0, 1), st.floats(0, 1))
 def test_a_sure_reading_suggests_only_known_fields_in_range(conf, e, d):
     out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=e, density=d, tempo_feel="floating", mode="minor", confidence=conf, mode_confidence=conf)))
@@ -258,6 +272,7 @@ fields = st.fixed_dictionaries({}, optional={
 })
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fields, fields)
 def test_merging_never_changes_what_was_already_settled(existing, hints):
     merged, filled, _ = merge.merge_fingerprint(existing, hints)
@@ -266,6 +281,7 @@ def test_merging_never_changes_what_was_already_settled(existing, hints):
     assert set(filled) == set(hints) - set(existing)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fields, fields)
 def test_merging_the_same_hints_twice_changes_nothing_more(existing, hints):
     once, _, _ = merge.merge_fingerprint(existing, hints)
@@ -273,6 +289,7 @@ def test_merging_the_same_hints_twice_changes_nothing_more(existing, hints):
     assert twice == once and filled_again == []
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fields, fields)
 def test_the_inputs_are_left_untouched(existing, hints):
     e, h = dict(existing), dict(hints)
@@ -280,6 +297,7 @@ def test_the_inputs_are_left_untouched(existing, hints):
     assert existing == e and hints == h
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fields, fields)
 def test_a_disagreement_is_named_not_resolved(existing, hints):
     merged, _, conflicts = merge.merge_fingerprint(existing, hints)
@@ -291,6 +309,7 @@ def test_a_disagreement_is_named_not_resolved(existing, hints):
 BANNED = ("tempo", "bpm", " key", "major", "minor", "chord", "beat", "melody", "rhythm", "mode")
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.sampled_from(["minor", "major"]), st.sampled_from(["minor", "major"]), st.floats(0, 1), st.floats(0, 1))
 def test_the_question_asked_about_a_disagreement_is_one_plain_question(settled_mode, new_mode, e1, e2):
     _, _, conflicts = merge.merge_fingerprint({"mode": settled_mode, "energy_level": e1}, {"mode": new_mode, "energy_level": e2})
@@ -323,6 +342,7 @@ def sections_with(feelings: list[str | None], sizes: list[int] | None = None) ->
     return out
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(feeling_lists, st.lists(st.integers(1, 8), min_size=10, max_size=10))
 def test_the_mood_follows_whichever_feeling_has_more_lines(feelings, sizes):
     secs = sections_with(feelings, sizes)
@@ -333,6 +353,7 @@ def test_the_mood_follows_whichever_feeling_has_more_lines(feelings, sizes):
     assert 0.0 <= mood.margin <= 1.0 and 0.0 <= mood.mixed_share <= 1.0 and mood.labelled
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(feeling_lists, st.randoms())
 def test_the_order_of_the_sections_does_not_change_the_mood(feelings, rnd):
     a = sections_with(feelings)
@@ -346,29 +367,34 @@ def test_unlabelled_sections_give_no_mood_at_all():
     assert ly.derive_mood([]).mode is None
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(0, 1), feeling_lists)
 def test_confidence_never_rises_above_what_the_model_said(model, feelings):
     mood = ly.derive_mood(sections_with(feelings))
     assert ly.mood_confidence(model, mood) <= model + 1e-9
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(0, 1), st.integers(1, 8))
 def test_a_dead_heat_is_never_confident_enough_to_act_on(model, n):
     mood = ly.derive_mood(sections_with(["sorrowful"] * n + ["warm"] * n))
     assert mood.mode is None and ly.mood_confidence(model, mood) < ly.CONFIDENT
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(1, 8))
 def test_a_song_that_is_all_both_at_once_is_never_confident(n):
     assert ly.mood_confidence(1.0, ly.derive_mood(sections_with(["mixed"] * n))) < ly.CONFIDENT
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(2, 8), st.sampled_from(["sorrowful", "warm"]))
 def test_a_song_that_feels_one_way_throughout_is_trusted(n, feeling):
     mood = ly.derive_mood(sections_with([feeling] * n))
     assert ly.mood_confidence(0.9, mood) >= ly.CONFIDENT
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(1, 6), st.integers(0, 6))
 def test_more_both_at_once_never_makes_it_more_sure(clear, extra_mixed):
     base = ly.mood_confidence(1.0, ly.derive_mood(sections_with(["sorrowful"] * clear)))
@@ -381,6 +407,7 @@ def answer_with_feelings(feelings: list[str], model_mode: str, model_conf: float
     return json.dumps(good_answer(sections=secs, hints={"energy_level": 0.3, "density": 0.3, "tempo_feel": "steady", "mode": model_mode, "confidence": model_conf}))
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(2, 6), st.sampled_from(["minor", "major"]))
 def test_the_sections_win_over_the_models_own_overall_guess(n, model_mode):
     r = ly.parse_reading(answer_with_feelings(["sorrowful"] * n, model_mode, 0.9), 4 * n)
@@ -389,6 +416,7 @@ def test_the_sections_win_over_the_models_own_overall_guess(n, model_mode):
     assert r.hints.mode == "major"
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(feeling_lists, st.sampled_from(["minor", "major"]), st.floats(0, 1))
 def test_frank_asks_one_question_exactly_when_it_cannot_tell_dark_from_warm(feelings, mode, conf):
     r = ly.parse_reading(answer_with_feelings(feelings, mode, conf), 4 * len(feelings))
@@ -401,12 +429,14 @@ def test_frank_asks_one_question_exactly_when_it_cannot_tell_dark_from_warm(feel
         assert "mode" not in ly.lyrics_hints(r)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.sampled_from(["", "joyful", "SORROWFUL", "furious", "x" * 20]))
 def test_an_unknown_section_feeling_is_dropped_not_guessed(label):
     secs = ly.repair_sections([LyricSection(name="verse", first_line=1, last_line=4, feeling=label)], 4)
     assert secs[0].feeling is None
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(1, 20), st.data())
 def test_repairing_keeps_each_sections_feeling(n, data):
     cuts = sorted(set(data.draw(st.lists(st.integers(1, n - 1), max_size=5)))) if n > 1 else []
@@ -415,6 +445,7 @@ def test_repairing_keeps_each_sections_feeling(n, data):
     assert ly.repair_sections(valid, n) == valid
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(1, 6), st.sampled_from(["sorrowful", "warm"]))
 def test_a_song_that_is_half_both_at_once_is_not_trusted_even_though_the_rest_leans_one_way(k, leaning):
     mood = ly.derive_mood(sections_with([leaning] * k + ["mixed"] * k))
@@ -422,6 +453,7 @@ def test_a_song_that_is_half_both_at_once_is_not_trusted_even_though_the_rest_le
     assert ly.mood_confidence(1.0, mood) < ly.CONFIDENT  # ... but half the song is both, so ask instead of guessing
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.text(alphabet="abc .!?,", min_size=1, max_size=40).filter(lambda t: t.strip()))
 def test_the_summary_always_ends_like_a_sentence_so_a_question_can_follow_it(summary):
     ans = good_answer()
@@ -460,6 +492,7 @@ def test_everyday_sentences_are_plain(fine):
     assert ly.is_plain(fine)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.sampled_from(BAD_FRAGMENTS), st.sampled_from(["summary", "emotional_arc", "question"]))
 def test_a_summary_arc_or_question_that_is_not_plain_sends_the_answer_back_for_repair(bad, where):
     ans = good_answer()
@@ -488,6 +521,7 @@ def test_two_answers_that_are_not_plain_fall_back_to_the_page_with_no_feeling():
     assert not reading.from_model and reading.feeling is None
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(st.sampled_from(["rain", "kitchen light", "3 am", "a minor chord", "https://x.io", "spring"]), max_size=6))
 def test_themes_and_images_that_are_not_plain_are_left_out_not_fatal(items):
     ans = good_answer()
@@ -512,6 +546,7 @@ def test_a_sloppy_section_is_dropped_and_the_rest_of_the_answer_is_kept(bad_sect
     assert r.from_model and covers_exactly(r.sections, 2)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.one_of(st.none(), st.text(max_size=5), st.integers(), st.dictionaries(st.text(max_size=3), st.integers(), max_size=2)))
 def test_sections_that_are_not_a_list_never_break_reading(junk):
     r = ly.parse_reading(json.dumps(good_answer(sections=junk)), 3)
@@ -519,6 +554,7 @@ def test_sections_that_are_not_a_list_never_break_reading(junk):
 
 
 # A very long song is cut on a line break and the person is told.
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(1, 30))
 def test_a_long_song_is_cut_on_a_whole_line_and_flagged(extra):
     line = "a line of the song that goes on and on\n"   # 43 characters: does not divide the limit evenly
@@ -553,6 +589,7 @@ def test_a_dead_heat_leaves_no_mood_stored_rather_than_the_models_guess():
 
 
 # A direction marked 'modal' is not a disagreement with minor or major.
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.sampled_from(["minor", "major"]))
 def test_a_modal_direction_is_not_treated_as_a_disagreement(new_mode):
     merged, filled, conflicts = merge.merge_fingerprint({"mode": "modal"}, {"mode": new_mode})
@@ -584,12 +621,14 @@ def test_the_request_body_has_a_size_limit():
 
 # ─── Anger is dark too (the founder's own lyric, Nov 13) ─
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(1, 8), st.integers(1, 8))
 def test_a_song_that_moves_between_sorrow_and_anger_is_clearly_dark_not_split(sorrowful, angry):
     mood = ly.derive_mood(sections_with(["sorrowful"] * sorrowful + ["angry"] * angry))
     assert mood.mode == "minor" and mood.margin == 1.0
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(1, 8), st.integers(1, 8))
 def test_a_dark_song_gets_no_question_whether_it_is_sad_angry_or_both(sorrowful, angry):
     feelings = ["sorrowful"] * sorrowful + ["angry"] * angry
@@ -597,6 +636,7 @@ def test_a_dark_song_gets_no_question_whether_it_is_sad_angry_or_both(sorrowful,
     assert r.question is None and r.hints.mode == "minor" and r.hints.mode_confidence >= ly.CONFIDENT
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(1, 6), st.integers(1, 6))
 def test_angry_against_warm_is_a_real_doubt_and_gets_one_question(angry, warm):
     feelings = ["angry"] * angry + ["warm"] * warm
@@ -607,6 +647,7 @@ def test_angry_against_warm_is_a_real_doubt_and_gets_one_question(angry, warm):
         assert r.question and r.question.count("?") == 1
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(0, 1), st.floats(0, 1))
 def test_the_mood_confidence_comes_from_the_sections_alone_not_the_models_number(model_a, model_b):
     # The model's own confidence is about energy and pace and wobbled between 0.45 and 0.65 on the same
@@ -619,6 +660,7 @@ def test_the_mood_confidence_comes_from_the_sections_alone_not_the_models_number
     assert (a.question is None) == (b.question is None)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(ly.HINT_CONFIDENCE, 1.0), st.floats(0, 1), st.floats(0, 1))
 def test_intensity_and_pace_are_offered_once_the_model_is_moderately_sure_of_them(conf, e, d):
     out = ly.lyrics_hints(reading_with(LyricsHints(energy_level=e, density=d, tempo_feel="driving", confidence=conf)))
@@ -644,6 +686,7 @@ def test_the_bar_for_deciding_dark_or_warm_is_about_six_in_ten(sure, offered):
 QUESTIONS = st.text(alphabet="abcdefg ,", min_size=2, max_size=40).filter(lambda t: t.strip()).map(lambda t: t.strip() + "?")
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(QUESTIONS)
 def test_a_question_always_offers_both_and_stays_one_question(q):
     out = ly.allow_both(q)
@@ -651,6 +694,7 @@ def test_a_question_always_offers_both_and_stays_one_question(q):
     assert ly._BOTH.search(out)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(QUESTIONS)
 def test_offering_both_twice_changes_nothing(q):
     once = ly.allow_both(q)

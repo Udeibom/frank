@@ -76,6 +76,7 @@ def run_steps(step_list, snapshots: list | None = None) -> list[FacetVersion]:
 
 # ─── Version rules ───────────────────────────
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(steps)
 def test_stored_versions_are_never_changed_by_later_writes(step_list):
     # Requirement 3.2: append-only. Every earlier state must still match the final rows.
@@ -85,6 +86,7 @@ def test_stored_versions_are_never_changed_by_later_writes(step_list):
         assert snap == [v.model_dump() for v in final[: len(snap)]]
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(steps)
 def test_every_lineage_is_acyclic_and_stays_in_its_project_and_facet(step_list):
     store = run_steps(step_list)
@@ -96,6 +98,7 @@ def test_every_lineage_is_acyclic_and_stays_in_its_project_and_facet(step_list):
         assert all(c.project_id == v.project_id and c.facet == v.facet for c in chain)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(steps)
 def test_only_the_first_version_of_a_facet_has_no_parent_unless_branched_from_a_root(step_list):
     store = run_steps(step_list)
@@ -108,6 +111,7 @@ def test_only_the_first_version_of_a_facet_has_no_parent_unless_branched_from_a_
                 assert lane[0].parent_id is None
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(steps, st.integers(0, 50), st.sampled_from(PROJECTS), st.sampled_from(NON_INTENT))
 def test_restore_adds_a_version_with_the_old_content_and_the_old_version_as_parent(
     step_list, pick, project, facet
@@ -128,6 +132,7 @@ def test_restore_adds_a_version_with_the_old_content_and_the_old_version_as_pare
     assert len(store) == before  # restore() only builds; the caller stores it
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(contents, st.sampled_from([a for a in AUTHORS if a != USER_AUTHOR]))
 def test_only_the_user_can_write_the_intent(content, author):
     with pytest.raises(rules.VersionError):
@@ -142,6 +147,7 @@ def test_only_the_user_can_write_the_intent(content, author):
     assert ok.content == content
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(steps, st.sampled_from(NON_INTENT), contents)
 def test_a_parent_from_another_project_or_facet_is_rejected(step_list, facet, content):
     store = run_steps(step_list)
@@ -155,6 +161,7 @@ def test_a_parent_from_another_project_or_facet_is_rejected(step_list, facet, co
         )
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(steps)
 def test_a_missing_parent_is_rejected_once_a_facet_has_versions(step_list):
     store = run_steps(step_list)
@@ -207,11 +214,13 @@ budgets = st.integers(50, 8000)
 roles = st.one_of(st.none(), st.sampled_from(["mix_engineer", "vocal_producer", "beat_maker", "producer"]))
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(records(), roles, budgets)
 def test_the_same_record_gives_the_same_brief(record, role, budget):
     assert build_brief(record, role, budget) == build_brief(copy.deepcopy(record), role, budget)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(records(), roles, budgets)
 def test_brief_always_keeps_the_intent_and_phase(record, role, budget):
     brief = build_brief(record, role, budget)
@@ -220,12 +229,14 @@ def test_brief_always_keeps_the_intent_and_phase(record, role, budget):
     assert (intent in brief) if intent else ("not said yet" in brief)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(records(), roles, budgets)
 def test_brief_fits_the_budget_unless_only_the_always_kept_part_remains(record, role, budget):
     brief = build_brief(record, role, budget)
     assert len(brief) <= budget or brief == _required_header(record)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(records(), roles, st.integers(50, 8000), st.integers(50, 8000))
 def test_a_smaller_budget_drops_older_decisions_first(record, role, a, b):
     big, small = max(a, b), min(a, b)

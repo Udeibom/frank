@@ -64,6 +64,7 @@ def compose(name: str, fp: dict, seed: int, index: int = 0, repeat: int = 0, fin
 # ── timing ────────────────────────────────────────────────────────────────
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(arrangements, st.integers(50, 180))
 def test_sections_are_contiguous_and_exact(arr, bpm):
     """Every section ends exactly where the next begins; the song is exactly as long as its bars."""
@@ -263,6 +264,7 @@ def test_more_density_never_means_fewer_notes(fp, seed):
     assert count(0.9) >= count(0.1)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.lists(st.lists(st.integers(36, 84), min_size=3, max_size=4, unique=True), min_size=1, max_size=6))
 def test_voice_leading_keeps_the_same_notes(chords):
     chords = [sorted(c) for c in chords]
@@ -477,6 +479,7 @@ def test_the_bass_loses_rumble_and_the_pad_gets_space():
     assert np.abs(out[22050:]).max() > 1.0          # a tail rings long after the click
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(-1.0, 1.0, allow_nan=False))
 def test_panning_never_makes_the_sound_louder_overall(pan):
     x = noise(4000, 3)

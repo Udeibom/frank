@@ -96,6 +96,7 @@ note_sets = st.lists(
 )
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(note_sets, st.integers(1, 11))
 def test_transposing_a_tune_transposes_its_key_by_the_same_amount(tune, k):
     base = [raw(p, i * 3.0, d) for i, (p, d) in enumerate(tune)]
@@ -137,6 +138,7 @@ def test_a_steady_pulse_is_found_or_its_double_or_half(bpm, steps):
     assert conf > 0.3
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(0, m.MIN_ONSETS_FOR_TEMPO - 1))
 def test_too_few_note_starts_means_no_tempo_not_a_made_up_one(n):
     bpm, conf, _ = m.estimate_tempo(np.linspace(0.5, 3.0, n))
@@ -145,6 +147,7 @@ def test_too_few_note_starts_means_no_tempo_not_a_made_up_one(n):
 
 # ─── Tuning ──────────────────────────────────
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(
     st.lists(st.tuples(st.integers(48, 72), st.floats(-0.1, 0.1)), min_size=6, max_size=24),
     st.floats(0.36, 0.5),
@@ -164,6 +167,7 @@ def test_a_hum_sitting_between_two_notes_still_gets_steady_notes(sung, offset, s
 
 # ─── Rounding to the beat grid ───────────────
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(
     st.lists(st.tuples(st.floats(0.05, 0.8), st.floats(0.08, 1.2)), min_size=1, max_size=25),
     st.integers(60, 140),
@@ -241,6 +245,7 @@ def pitch_distance(a: int, b: int) -> int:
     return min(d, 12 - d)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(messy_tunes, st.integers(0, 11), st.sampled_from(["major", "minor"]), st.floats(0.0, 1.0))
 def test_cleanup_only_removes_notes_keeps_order_and_the_overall_span(pairs, tonic, mode, conf):
     notes = tune_from(pairs)
@@ -251,6 +256,7 @@ def test_cleanup_only_removes_notes_keeps_order_and_the_overall_span(pairs, toni
     assert out[-1].end_s == pytest.approx(notes[-1].end_s)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(messy_tunes, st.integers(0, 11), st.sampled_from(["major", "minor"]), st.floats(0.0, 1.0))
 def test_cleanup_never_moves_a_note_further_than_its_neighbour_note_name(pairs, tonic, mode, conf):
     notes = tune_from(pairs)
@@ -263,12 +269,14 @@ def test_cleanup_never_moves_a_note_further_than_its_neighbour_note_name(pairs, 
     assert [n.midi for n in notes] == before  # the input is left untouched
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(messy_tunes, st.integers(0, 11), st.sampled_from(["major", "minor"]), st.floats(0.0, m.CONFIDENT - 0.01))
 def test_cleanup_does_not_force_notes_into_a_key_it_is_unsure_about(pairs, tonic, mode, conf):
     _, report = m.clean_up(tune_from(pairs), tonic, mode, conf)
     assert report["out_of_key_snapped"] == 0
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(0, 11), st.integers(1, 3))
 def test_a_tidy_tune_is_left_alone(tonic, octaves):
     # Long, in-key notes where every note name is used plenty: nothing to clean.
@@ -286,6 +294,7 @@ def test_a_tidy_tune_is_left_alone(tonic, octaves):
     assert sum(report.values()) == 0
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(48, 70), st.sampled_from([1, -1]), st.integers(2, 18))
 def test_a_stray_note_one_step_from_the_note_the_tune_lives_on_becomes_that_note(home, side, where):
     # A tune that sits on one note, with a single brief wobble a step away.
@@ -313,6 +322,7 @@ def sung_from(items) -> list[m.RawNote]:
     return notes
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(sung_tunes, st.integers(50, 180))
 def test_performed_notes_keep_the_singers_timing_instead_of_snapping_to_a_grid(items, bpm):
     notes = sung_from(items)
@@ -325,6 +335,7 @@ def test_performed_notes_keep_the_singers_timing_instead_of_snapping_to_a_grid(i
         assert n_out.start_beat == pytest.approx((n_in.start_s - notes[0].start_s) * per_second, abs=1e-3)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(sung_tunes, st.integers(50, 180))
 def test_performed_notes_never_overlap_and_always_have_length(items, bpm):
     out = m.performed_notes(sung_from(items), float(bpm))
@@ -349,6 +360,7 @@ def test_playback_uses_the_sung_timing_when_it_exists():
 
 # ─── Octave glitches ─────────────────────────
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(
     st.integers(48, 66),
     st.lists(st.integers(-2, 2), min_size=8, max_size=20),
@@ -368,6 +380,7 @@ def test_a_note_an_octave_away_from_a_steady_tune_is_moved_back_whatever_its_len
     assert max(n.midi for n in out) - min(n.midi for n in out) <= 9
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(48, 66), st.sampled_from([12, -12]))
 def test_a_real_octave_leap_that_stays_there_is_not_flattened(home, jump):
     # The tune moves up (or down) an octave and keeps going: two neighbours on the same new level.
@@ -376,6 +389,7 @@ def test_a_real_octave_leap_that_stays_there_is_not_flattened(home, jump):
     assert [n.midi for n in out] == [p for p, _ in pairs]
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(48, 66), st.integers(7, 9), st.integers(2, 12), st.floats(0.1, 1.2))
 def test_a_big_but_ordinary_leap_up_and_back_down_is_a_tune_not_a_glitch(home, leap, where, length):
     # A sixth up and back again is a normal melodic move. Only a full octave out is treated as a tracking error.
@@ -477,6 +491,7 @@ from app.services.audio.convert import to_wav  # noqa: E402
 from app.services.intake import hints  # noqa: E402
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.one_of(st.none(), st.text(max_size=40)))
 def test_whatever_the_filename_the_upload_extension_is_a_few_safe_letters(name):
     ext = intake_router.safe_extension(name)
@@ -512,6 +527,7 @@ def test_a_recording_over_a_minute_is_turned_away_before_any_heavy_work():
     assert result.diagnostics == {}  # it never reached pitch tracking
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(0.0, 1.0), st.floats(0.0, 1.0))
 def test_what_frank_is_unsure_about_is_a_short_list_of_simple_keys_most_important_first(key_conf, tempo_conf):
     from app.models.song import MelodySketch

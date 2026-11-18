@@ -34,6 +34,7 @@ fingerprints = st.fixed_dictionaries(
 )
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints)
 def test_feel_fields_always_clamped_to_unit_range(fp):
     out = normalize(fp)
@@ -41,6 +42,7 @@ def test_feel_fields_always_clamped_to_unit_range(fp):
         assert 0.0 <= out[k] <= 1.0
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints)
 def test_tempo_always_within_sane_bounds(fp):
     out = normalize(fp)
@@ -48,22 +50,26 @@ def test_tempo_always_within_sane_bounds(fp):
     assert 50 <= out["tempo_bpm"] <= 180
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints)
 def test_normalize_is_idempotent(fp):
     once = normalize(fp)
     assert normalize(once) == once
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints)
 def test_key_is_never_empty(fp):
     assert normalize(fp)["key"]
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints)
 def test_cache_key_is_deterministic(fp):
     assert texture_cache_key(fp) == texture_cache_key(dict(fp))
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints, st.lists(st.text(max_size=8), max_size=4))
 def test_cache_key_ignores_fields_that_do_not_shape_the_texture(fp, genres):
     """genre_proximity doesn't change the generated texture, so it mustn't
@@ -73,6 +79,7 @@ def test_cache_key_ignores_fields_that_do_not_shape_the_texture(fp, genres):
     assert a == b
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.floats(allow_nan=True, allow_infinity=True))
 def test_any_float_tempo_never_crashes_normalize(bpm):
     """Regression found by property testing: int(float('inf')) raises

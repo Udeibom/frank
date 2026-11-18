@@ -5,7 +5,7 @@ Pure logic only; the database writes are verified live.
 import asyncio
 from datetime import datetime, timedelta, timezone
 
-from hypothesis import given, strategies as st
+from hypothesis import given, strategies as st, settings
 
 from app.services.jobs.staleness import (
     ACTIVE_STATUSES,
@@ -30,22 +30,26 @@ def job(status: str, age: timedelta, fmt: str = "iso") -> dict:
     return {"status": status, "updated_at": value}
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(statuses, ages)
 def test_stale_iff_active_and_older_than_the_limit(status, age):
     expected = status in ACTIVE_STATUSES and age > STALE_AFTER
     assert is_stale(job(status, age), NOW) is expected
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.sampled_from(["complete", "failed"]), ages)
 def test_finished_jobs_are_never_stale(status, age):
     assert is_stale(job(status, age), NOW) is False
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(statuses, ages, st.sampled_from(["iso", "z", "datetime"]))
 def test_timestamp_format_does_not_change_the_answer(status, age, fmt):
     assert is_stale(job(status, age, fmt), NOW) == is_stale(job(status, age), NOW)
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.sampled_from(list(ACTIVE_STATUSES)),
        st.one_of(st.none(), st.text(max_size=12), st.integers()))
 def test_an_unreadable_timestamp_is_never_called_stale(status, junk):
@@ -54,6 +58,7 @@ def test_an_unreadable_timestamp_is_never_called_stale(status, junk):
     assert is_stale({"status": status, "updated_at": junk}, NOW) is False
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.timedeltas(min_value=timedelta(hours=-12), max_value=timedelta(hours=12)))
 def test_offsets_are_normalised_to_utc(offset):
     tz = timezone(offset)
@@ -69,6 +74,7 @@ async def _no_sleep(_: float) -> None:
     return None
 
 
+@settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(st.integers(min_value=1, max_value=6), st.integers(min_value=0, max_value=8))
 def test_retries_succeed_iff_failures_fewer_than_attempts(attempts, failures):
     calls = {"n": 0}
