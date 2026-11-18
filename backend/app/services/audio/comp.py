@@ -143,7 +143,17 @@ def phrase_slots(takes: list[np.ndarray], sr: int) -> list[tuple[float, float]]:
     """Where anyone sang: each take's phrases (breath to breath), merged across takes (they share song time)."""
     from app.services.audio import vocal_notes
 
-    spans = sorted(s for a in takes for s in vocal_notes.phrases_from_energy(a, sr))
+    spans: list[tuple[float, float]] = []
+    for a in takes:
+        found = vocal_notes.phrases_from_energy(a, sr)
+        covered = sum(b - x for x, b in found)
+        # A take with the beat in it (or constant noise) has no quiet gaps: it cannot say where lines start
+        # and end, so only takes with real breaths draw the lines (found on prod Nov 18: one giant "line").
+        if found and covered < 0.9 * (a.shape[0] / sr):
+            spans += found
+    if not spans:
+        spans = [s for a in takes for s in vocal_notes.phrases_from_energy(a, sr)]
+    spans.sort()
     merged: list[list[float]] = []
     for a, b in spans:
         if merged and a <= merged[-1][1] + 0.05:

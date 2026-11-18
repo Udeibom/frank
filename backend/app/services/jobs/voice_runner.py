@@ -413,21 +413,30 @@ async def run_bleed_job(job_id: str, project_id: str, take: dict) -> None:
 
 # ── phrase comp and swap ─────────────────────────────────────────────────
 
-def _phrase_comp_sync(project_id: str, take_refs: list[tuple[str, str]], song: song_notes.SongNotes) -> dict:
+def _phrase_comp_sync(project_id: str, take_refs: list[tuple[str, str]], song: song_notes.SongNotes,
+                      labels: dict[str, str] | None = None) -> dict:
     takes = [(tid, _fetch(url)) for tid, url in take_refs]
     comp_wav, segments = comp_svc.build_phrase_comp(takes, song)
     url = upload_audio("vocals", _to_mp3(comp_wav), extension="mp3", name_prefix="comp")
     record = voice_db.create_comp_sync(project_id, url, segments)
-    names = {tid: i + 1 for i, (tid, _) in enumerate(take_refs)}
-    used = sorted({names[s["take_id"]] for s in segments})
+    labels = labels or {}
+    order = [tid for tid, _ in take_refs]
+    used = [labels.get(t, f"take {order.index(t) + 1}") for t in order if any(s["take_id"] == t for s in segments)]
+    said = used[0] if len(used) == 1 else ", ".join(used[:-1]) + " and " + used[-1]
     return {"comp_id": record["id"], "audio_url": url, "segments": segments,
-            "message": (f"I put together a version from the best line of each part, using takes {', '.join(map(str, used))}. "
+            "message": (f"I put together a version from the best line of each part, using {said}. "
                         "It's a suggestion: you can swap any line for the same line from another take.")}
 
 
 async def run_phrase_comp_job(job_id: str, project_id: str, take_refs: list[tuple[str, str]]) -> None:
     song = await song_notes.for_project(project_id)
-    result = await _job(job_id, "Frank couldn't put that together. Want to try again?", _phrase_comp_sync, project_id, take_refs, song)
+    labels: dict[str, str] = {}
+    for tid, _ in take_refs:
+        try:
+            labels[tid] = ((await voice_db.get_take(tid)) or {}).get("label") or "a take"
+        except Exception:  # noqa: BLE001  a missing label only changes the wording
+            pass
+    result = await _job(job_id, "Frank couldn't put that together. Want to try again?", _phrase_comp_sync, project_id, take_refs, song, labels)
     if result:
         await projects_db.update_project_active_state(project_id, {"active_comp_id": result["comp_id"]})
 
@@ -460,7 +469,11 @@ def _chord_harmony_sync(project_id: str, take: dict, harmony_type: str, section_
     if not plan:
         return {"failed": "I couldn't find notes to build a harmony on in that part of the take."}
     url = upload_audio("vocals", _to_mp3(harmony_wav), extension="mp3", name_prefix="harmony")
-    where = " in the " + " and ".join(plural(PLAIN_SECTION.get(n, n)) for n in section_names) if section_names else ""
+    def place(n: str) -> str:
+        word = PLAIN_SECTION.get(n, n)
+        return plural(word) if sum(s.value[1] == n for s in song.sections) > 1 else word
+
+    where = " in the " + " and ".join(place(n) for n in section_names) if section_names else ""
     record = voice_db.create_take_sync(project_id, url, label=f"Harmony ({harmony_type}){where}", kind="harmony",
                                        parent_take_id=take["id"], params={"type": harmony_type, "sections": section_names or []},
                                        facts={"notes": len(plan)}, is_harmony=True)
