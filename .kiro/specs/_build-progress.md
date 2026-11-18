@@ -1,12 +1,23 @@
 # Build progress (read this first after an interruption)
 
-Reference point for resuming: "Continue from .kiro/specs/_build-progress.md, checkpoint 3."
+Reference point for resuming: "Continue from .kiro/specs/_build-progress.md, checkpoint 4."
 
 Deployed: frontend https://frank-bay-zeta.vercel.app · backend https://frank-api-pzjo.onrender.com (Render srv-dbtv8e0n74is73evdbdg)
 Ops (all in the repo, survive restarts): `backend/scripts/ops/render.py wait|logs|events|env`,
 `backend/scripts/ops/e2e.py` (full HTTP walkthrough on prod, now including demo story 3; `E2E_REFINE=0` skips it),
 `backend/scripts/ops/sql.py` (needs SUPABASE_ACCESS_TOKEN env), `backend/scripts/mutate_check.py` (proves the refine
 properties can fail). Plan of record: `.kiro/specs/_remaining-work.md`.
+
+## Checkpoint 4 (Nov 18): sing it (spec 06)
+- Migration 008 applied (vocal_takes kind/parent/is_harmony/params/facts, user_settings, guide_renders).
+- `services/audio/{song_notes, vocal_notes, align, bleed, engineer, guide}.py`; pitch/harmony/comp extended;
+  voice routes rewritten with ownership checks; Voice Room: recorder with start point, count-in, practice loop,
+  sing-along guide, headphones, one-time delay check, take cards with versions, best-of view with line swap.
+- VERIFIED ON PRODUCTION (Nov 18, e6f9140+): walkthrough with the vocal session passes (E2E OK in 669 s):
+  placed take, engineer warning on the leaky take, tune, line up, music taken out (7.8 dB), harmony, guide,
+  best-of, swap, mix, listen, export.
+- Real hums through the tools: listening files in `listening/sing-it-2026-11-18/` (git-ignored) for the founder.
+- Not checkable here: the browser timing (lead-in + delay check) with a real microphone.
 
 ## Checkpoint 3 (Nov 18): refine loop (spec 08)
 - Migration 007 `refine_proposals` applied.
@@ -35,4 +46,4 @@ properties can fail). Plan of record: `.kiro/specs/_remaining-work.md`.
 - `/beat/versions/active` and `/mix/versions/active` don't check the version belongs to the project (fix in spec 13 audit).
 
 ## Next, in order
-1. Spec 06 sing it. 2. Spec 11 finish and intent. 3. Specs 09, 10, 02 rest, 12, then 13 demo runs.
+1. Spec 11 finish and intent. 2. Specs 09, 10, 02 rest, 12, then 13 demo runs.
