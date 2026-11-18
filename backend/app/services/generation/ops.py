@@ -20,6 +20,7 @@ from app.services.generation.rng import derive_seed
 PARTS = ("drums", "bass", "keys", "melody", "pad", "strings", "arp")
 PLAIN_PART = {"drums": "the drums", "bass": "the bass", "keys": "the keys", "melody": "the tune", "pad": "the soft background",
               "strings": "the strings", "arp": "the running pattern"}
+PLURAL_PARTS = {"drums", "keys", "strings"}
 PLAIN_SECTION = {"intro": "intro", "verse": "verse", "pre-chorus": "build-up", "chorus": "chorus", "bridge": "bridge", "outro": "ending"}
 
 # Sounds a person can ask for, in their words, mapped to General MIDI programs.
@@ -163,6 +164,8 @@ def _scope_words(sections: list[SectionPlan], scope: Scope) -> str:
     if scope is None:
         return "everywhere"
     idx = [scope] if isinstance(scope, int) else list(dict.fromkeys(scope))
+    if len(idx) == len(sections) and len(sections) > 2:
+        return "everywhere"
     targets = [sections[i] for i in idx]
     if len(targets) > 1 and len({t.name for t in targets}) == 1:
         word = PLAIN_SECTION.get(targets[0].name, targets[0].name)
@@ -225,7 +228,8 @@ def _apply(op, sections: list[SectionPlan], seed: int) -> tuple[int, str]:
             raise OpError("The drums keep their kit; I can make them busier, simpler or add a fill.")
         for s in _where(sections, op.section):
             s.parts.setdefault(op.part, {})["preset"] = SOUNDS[key]
-        return seed, f"{PLAIN_PART[op.part].capitalize()} now plays on {key} {_scope_words(sections, op.section)}."
+        verb = "play" if op.part in PLURAL_PARTS else "plays"
+        return seed, f"{PLAIN_PART[op.part].capitalize()} now {verb} on {key} {_scope_words(sections, op.section)}."
     if isinstance(op, AddFill):
         hit = [s for s in _where(sections, op.section) if "drums" in s.layers]
         if not hit:
@@ -327,3 +331,26 @@ part is one of: drums, bass, keys, melody, pad, strings, arp.
 - {"op": "repeat", "section": N}                   play it one more time right after
 - {"op": "remove_section", "section": N}
 """
+
+
+def apply_audible(
+    sections: list[SectionPlan], seed: int, raw: list[dict], fp: dict, lead=None
+) -> tuple[list[SectionPlan], int, list[str], list[int]]:
+    """
+    apply_operations, then check the song really sounds different (composition only, no audio). Some sounds and
+    sizes are chosen by the composer, so a change can ask for what is already there ("vibraphone" on keys that
+    already play vibraphone). That is said plainly instead of making an identical new version.
+    Returns (sections, seed, changes, indices of sections whose music changed, in the new plan).
+    """
+    from app.services.generation.beat import score_of
+
+    new, new_seed, changes = apply_operations(sections, seed, raw)
+    before, after = score_of(sections, fp, seed, lead), score_of(new, fp, new_seed, lead)
+    if before == after:
+        raise OpError("That's already how it sounds there, so nothing would change. Want to try something else?")
+    a = {(uid, part): v for (uid, _, part), v in before.items()}
+    b = {(uid, part): v for (uid, _, part), v in after.items()}
+    moved_uids = {uid for (uid, part) in a.keys() | b.keys() if a.get((uid, part)) != b.get((uid, part))}
+    where = {(s.uid if s.uid is not None else s.index): s.index for s in new}
+    changed = sorted({where[u] for u in moved_uids if u in where})
+    return new, new_seed, changes, changed

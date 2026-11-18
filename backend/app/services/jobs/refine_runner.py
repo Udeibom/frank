@@ -79,6 +79,7 @@ async def run_propose_job(job_id: str, project_id: str, concern: Optional[str]) 
         basis = await load_basis(project_id)
         message, directions, experiment = await asyncio.to_thread(
             propose_mod.propose, concern, found, basis["sections"], basis["seed"], basis["mix_params"], basis["lead"] is not None,
+            True, basis["fp"] or None, basis["lead"],
         )
         if not directions:
             await jobs_db.mark_failed(job_id, "I couldn't find a change to try on this song yet. Build a beat or record a take first?")

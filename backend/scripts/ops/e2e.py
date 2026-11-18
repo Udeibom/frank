@@ -78,6 +78,32 @@ def sung_take() -> bytes:
     return buf.getvalue()
 
 
+def refine_story(h: dict, pid: str) -> None:
+    """Demo story 3 (spec 08): something feels wrong -> directions -> hear one -> use it -> go back."""
+    beats_before = len(call(h, "GET", f"/projects/{pid}/beat/versions"))
+    mixes_before = len(call(h, "GET", f"/projects/{pid}/mix/versions"))
+    prop = job(h, call(h, "POST", f"/projects/{pid}/refine", json={"concern": "the chorus doesn't hit"})["job_id"], "refine")
+    print("   says:", prop["message"])
+    for d in prop["directions"]:
+        print("   ->", d["kind"], d["title"], "|", " ".join(d["changes"]), "| sections", d["sections"])
+    assert 2 <= len(prop["directions"]) <= 3, "two or three directions"
+    n = next((i for i, d in enumerate(prop["directions"]) if d["kind"] == "beat"), 0)
+    pv = job(h, call(h, "POST", f"/projects/{pid}/refine/{prop['proposal_id']}/preview/{n}")["job_id"], "preview")
+    for key in ("preview_url", "before_url"):
+        if pv.get(key):
+            print(f"   {key}: {len(c.get(pv[key]).content)} bytes")
+    assert pv.get("preview_url"), "a preview to hear"
+    assert len(call(h, "GET", f"/projects/{pid}/beat/versions")) == beats_before, "a preview never makes a beat version"
+    assert len(call(h, "GET", f"/projects/{pid}/mix/versions")) == mixes_before, "a preview never makes a mix version"
+    ch = call(h, "POST", f"/projects/{pid}/refine/{prop['proposal_id']}/choose/{n}")
+    print("   says:", ch["message"])
+    made = job(h, ch["job_id"], "use it")
+    print("   changes:", made.get("changes"))
+    back = call(h, "POST", f"/projects/{pid}/versions/resolve", json={"text": "give me the first version back", "layer": "beat"})
+    print("   go back:", back["status"], back["message"])
+    assert back["status"] == "resolved"
+
+
 def main() -> None:
     uid, h = login()
     started = time.time()
@@ -98,6 +124,8 @@ def main() -> None:
         listened = job(h, call(h, "POST", f"/projects/{pid}/listen", json={"concern": "the chorus doesn't lift"})["job_id"], "listen")
         for f in listened["findings"]["findings"]:
             print("   -", f["severity"], f["plain"])
+        if os.environ.get("E2E_REFINE", "1") == "1":
+            refine_story(h, pid)
         job(h, call(h, "POST", f"/projects/{pid}/export", json={"mix_version_id": mixid, "apply_mastering": True})["job_id"], "export")
         dl = call(h, "GET", f"/projects/{pid}/export")[0]
         mp3 = c.get(dl["audio_url"]).content

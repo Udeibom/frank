@@ -53,7 +53,8 @@ def situations(draw):
 def test_directions_apply_are_distinct_and_two_or_three(case):
     sections, found, has_mix, hummed, concern = case
     frozen = copy.deepcopy(sections)
-    message, dirs, experiment = propose.propose(concern, {"findings": found}, sections, SEED, MIX if has_mix else None, hummed, use_model=False)
+    message, dirs, experiment = propose.propose(concern, {"findings": found}, sections, SEED, MIX if has_mix else None, hummed,
+                                                use_model=False, fp=FP)
     assert [vars(s) for s in sections] == [vars(s) for s in frozen], "proposing must not touch the plan"
     assert message
     assert 1 <= len(dirs) <= 3
@@ -63,7 +64,8 @@ def test_directions_apply_are_distinct_and_two_or_three(case):
     for d in dirs:
         assert d.changes, d
         if d.kind == "beat":
-            new, _, _ = ops.apply_operations(sections, SEED, d.actions)
+            new, _, _, heard = ops.apply_audible(sections, SEED, d.actions, FP)     # every beat direction is audible
+            assert set(d.sections) & set(heard)
             assert d.sections and all(0 <= i < len(new) for i in d.sections) and len(d.sections) <= propose.PREVIEW_MAX_SECTIONS
         else:
             assert has_mix
@@ -147,7 +149,9 @@ def test_changed_sections_follow_identity_not_position():
     before = plan()
     after, seed, _ = ops.apply_operations(before, SEED, [{"op": "bigger", "section": 2}])
     assert propose.changed_sections(before, after, SEED, seed) == [2]
-    assert propose.preview_sections([2], len(after)) == [2, 3]
+    assert propose.preview_sections([2], len(after)) == [2]
+    assert propose.preview_sections([0], 5, [4, 8, 8, 8, 4]) == [0, 1]          # 12 bars together: heard in context
+    assert propose.preview_sections([1], 5, [4, 8, 8, 8, 4]) == [1]             # 16 bars would be over the wait
     moved, seed, _ = ops.apply_operations(before, SEED, [{"op": "move", "section": 1, "to": 3}])
     assert propose.changed_sections(before, moved, SEED, seed)        # sections that moved are what changed
     _, seed2, _ = ops.apply_operations(before, SEED, [{"op": "another_song"}])
@@ -207,7 +211,7 @@ def test_a_preview_writes_no_version_and_no_pointer(monkeypatch):
     asyncio.run(rr.run_preview_job("job", "proj", "p1", 0))
     assert not calls
     assert done["preview_url"].endswith("preview.mp3") and stored["preview_url"] == done["preview_url"]
-    assert heard["idx"] == [2, 3] and heard["gain"] == 1.0 and heard["energy"] > sections[2].energy
+    assert heard["idx"] == d.sections and 2 in d.sections and heard["gain"] == 1.0 and heard["energy"] > sections[2].energy
     assert sections[2].energy == plan()[2].energy, "the saved plan is untouched"
 
 
@@ -267,3 +271,11 @@ def test_disagreeing_asks_one_question_about_the_word():
     q = meaning_question("No, it needs to be bigger")
     assert q.count("?") == 1 and "louder" in q and "fuller" in q
     assert meaning_question("nah").endswith("?")
+
+
+def test_frank_speaks_as_one_person_and_names_an_experiment():
+    found = {"findings": []}
+    said = propose.finish_message("The Listener didn't find a clear cause.", found, True)
+    assert "listener" not in said.lower() and "one thing" in said
+    assert propose.finish_message("I couldn't pin it down.", found, True).endswith("your ears can decide.")
+    assert propose.finish_message("", {"findings": [{"plain": "The chorus is quiet."}]}, False).startswith("I listened.")

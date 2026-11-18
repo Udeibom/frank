@@ -44,7 +44,13 @@ def test_an_edit_to_one_part_of_one_section_changes_nothing_else(kind, part, idx
     op = {"op": kind, "part": part, "section": idx}
     if kind == "swap_sound":
         op["sound"] = "vibraphone"
-    after, seed, changes = ops.apply_operations(before, SEED, [op])
+    try:
+        after, seed, changes, _ = ops.apply_audible(before, SEED, [op], FP)
+    except ops.OpError as exc:
+        # asking for what is already there (keys that already play vibraphone) is said, never silently "done"
+        assert "already" in str(exc)
+        assert score(ops.apply_operations(before, SEED, [op])[0]) == score(before)
+        return
     a, b = score(before), score(after, seed)
     assert changes and seed == SEED
     differ = {k for k in a.keys() | b.keys() if a.get(k) != b.get(k)}
@@ -154,3 +160,15 @@ def test_a_list_of_sections_names_them_in_plain_words():
     assert changes == ["I made the bass simpler in every chorus."]
     with pytest.raises(ops.OpError):
         ops.apply_operations(sections, SEED, [{"op": "bigger", "section": [0, 99]}])
+
+
+def test_an_edit_that_changes_nothing_audible_says_so():
+    before = plan()
+    bridge = next(s.index for s in before if s.name == "bridge" and "keys" in s.layers)
+    sound = beat.score_of(before, FP, SEED)
+    preset = next(v[0] for (uid, idx, part), v in sound.items() if idx == bridge and part == "keys")
+    name = next(k for k, v in ops.SOUNDS.items() if v == preset)
+    with pytest.raises(ops.OpError, match="already"):
+        ops.apply_audible(before, SEED, [{"op": "swap_sound", "part": "keys", "sound": name, "section": bridge}], FP)
+    _, _, _, changed = ops.apply_audible(before, SEED, [{"op": "bigger", "section": 2}], FP)
+    assert 2 in changed

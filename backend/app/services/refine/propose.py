@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 
 MIN_DIRECTIONS, MAX_DIRECTIONS = 2, 3
 PREVIEW_MAX_SECTIONS = 2
+PREVIEW_MAX_BARS = 12
 MIX_TYPES = {"adjust_levels", "apply_effect", "toggle_harmony", "section_adjust"}
 
 
@@ -44,20 +45,23 @@ def changed_sections(old: list[SectionPlan], new: list[SectionPlan], old_seed: i
     return out
 
 
-def preview_sections(changed: list[int], total: int) -> list[int]:
+def preview_sections(changed: list[int], total: int, bars: Optional[list[int]] = None) -> list[int]:
     """
     What a preview plays: the first changed section, plus the one after it so the change is heard in context
-    (a quieter verse only makes sense next to its chorus). At most PREVIEW_MAX_SECTIONS, to keep the wait short.
+    (a quieter verse only makes sense next to its chorus) when both together are short. Measured Nov 18 on the
+    deployed server: two 8-bar sections took 75 s, over the 60 s promise (requirement 2.3), so the pair is only
+    played together when it fits in PREVIEW_MAX_BARS; otherwise the changed section alone, compared with itself now.
     """
     if not changed:
         return []
     first = changed[0]
     run = [first]
-    if first + 1 < total:
-        run.append(first + 1)
-    elif first - 1 >= 0:
-        run.insert(0, first - 1)
-    return run[:PREVIEW_MAX_SECTIONS]
+    if bars is None:
+        return run
+    nxt = first + 1 if first + 1 < total else first - 1
+    if 0 <= nxt < total and bars[first] + bars[nxt] <= PREVIEW_MAX_BARS:
+        run = sorted([first, nxt])
+    return run
 
 
 # ── checking a direction ─────────────────────────────────────────────────
@@ -84,20 +88,26 @@ def _mix_sentence(action: dict) -> str:
 
 
 def validate(
-    d: Direction, sections: list[SectionPlan], seed: int, mix_params: Optional[dict]
+    d: Direction, sections: list[SectionPlan], seed: int, mix_params: Optional[dict],
+    fp: Optional[dict] = None, lead: Any = None,
 ) -> Optional[Direction]:
     """The direction with its plain changes and preview sections filled in, or None if it cannot be applied."""
     if d.kind == "beat":
         if not sections:
             return None
         try:
-            new, new_seed, changes = ops_mod.apply_operations(sections, seed, d.actions)
+            if fp is not None:       # the real check: does the song sound different?
+                new, new_seed, changes, heard = ops_mod.apply_audible(sections, seed, d.actions, fp, lead)
+                # Preview where the plan changed (the chorus that got bigger), not a neighbour that only follows it.
+                changed = [i for i in changed_sections(sections, new, seed, new_seed) if i in heard] or heard
+            else:
+                new, new_seed, changes = ops_mod.apply_operations(sections, seed, d.actions)
+                changed = changed_sections(sections, new, seed, new_seed)
         except ops_mod.OpError:
             return None
-        changed = changed_sections(sections, new, seed, new_seed)
         if not changed:
             return None
-        return d.model_copy(update={"changes": changes, "sections": preview_sections(changed, len(new))})
+        return d.model_copy(update={"changes": changes, "sections": preview_sections(changed, len(new), [s.bars for s in new])})
     if mix_params is None:
         return None
     from app.routers.mix import apply_actions          # the Mix Room's own rules for its settings
@@ -132,9 +142,10 @@ def pick_distinct(candidates: list[Direction], limit: int = MAX_DIRECTIONS) -> l
 
 # ── the Producer's call ──────────────────────────────────────────────────
 
-PRODUCER_SYSTEM = """You are the producer on Frank's team. The person said something about their song feels wrong.
-The Listener measured the song. Your job: say in one or two short sentences what the Listener found (ONLY what it
-found, in plain words, comparing parts of the song, never numbers or music terms), then offer two or three different
+PRODUCER_SYSTEM = """You are Frank. The person said something about their song feels wrong, and you have just
+listened to it closely. Speak as "I", warmly. Never mention a Listener, a producer or a team. Your job: say in one or
+two short sentences what you heard (ONLY what the measurements below found, in plain words, comparing parts of the
+song, never numbers or music terms), then offer two or three different
 directions to try. Each direction changes different things. Prefer the ready-made options; you may write your own
 using the same action format. Never promise a result; the person will listen to each before choosing.
 If the Listener found no clear cause, say honestly you can't tell yet and that each option changes just one thing.
@@ -193,7 +204,7 @@ def fallback_message(found: dict, experiment: bool) -> str:
 
 def propose(
     concern: Optional[str], found: dict, sections: list[SectionPlan], seed: int, mix_params: Optional[dict],
-    hummed_tune: bool, use_model: bool = True,
+    hummed_tune: bool, use_model: bool = True, fp: Optional[dict] = None, lead: Any = None,
 ) -> tuple[str, list[Direction], bool]:
     """
     Returns (message, directions, experiment). `found` is a FindingsReport dict. Directions are validated and
@@ -203,9 +214,9 @@ def propose(
     experiment = not found.get("findings")
     ready = (experiments.experiment_menu(sections, hummed_tune, has_mix, concern) if experiment
              else experiments.from_findings(found["findings"], sections, has_mix))
-    ready = pick_distinct([v for v in (validate(d, sections, seed, mix_params) for d in ready) if v], limit=6)
+    ready = pick_distinct([v for v in (validate(d, sections, seed, mix_params, fp, lead) for d in ready) if v], limit=6)
     if not experiment and len(ready) < MIN_DIRECTIONS:
-        extra = [validate(d, sections, seed, mix_params) for d in experiments.experiment_menu(sections, hummed_tune, has_mix, concern)]
+        extra = [validate(d, sections, seed, mix_params, fp, lead) for d in experiments.experiment_menu(sections, hummed_tune, has_mix, concern)]
         ready += [v for v in extra if v]
     ready = pick_distinct(ready, limit=6)
 
@@ -215,10 +226,23 @@ def propose(
             reply = _ask_producer(concern or "", found, sections, ready)
             message = str(reply.get("message") or "")
             picked = _from_reply(reply, ready)
-            chosen = [v for v in (validate(d, sections, seed, mix_params) for d in picked) if v]
+            chosen = [v for v in (validate(d, sections, seed, mix_params, fp, lead) for d in picked) if v]
             if experiment:   # an experiment changes exactly one thing; the model may not widen it
                 chosen = [d for d in chosen if len(d.actions) == 1]
         except Exception as exc:  # noqa: BLE001  the ready-made directions still work without the model
             log.warning("producer call failed, using ready-made directions: %s", exc)
     directions = pick_distinct(chosen + ready, MAX_DIRECTIONS)
-    return plain.guard(message) or fallback_message(found, experiment), directions, experiment
+    return finish_message(message, found, experiment), directions, experiment
+
+
+INTERNAL_NAMES = ("listener", "producer", "the team", "specialist")
+
+
+def finish_message(message: str, found: dict, experiment: bool) -> str:
+    """Frank speaks as one person ("I listened"), never about its parts; an experiment always says what it is."""
+    text = plain.guard(message or "").strip()
+    if not text or any(w in text.lower() for w in INTERNAL_NAMES):
+        return fallback_message(found, experiment)
+    if experiment and "one thing" not in text.lower():
+        text += " Each of these changes just one thing, so your ears can decide."
+    return text

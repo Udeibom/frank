@@ -366,6 +366,23 @@ def render_song(
     return per_section, full
 
 
+def score_of(sections: list[SectionPlan], fp: dict, seed: int, lead: Optional[lead_mod.Lead] = None) -> dict[tuple, tuple]:
+    """
+    Every note the song would play, per (section uid, part): (sound, notes). Composition only, no synthesis, so it
+    is cheap. Two plans with the same score sound the same; an edit that leaves it unchanged changed nothing.
+    """
+    _, contexts, progressions = plan_contexts(sections, fp, seed, lead)
+    out: dict[tuple, tuple] = {}
+    for s, ctx in zip(sections, contexts):
+        parts = composer.compose_section(
+            section=s.name, progression=progressions[s.name], bars=s.bars, energy=s.energy, density=s.density, layers=s.layers, ctx=ctx,
+        )
+        uid = s.uid if s.uid is not None else s.index
+        for p in parts:
+            out[(uid, s.index, p.name)] = (p.preset, s.bars, tuple((e.note, round(e.start, 4), round(e.duration, 4), e.velocity) for e in p.events))
+    return out
+
+
 PREVIEW_GAP_SECONDS = 0.6
 
 

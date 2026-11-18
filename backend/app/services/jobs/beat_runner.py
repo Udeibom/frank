@@ -279,7 +279,7 @@ async def run_operations_job(job_id: str, project_id: str, operations: list[dict
         await jobs_db.mark_processing(job_id)
         sections, fp, seed, lead = await _load_active_arrangement(project_id)
         try:
-            sections, seed, changes = ops_mod.apply_operations(sections, seed, operations)
+            sections, seed, changes, _ = ops_mod.apply_audible(sections, seed, operations, fp, lead)
         except ops_mod.OpError as exc:
             await jobs_db.mark_failed(job_id, str(exc))
             return
