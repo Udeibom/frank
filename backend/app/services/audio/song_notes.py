@@ -161,4 +161,6 @@ def target_note(sung: float, t: Target) -> int:
     nearby = [n for n in (r - 1, r + 1) if n % 12 in t.scale or n % 12 == tune_pc]
     if not nearby:
         return nearest_in(sung, t.scale)
-    return min(nearby, key=lambda n: (n % 12 != tune_pc, abs(n - sung)))
+    # the closer neighbour wins; the tune's note only breaks a near tie (a second listening run, Nov 18, showed
+    # that always preferring the tune still moved notes almost 1.5 steps)
+    return min(nearby, key=lambda n: abs(n - sung) - (0.25 if n % 12 == tune_pc else 0.0))

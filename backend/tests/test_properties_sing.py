@@ -68,7 +68,7 @@ def test_target_is_a_song_note_or_the_tune(sung_note, melody):
     got = target_note(sung_note, t)
     assert got % 12 in t.scale or (melody is not None and got % 12 == melody % 12)
     # tuning never rewrites the tune: at most the neighbouring note (measured on real hums, Nov 18)
-    assert abs(got - sung_note) <= 1.5
+    assert abs(got - sung_note) <= 1.25
 
 
 # ── properties 1 and 2: tuning ───────────────────────────────────────────
