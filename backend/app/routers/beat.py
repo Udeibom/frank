@@ -18,6 +18,7 @@ from app.models.beat import (
 from app.models.conversation import ConversationAction
 from app.services.llm.groq_client import chat_structured
 from app.services.song.record import system_with_brief
+from app.services.team import conversation_store as convo
 from app.services.llm.prompts import BEAT_ROOM_SYSTEM, build_beat_room_messages
 from app.services.jobs.beat_runner import run_full_beat_job, run_operations_job
 from app.services.generation import ops as ops_mod
@@ -84,6 +85,32 @@ async def add_stem(project_id: str, body: AddStemRequest, background: Background
 async def mute_stem(project_id: str, body: MuteStemRequest, background: BackgroundTasks) -> JobResponse:
     """Older clients: take a part out of one or all sections."""
     return await _start_operations(project_id, [{"op": "remove_part", "part": body.stem_type, "section": body.section_index}], background)
+
+
+@router.post("/conversation", response_model=BeatConversationResponse)
+async def beat_conversation(
+    project_id: str, body: BeatConversationRequest
+) -> BeatConversationResponse:
+    """Beat Room conversation: turns reactions into typed beat edits."""
+    history = [{"role": m.role, "content": m.content} for m in body.history]
+    if not history:   # after a reload the page has nothing; the stored conversation is the memory
+        history = convo.recent_messages(await convo.history(project_id, "beat"))
+    messages = build_beat_room_messages(body.beat_state, history, body.message)
+    system = await convo.with_earlier(project_id, "beat", await system_with_brief(project_id, BEAT_ROOM_SYSTEM, "beat_maker"))
+    try:
+        result = chat_structured(system, messages)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Frank zoned out for a second — say that again?",
+        ) from exc
+    actions = [
+        ConversationAction(type=a["type"], params=a.get("params", {}))
+        for a in result.get("actions", [])
+        if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS
+    ]
+    await convo.record(project_id, "beat", body.message, result.get("message", ""), [a.model_dump() for a in actions])
+    return BeatConversationResponse(message=result.get("message", ""), actions=actions)
 
 
 @router.post("/preview-with-vocal", response_model=JobResponse)

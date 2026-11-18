@@ -316,6 +316,8 @@ export default function MixRoomPage() {
       </div>
 
       <ConversationPanel
+        projectId={projectId}
+        room="mix"
         emptyText="Getting your mix ready…"
         turns={turns}
         onSend={handleSend}

@@ -17,6 +17,7 @@ from app.models.voice import (
 from app.models.conversation import ConversationAction
 from app.services.llm.groq_client import chat_structured
 from app.services.song.record import system_with_brief
+from app.services.team import conversation_store as convo
 from app.services.llm.prompts import VOICE_ROOM_SYSTEM, build_voice_room_messages
 from app.services.audio.convert import to_wav
 from app.services.storage.files import upload_audio
@@ -189,9 +190,11 @@ async def voice_conversation(
     """Voice Room conversation — the patient vocal producer."""
     take_count = len(await voice_db.list_takes(project_id))
     history = [{"role": m.role, "content": m.content} for m in body.history]
+    if not history:   # after a reload the page has nothing; the stored conversation is the memory
+        history = convo.recent_messages(await convo.history(project_id, "voice"))
     messages = build_voice_room_messages(take_count, history, body.message)
 
-    system = await system_with_brief(project_id, VOICE_ROOM_SYSTEM, "vocal_producer")
+    system = await convo.with_earlier(project_id, "voice", await system_with_brief(project_id, VOICE_ROOM_SYSTEM, "vocal_producer"))
     try:
         result = chat_structured(system, messages)
     except Exception as exc:
@@ -205,6 +208,5 @@ async def voice_conversation(
         for a in result.get("actions", [])
         if isinstance(a, dict) and a.get("type") in allowed
     ]
-    return VoiceConversationResponse(
-        message=result.get("message", ""), actions=actions
-    )
+    await convo.record(project_id, "voice", body.message, result.get("message", ""), [a.model_dump() for a in actions])
+    return VoiceConversationResponse(message=result.get("message", ""), actions=actions)

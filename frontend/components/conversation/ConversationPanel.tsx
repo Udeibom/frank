@@ -10,6 +10,7 @@ import { useRef, useEffect, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Send, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getRoomHistory, type StoredTurn } from "@/lib/api/conversation"
 
 export interface ChatTurn {
   id: string
@@ -28,6 +29,9 @@ interface ConversationPanelProps {
   inputAccessory?: ReactNode
   // Shown before the first message. Each room should pass its own.
   emptyText?: string
+  // When given, what was said in this room before (stored on the server) is shown above this session.
+  projectId?: string
+  room?: "idea" | "feel" | "beat" | "voice" | "mix" | "export"
 }
 
 export function ConversationPanel({
@@ -37,8 +41,23 @@ export function ConversationPanel({
   placeholder = "Talk to Frank…",
   inputAccessory,
   emptyText = "Frank is here.",
+  projectId,
+  room,
 }: ConversationPanelProps) {
   const [input, setInput] = useState("")
+  const [earlier, setEarlier] = useState<StoredTurn[]>([])
+
+  // The stored conversation from earlier visits. Loaded once per room; a failure just means nothing is shown.
+  useEffect(() => {
+    if (!projectId || !room) return
+    let alive = true
+    getRoomHistory(projectId, room)
+      .then((h) => alive && setEarlier(h))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [projectId, room])
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to the newest message
@@ -61,7 +80,24 @@ export function ConversationPanel({
     <div className="flex h-full w-80 flex-col border-l border-border bg-card">
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5">
-        {turns.length === 0 && !isThinking ? (
+        {earlier.length > 0 && (
+          <div className="mb-4 flex flex-col gap-3 opacity-70" aria-label="Earlier conversation">
+            {earlier.map((t, i) => (
+              <div key={`earlier-${i}`} className={cn("flex", t.role === "user" ? "justify-end" : "justify-start")}>
+                <div
+                  className={cn(
+                    "max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+                    t.role === "user" ? "bg-primary/10 text-foreground" : "bg-secondary/70 text-foreground",
+                  )}
+                >
+                  {t.content}
+                </div>
+              </div>
+            ))}
+            <p className="text-center text-xs text-muted-foreground">Earlier</p>
+          </div>
+        )}
+        {turns.length === 0 && !isThinking && earlier.length === 0 ? (
           <div className="flex h-full items-center justify-center px-4 text-center">
             <p className="text-sm text-muted-foreground/50 leading-relaxed">
               {emptyText}

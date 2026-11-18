@@ -11,6 +11,7 @@ from app.models.mix import (
 from app.models.conversation import ConversationAction
 from app.services.llm.groq_client import chat_structured
 from app.services.song.record import system_with_brief
+from app.services.team import conversation_store as convo
 from app.services.llm.prompts import MIX_ROOM_SYSTEM, build_mix_room_messages
 from app.services.jobs.mix_runner import run_mix_job
 from app.db import jobs as jobs_db
@@ -116,9 +117,11 @@ async def mix_conversation(
     the LLM can ask to analyze — we run analysis and let it suggest a fix.
     """
     history = [{"role": m.role, "content": m.content} for m in body.history]
+    if not history:   # after a reload the page has nothing; the stored conversation is the memory
+        history = convo.recent_messages(await convo.history(project_id, "mix"))
     params = {**DEFAULT_MIX_PARAMS, **body.mix_params}
 
-    system = await system_with_brief(project_id, MIX_ROOM_SYSTEM, "mix_engineer")
+    system = await convo.with_earlier(project_id, "mix", await system_with_brief(project_id, MIX_ROOM_SYSTEM, "mix_engineer"))
     # First pass
     messages = build_mix_room_messages(params, history, body.message)
     try:
@@ -150,6 +153,7 @@ async def mix_conversation(
     new_params, render = apply_actions(params, raw_actions)
     actions = [ConversationAction(type=a["type"], params=a.get("params", {})) for a in raw_actions]
 
+    await convo.record(project_id, "mix", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return MixConversationResponse(
         message=result.get("message", ""),
         mix_params=new_params,

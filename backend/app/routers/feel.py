@@ -14,6 +14,7 @@ from app.models.feel import (
 from app.models.conversation import ConversationAction
 from app.services.llm.groq_client import chat_structured
 from app.services.song.record import system_with_brief
+from app.services.team import conversation_store as convo
 from app.services.llm.prompts import FEEL_LAB_SYSTEM, build_feel_lab_messages
 from app.services.audio.convert import to_wav
 from app.services.generation.hum import analyze_hum
@@ -35,9 +36,11 @@ async def feel_conversation(
 ) -> FeelConversationResponse:
     """Feel Lab conversation — discovers the song's feeling, builds the fingerprint."""
     history = [{"role": m.role, "content": m.content} for m in body.history]
+    if not history:   # after a reload the page has nothing; the stored conversation is the memory
+        history = convo.recent_messages(await convo.history(project_id, "feel"))
     messages = build_feel_lab_messages(body.fingerprint, history, body.message)
 
-    system = await system_with_brief(project_id, FEEL_LAB_SYSTEM, "producer")
+    system = await convo.with_earlier(project_id, "feel", await system_with_brief(project_id, FEEL_LAB_SYSTEM, "producer"))
     try:
         result = chat_structured(system, messages)
     except Exception as exc:
@@ -52,6 +55,7 @@ async def feel_conversation(
         if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS
     ]
 
+    await convo.record(project_id, "feel", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return FeelConversationResponse(
         message=result.get("message", ""),
         fingerprint_update=result.get("fingerprint_update", {}) or {},

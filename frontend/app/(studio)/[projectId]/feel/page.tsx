@@ -298,6 +298,8 @@ export default function FeelLabPage() {
 
       {/* Conversation */}
       <ConversationPanel
+        projectId={projectId}
+        room="feel"
         emptyText="Tell me how the song should feel."
         turns={turns}
         onSend={handleSend}

@@ -19,3 +19,15 @@ export async function sendIdeaMessage(
     history: input.history,
   })
 }
+
+/** One stored exchange line from a room's conversation (backend conversation_store). */
+export interface StoredTurn {
+  role: "user" | "assistant"
+  content: string
+  created_at: string
+}
+
+/** Everything said in a room before, oldest first, so a reload or another device shows the conversation. */
+export async function getRoomHistory(projectId: string, room: string): Promise<StoredTurn[]> {
+  return api.get<StoredTurn[]>(`/projects/${projectId}/conversation/${room}/history`)
+}

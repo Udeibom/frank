@@ -375,6 +375,8 @@ export default function VoiceRoomPage() {
       </div>
 
       <ConversationPanel
+        projectId={projectId}
+        room="voice"
         emptyText="Getting your takes ready…"
         turns={turns}
         onSend={handleSend}
