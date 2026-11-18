@@ -128,6 +128,9 @@ async def choose(project_id: str, proposal_id: str, n: int, background: Backgrou
         background.add_task(run_mix_job, job["id"], project_id, params, "preview")
     await song_db.insert_decision(project_id, _decision(row, n))
     await asyncio.to_thread(refine_db.set_chosen, proposal_id, n)
+    from app.services.taste.signals import record_choice
+
+    await record_choice(project_id, directions[n], [s.name for s in basis["sections"]], bool(row.get("experiment")))
     message = f"I'm putting “{d.title}” into the song now. Your earlier version stays. Have a listen when it's ready: how does that feel?"
     room = "beat" if d.kind == "beat" else "mix"
     await convo.record(project_id, room, f"Use “{d.title}”", message, [{"type": "refine_choose", "params": {"proposal": proposal_id, "n": n}}])
@@ -169,6 +172,9 @@ async def disagree(project_id: str, proposal_id: str, body: DisagreeRequest) -> 
         "user_reaction": body.said,
         "options": [{"kind": "mismatch", "concern": row.get("concern")}],
     })
+    from app.services.taste.signals import record_mismatch
+
+    await record_mismatch(project_id, [m for m in measured if m], body.said)
     return {"message": meaning_question(body.said)}
 
 

@@ -148,6 +148,9 @@ export function StudioNav({ projectId }: { projectId: string }) {
         <ChevronLeft className="h-3.5 w-3.5" />
         All Songs
       </Link>
+      <Link href="/taste" className="-mt-4 mb-6 px-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground">
+        What Frank knows about your taste
+      </Link>
 
       {/* Project title — inline editable */}
       <div className="mb-6 px-1">

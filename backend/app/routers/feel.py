@@ -140,6 +140,9 @@ async def save_fingerprint(
     await projects_db.update_project_active_state(
         project_id, {"active_fingerprint_id": saved["id"]}
     )
+    from app.services.taste.signals import record_texture
+
+    await record_texture(project_id, body.fingerprint or {}, approved=True)     # "yes, that direction" (spec 09)
     return FingerprintResponse(
         id=saved["id"],
         project_id=saved["project_id"],

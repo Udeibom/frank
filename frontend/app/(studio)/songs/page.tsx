@@ -4,6 +4,7 @@
  * Project dashboard — lists all songs, lets the user create a new one.
  */
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createProject, listProjects } from "@/lib/api/projects"
@@ -61,6 +62,9 @@ export default function DashboardPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Pick up where you left off, or start something new.
           </p>
+          <Link href="/taste" className="mt-2 inline-block text-xs text-muted-foreground underline hover:text-foreground">
+            What Frank knows about your taste
+          </Link>
         </div>
         <button
           onClick={handleNewProject}

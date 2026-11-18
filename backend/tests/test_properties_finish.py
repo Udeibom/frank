@@ -168,3 +168,10 @@ def test_the_waveform_is_a_short_shape_between_zero_and_one():
     w = waveform(audio)
     assert 0 < len(w) <= WAVE_POINTS and max(w) == 1.0 and min(w) >= 0
     assert waveform(np.zeros((2, 0), dtype=np.float32)) == []
+
+
+def test_a_taste_statement_is_not_the_song_description():
+    from app.services.finish import intent
+
+    assert not intent.looks_like_description("feel", "I hate autotune on my voice, keep it natural")
+    assert intent.looks_like_description("feel", "a song for my grandmother who sang to me every night")

@@ -20,8 +20,13 @@ NOT_A_DESCRIPTION = re.compile(r"^\s*(make|build|change|turn|add|remove|can you|
 
 
 def looks_like_description(room: str, text: str) -> bool:
+    from app.services.taste.rules import from_self
+
     words = re.findall(r"[A-Za-z']+", text)
-    return room in DESCRIBING_ROOMS and len(words) >= MIN_WORDS and not NOT_A_DESCRIPTION.match(text) and "?" not in text[-2:]
+    if room not in DESCRIBING_ROOMS or len(words) < MIN_WORDS or NOT_A_DESCRIPTION.match(text) or "?" in text[-2:]:
+        return False
+    taste = from_self(text)
+    return taste is None or taste[0] == "other"        # "I hate autotune" is about taste, not what the song is
 
 
 async def capture(project_id: str, room: str, text: str) -> Optional[str]:

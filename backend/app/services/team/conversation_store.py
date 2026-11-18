@@ -57,6 +57,13 @@ async def record(project_id: str, room: str, user_message: str, reply: str, acti
 
     if looks_like_description(room, user_message):
         await capture(project_id, room, user_message)
+    # "I hate autotune": what the person says about their own taste is kept at once (spec 09, requirement 1.1).
+    from app.services.taste.signals import record_self
+
+    try:
+        await record_self(project_id, user_message)
+    except Exception:  # noqa: BLE001
+        log.warning("could not keep a taste statement", exc_info=True)
 
 
 def _summary_row(project_id: str, room: str) -> Optional[dict]:

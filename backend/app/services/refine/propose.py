@@ -16,6 +16,7 @@ from app.services.generation import ops as ops_mod
 from app.services.generation.beat import SectionPlan
 from app.services.refine import experiments
 from app.services.refine.models import Direction
+from app.services.taste.rules import statement_for
 from app.services.team import plain
 
 log = logging.getLogger(__name__)
@@ -165,13 +166,16 @@ def _plan_lines(sections: list[SectionPlan]) -> str:
     return "\n".join(f"{s.index}: {s.name} ({s.bars} bars) playing {', '.join(s.layers)}" for s in sections)
 
 
-def _ask_producer(concern: str, found: dict, sections: list[SectionPlan], options: list[Direction]) -> dict:
+def _ask_producer(concern: str, found: dict, sections: list[SectionPlan], options: list[Direction],
+                  prefs: Optional[dict[str, int]] = None) -> dict:
     from app.services.llm.groq_client import chat_structured
 
     lines = [f"The person said: {concern or '(nothing specific, they want it better)'}",
              "The song:\n" + (_plan_lines(sections) or "(no beat yet)"),
              "The Listener found:" if found.get("findings") else "The Listener found no clear cause.",
              *[f"- {f['plain']} (sections {f.get('sections', [])})" for f in found.get("findings", [])[:5]],
+             *(["What this artist usually likes (offer the matching option first; you may mention it once):",
+                *[f"- {statement_for(t, d)}" for t, d in (prefs or {}).items()]] if prefs else []),
              "Ready-made options:",
              *[f"{n}. {d.title}: {d.plain} -> {d.kind} {json.dumps(d.actions)}" for n, d in enumerate(options, 1)]]
     return chat_structured(PRODUCER_SYSTEM, [{"role": "user", "content": "\n".join(lines)}], temperature=0.4)
@@ -205,6 +209,7 @@ def fallback_message(found: dict, experiment: bool) -> str:
 def propose(
     concern: Optional[str], found: dict, sections: list[SectionPlan], seed: int, mix_params: Optional[dict],
     hummed_tune: bool, use_model: bool = True, fp: Optional[dict] = None, lead: Any = None,
+    prefs: Optional[dict[str, int]] = None,
 ) -> tuple[str, list[Direction], bool]:
     """
     Returns (message, directions, experiment). `found` is a FindingsReport dict. Directions are validated and
@@ -219,11 +224,17 @@ def propose(
         extra = [validate(d, sections, seed, mix_params, fp, lead) for d in experiments.experiment_menu(sections, hummed_tune, has_mix, concern)]
         ready += [v for v in extra if v]
     ready = pick_distinct(ready, limit=6)
+    if prefs:
+        # the artist's known taste decides what is offered first (spec 09, requirement 3.2); stable otherwise
+        from app.services.taste.rules import direction_score
+
+        names = [s.name for s in sections]
+        ready.sort(key=lambda d: -direction_score(d.kind, d.actions, names, prefs))
 
     message, chosen = "", []
     if use_model and ready:
         try:
-            reply = _ask_producer(concern or "", found, sections, ready)
+            reply = _ask_producer(concern or "", found, sections, ready, prefs)
             message = str(reply.get("message") or "")
             picked = _from_reply(reply, ready)
             chosen = [v for v in (validate(d, sections, seed, mix_params, fp, lead) for d in picked) if v]
@@ -232,6 +243,11 @@ def propose(
         except Exception as exc:  # noqa: BLE001  the ready-made directions still work without the model
             log.warning("producer call failed, using ready-made directions: %s", exc)
     directions = pick_distinct(chosen + ready, MAX_DIRECTIONS)
+    if prefs:
+        from app.services.taste.rules import direction_score
+
+        names = [s.name for s in sections]
+        directions.sort(key=lambda d: -direction_score(d.kind, d.actions, names, prefs))
     return finish_message(message, found, experiment), directions, experiment
 
 

@@ -192,5 +192,12 @@ async def system_with_brief(project_id: str, system: str, role: Optional[str] = 
         previous = [t["content"] for t in (await convo.history(project_id, room)) if t["role"] == "assistant"]
     except Exception:  # noqa: BLE001
         previous = []
+    try:
+        from app.services.taste.signals import block_for
+
+        taste = await block_for(project_id, role)
+    except Exception:  # noqa: BLE001  taste is a help; a room never fails for it
+        taste = ""
     return (f"{system}\n\n{team.team_block(room, phase, team.may_mention(previous))}"
-            f"\n\n--- THE SONG SO FAR (the whole team shares this; do not contradict it) ---\n{brief}")
+            f"\n\n--- THE SONG SO FAR (the whole team shares this; do not contradict it) ---\n{brief}"
+            + (f"\n\n{taste}" if taste else ""))

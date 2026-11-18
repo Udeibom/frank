@@ -25,6 +25,7 @@ from app.routers import (
     listen,
     refine,
     finish,
+    taste,
 )
 
 settings = get_settings()
@@ -82,6 +83,7 @@ app.add_middleware(
 # /projects/{project_id}/... gets the ownership check ONCE here, so a route added
 # later cannot forget it (auth spec, requirement 5.4).
 app.include_router(projects.router)
+app.include_router(taste.router)          # the caller's own taste; checked by user id inside
 _owned = [Depends(require_project_access)]
 app.include_router(lyrics.router, dependencies=_owned)
 app.include_router(feel.router, dependencies=_owned)
