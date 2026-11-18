@@ -68,6 +68,8 @@ def clean(raw: dict[str, Any]) -> dict[str, Any]:
     question = plain.guard(str(raw.get("question") or "").strip())[:200]
     if re.search(r"\d", summary + question):
         summary, question = re.sub(r"\d+", "", summary), re.sub(r"\d+", "", question)
+    if summary and summary[-1] not in ".!?":
+        summary += "."
     return {"summary": summary, "feeling_words": words, "hints": hints, "confidence": confidence, "question": question}
 
 

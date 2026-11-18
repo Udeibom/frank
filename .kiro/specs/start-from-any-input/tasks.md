@@ -2,10 +2,10 @@
 
 Depends on spec 01 (song-record) tasks 1-3.
 
-- [ ] 1. Models and plumbing
+- [x] 1. Models and plumbing
   - [x] 1.1 `MelodySketch` and intake result models in `models/song.py`
     - _Requirements: 3.1, 6.1_
-  - [ ] 1.2 Intake routes per input kind, with job wiring and the original input stored. BUILT: `POST /intake/hum` (job), `POST /intake/lyrics`, melody confirm and reject. STILL TO BUILD: rhythm, description, voice memo. (A single route with `kind` routing was dropped on purpose: each kind needs different inputs and different waits.)
+  - [x] 1.2 Intake routes per input kind, with job wiring and the original input stored. BUILT: `POST /intake/hum` (job), `POST /intake/lyrics`, melody confirm and reject, `POST /intake/rhythm` (job), `POST /intake/description`, `POST /intake/voice-memo` (audio kept in voice-memos), `POST /intake/recording` (one way in: decides tune or description). Evidence: `scripts/ops/start_check.py` on prod Nov 18 "START OK". (A single route with `kind` routing was dropped on purpose: each kind needs different inputs and different waits.)
     - _Requirements: 1.1, 3.7, 6.6_
 
 - [x] 2. Hum to melody
@@ -28,7 +28,7 @@ Depends on spec 01 (song-record) tasks 1-3.
   - [x] 3.2 Drum preview and confirmation; store as groove — _Evidence: rhythm.render_preview_mp3; POST /intake/rhythm job; components/studio/RhythmIntake.tsx mounted in the Feel Lab; groove stored in the fingerprint and used by beat.plan_contexts (test_a_tapped_groove_replaces_the_kick_and_hat_lanes_and_keeps_the_snare). Not yet seen in a browser_
     - _Requirements: 4.2, 4.3_
 
-- [ ] 4. Words
+- [x] 4. Words
   - [x] 4.1 Lyrics understanding call with schema validation and one repair retry (`services/intake/lyrics.py`, route `POST /intake/lyrics`; mood is decided in code from per-section labels because one overall guess flipped between runs on the same words; verified live against the model and the database, and in a browser) Revised Nov 13 after the founder's own lyric (anger and sorrow together) got a needless either-or question: anger is now a feeling, sorrow and anger are one dark mood, and the mood has its own confidence from the sections
     - _Requirements: 2.1, 2.3, 2.4_
   - [x] 4.4 Safeguards on reading the words (found by the Code Reviewer, Nov 13): everything the model writes for the person is checked to be plain (no links, digits, markup or music terms) and sent back once for repair if not; the writer's words are fenced off as data; one sloppy section is dropped without losing the answer; a long song is cut on a whole line and Frank says so; only one read per song at a time; unchanged words are not read again; a failure saving the suggested direction does not turn a good read into a failure
@@ -37,17 +37,17 @@ Depends on spec 01 (song-record) tasks 1-3.
     - _Requirements: 2.4, 6.2, 6.5, 7.1_
   - [x] 4.2 Deterministic section repair (partition of lines) (`repair_sections`, plus `guess_sections` from blank lines and repeated stanzas as the fallback)
     - _Requirements: 2.2_
-  - [ ] 4.3 (not started) Description and voice-memo path (Whisper then text path)
+  - [x] 4.3 Description and voice-memo path (Whisper then text path). Evidence: `services/intake/description.py` (one read, one repair retry, a confidence for every value, only confident hints offered), `routers/intake.py _from_description` (intent kept when none, feeling facet, gaps filled, one question); `tests/test_start_paths.py`; prod: "I hear a quiet, bittersweet walk home that feels both sad and cozy", intent kept, six gaps filled.
     - _Requirements: 5.1, 5.2_
 
-- [ ] 5. Merge
+- [x] 5. Merge
   - [x] 5.1 Merge: fill gaps only, name disagreements, never replace a settled value (`services/intake/merge.py`; requirement 6.4 reworded Nov 13 to say exactly this)
     - _Requirements: 6.4, 6.5_
-  - [ ] 5.2 (done for the words: the route returns ONE question and the Idea Room says it; NOT done for a tune that disagrees with the words, because hum hints are merged in the browser) Conflict questions surfaced to the conversation
+  - [x] 5.2 Conflict questions surfaced to the conversation: words (route returns ONE question), a description (same), and now a confirmed tune that disagrees with what is settled (`confirm_melody` returns `question`; HumIntake and StartSurface say it). Grammar follows the source ("your tune feels", "your words feel").
     - _Requirements: 6.2, 6.5_
 
-- [ ] 6. Frontend
-  - [ ] 6.1 `StartSurface.tsx` reachable from every room
+- [x] 6. Frontend
+  - [x] 6.1 `StartSurface.tsx` reachable from every room (studio nav "Start from something new"; opens by itself once for an empty song). Type, paste words, hum/sing/say, or tap; no path chosen first. Not yet tried in a browser with a microphone.
     - _Requirements: 1.1-1.3_
   - [x] 6.2 Playback confirmation cards; plain-language result messages (hum card done: 'Is this your tune?' with hear again / yes / not quite; verified in a real browser)
     - _Requirements: 3.4, 3.5, 7.1_
