@@ -56,7 +56,7 @@ names live in this one file.
 reverb, compression, EQ, Hz/kHz/dB, quantization, stem, DAW, VST, MIDI, LUFS) plus replacements table.
 Shared with the Plain Language Auditor agent.
 
-## Token budget
+## Token budget (the reason for the decision above)
 Groq free tier is 6,000 tokens/min. Router + up to 3 specialists + Frank is too much per message at full
 brief size, so: router and Frank get the full brief; specialists get the role-trimmed brief
 (`build_brief(record, role, budget_chars=2500)`); a message that only needs one specialist skips the

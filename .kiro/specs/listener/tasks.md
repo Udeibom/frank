@@ -3,7 +3,7 @@
 Depends on spec 01 (record) and, for per-part measures, spec 04 (stems).
 
 - [ ] 1. Core measurements
-  - [ ] 1.1 Loudness per section (gated, K-weighted) and per part — _NOT DONE: per section works (BS.1770 K-weighted, gated); per part needs stored stems (song-engine 5.4); reported as 'could not measure'_
+  - [ ] 1.1 Loudness per section (gated, K-weighted) and per part — _NOT DONE: per section works (BS.1770 K-weighted, gated). Per part: the parts now exist (`beat_runner.ensure_parts`, stems with section 'all'), but nothing measures them: services/listener/service.py:201 still reports `part_loudness` as unmeasured ("not how loud each one is on its own yet") and the Listener never reads the stored parts_
     - _Requirements: 1.1, 1.3_
   - [x] 1.2 Density, colour, section-to-section change — _Evidence: dsp.onsets_per_bar, brightness_hz, band_share, change_between; service.measure_audio; calibration run on a real render__
     - _Requirements: 1.1_
@@ -30,14 +30,14 @@ Depends on spec 01 (record) and, for per-part measures, spec 04 (stems).
   - [x] 3.3 "No clear cause" path and confidence — _Evidence: test_no_rule_firing_with_a_concern_means_no_clear_cause_and_no_made_up_finding_
     - _Requirements: 3.2, 3.3_
 
-- [ ] 4. Service
+- [ ] 4. Service — _open: 4.4_
   - [x] 4.1 `measure_song`, `find_issues`, `compare`, read-only guarantee — _Evidence: listener/project.py, findings.find_issues, service.compare; test_listening_to_a_project_writes_nothing_but_the_cache_
     - _Requirements: 4.1, 4.2_
   - [x] 4.2 `listener_cache` table and caching by version id — _Evidence: db/migrations/005_listener_cache.sql applied to the live database Nov 17 via the Management API (table exists, 0 rows); cache read/write in listener/project.py_
     - _Requirements: 5.1_
-  - [x] 4.3 `POST /projects/{id}/listen` job with progress text and scoped runs — _Evidence: routers/listen.py, jobs/listen_runner.py, mounted in main.py; imports cleanly, NOT exercised over HTTP with a real login_
+  - [x] 4.3 `POST /projects/{id}/listen` job with progress text and scoped runs — _Evidence: routers/listen.py, jobs/listen_runner.py, mounted in main.py; the listen step runs inside scripts/ops/e2e.py, which passed against the deployed backend (build-progress Nov 18, e.g. E2E OK in 669 s and 1156 s); not re-run by me_
     - _Requirements: 5.2, 5.3_
-  - [ ] 4.4 Mismatch recording hook for taste signals (stores; spec 09 reads) — _NOT DONE_
+  - [ ] 4.4 Mismatch recording hook for taste signals (stores; spec 09 reads) — _PARTLY DONE: `POST /refine/{proposal_id}/disagree` (routers/refine.py `disagree`) writes a decision with the measurement and the person's words, then `taste.signals.record_mismatch` stores a signal (topic "other", source "measurement mismatch"). An ad-hoc call with the stores mocked (not committed) showed the decision and the signal both written. MISSING: no committed test covers it (test_properties_refine.py only tests `meaning_question`), and a real database write was not checked_
     - _Requirements: 6.1_
 
 - [ ] 5. Calibration
@@ -46,6 +46,6 @@ Depends on spec 01 (record) and, for per-part measures, spec 04 (stems).
   - [ ] 5.2 Founder check — _NOT DONE_: do the findings match what the founder hears?
 
 - [ ] 6. Property-based tests (`backend/tests/test_properties_listener.py`)
-  - [x] 6.1 Gain invariance, identity, timing recovery — _Evidence: tests/test_properties_listener.py, 15 passed_
-  - [x] 6.2 Silence, determinism, read-only, honesty — _Evidence: tests/test_properties_listener.py, 15 passed_
-  - [ ] 6.3 Prove each test can fail — _NOT DONE_
+  - [x] 6.1 Gain invariance, identity, timing recovery — _Evidence: tests/test_properties_listener.py, 16 passed Nov 18 (re-run)_
+  - [x] 6.2 Silence, determinism, read-only, honesty — _Evidence: tests/test_properties_listener.py, 16 passed Nov 18 (re-run)_
+  - [ ] 6.3 Prove each test can fail — _NOT DONE: backend/scripts/mutate_check.py has no entry for tests/test_properties_listener.py (checked)_

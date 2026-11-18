@@ -28,6 +28,6 @@ listening result behind them.
     - _Requirements: 3.3_
   - [ ] 3.4 Founder decides: keep, make optional, or drop — _NOT DONE: OPEN. Chain is on by default (mix_chain=True) meanwhile_
     - _Requirements: 3.4_
-- [ ] 4. Arrangement
-  - [ ] 4.1 Founder answers the v3 blind test — _NOT DONE: blind-engine-v3/LISTEN_FIRST.md has no answers yet; the moments layer is built (spec 04) but not heard_
+- [x] 4. Arrangement — _Evidence: child 4.1 ticked_
+  - [x] 4.1 Founder answers the v3 blind test — _Evidence: answers are now in /home/caleb/frank-listening/blind-engine-v3/LISTEN_FIRST.md (the old note said none): pairs 1-4 "no difference" or "both"; endings felt like endings in every pair; neither sounded like a children's song, though pair 2 "might not be my go to beat"; pair 5 was a repeat. The finding is that the moments layer did not make the founder prefer one render over the other. Same result as song-engine 8.2. Answers reported by the founder; I did not re-run the test_
     - _Requirements: 4.1, 4.2, 4.3_
