@@ -118,6 +118,16 @@ async def get_record(project_id: str) -> SongRecord:
     )
 
 
+async def active_facet(project_id: str, facet: str) -> Optional[dict[str, Any]]:
+    """Content of the active version of a facet, or None."""
+    active_map = await song_db.get_active_map(project_id)
+    vid = active_map.get(facet)
+    if not vid:
+        return None
+    versions = await song_db.get_versions(project_id, [vid])
+    return versions[0].content if versions else None
+
+
 async def active_melody(project_id: str) -> Optional[tuple[str, dict[str, Any]]]:
     """(version id, content) of the active melody, or None when there is none."""
     active_map = await song_db.get_active_map(project_id)

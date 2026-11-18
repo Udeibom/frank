@@ -71,7 +71,7 @@ PART_GAIN = {
 
 LEAD_GAIN = 1.1              # the person's own tune sits a little in front of the other parts
 PEAK_TARGET = 0.89
-ENGINE_VERSION = 3          # bumps when a change would make an old beat sound different if re-rendered
+ENGINE_VERSION = 4          # bumps when a change would make an old beat sound different if re-rendered
 FADE_OUT_SECONDS = 1.5
 EQ_MIN_DB = 0.25
 
@@ -133,20 +133,71 @@ def build_beat_plan(
     base_density = fp["density"]
 
     sections: list[SectionPlan] = []
-    for i, (name, bars) in enumerate(arrangement):
+    feelings: list[Optional[str]] = []
+    for i, entry in enumerate(arrangement):
+        name, bars = entry[0], entry[1]
+        feelings.append(entry[2] if len(entry) > 2 else None)
         if lead and name in lead_mod.LEAD_SECTIONS:
             bars = max(int(bars), lead.bars)
-        mult = SECTION_ENERGY.get(name, 0.8)
-        energy = _clamp(base_energy * mult)
-        # Density tracks energy a bit so bigger sections feel fuller
-        density = _clamp(base_density * (0.8 + 0.4 * mult))
-        sections.append(
-            SectionPlan(i, name, name.capitalize(), int(bars), energy, density, layers=[])
-        )
+        sections.append(SectionPlan(i, name, name.capitalize(), int(bars), 0.0, 0.0, layers=[]))
     _stamp_repeats(sections)
-    for s in sections:
+    for s, feeling in zip(sections, feelings):
+        mult = energy_multiplier(s, feeling)
+        s.energy = _clamp(base_energy * mult)
+        # Density tracks energy a bit so bigger sections feel fuller
+        s.density = _clamp(base_density * (0.8 + 0.4 * mult))
         s.layers = composer.layers_for_section(s.name, s.energy, s.density, s.repeat, s.final, style)
     return sections, fp
+
+
+# How a section's feeling in the words moves its energy (from the lyrics reading, spec 02).
+FEELING_ENERGY = {"angry": 0.08, "sorrowful": -0.06, "warm": 0.0, "mixed": 0.0}
+
+
+def energy_multiplier(s: SectionPlan, feeling: Optional[str] = None) -> float:
+    """
+    The song's energy curve (song-engine requirement 2, task 3.2): each kind of section has its place (intro low,
+    verse mid, build-up rising, chorus high, bridge a contrast, ending down), a chorus grows each time it comes back
+    and the last one is the biggest, a returning verse is a touch fuller, and the words' feeling nudges it.
+    """
+    mult = SECTION_ENERGY.get(s.name, 0.8)
+    if s.name == "chorus":
+        mult += 0.05 * min(s.repeat, 3) + (0.04 if s.final and s.repeat >= 1 else 0.0)
+    elif s.name == "verse" and s.repeat >= 1:
+        mult += 0.03
+    return mult + FEELING_ENERGY.get(feeling or "", 0.0)
+
+
+LINE_BARS = 2                 # a sung line takes about two bars
+INTRO_BARS, OUTRO_BARS = 4, 4
+
+
+def arrangement_from_structure(structure: Optional[dict]) -> Optional[list[tuple[str, int, Optional[str]]]]:
+    """
+    The arrangement the person's own words imply (song-engine requirement 1.1, task 3.1): their sections in their
+    order, each about two bars per line rounded up to whole four-bar phrases (4 to 16 bars), with an intro before and
+    an ending after. If the words end on a verse, the chorus comes back once more before the ending, the way a song
+    ends on its hook. Returns None when there is no usable structure (the style's template is used instead).
+    """
+    if not isinstance(structure, dict):
+        return None
+    out: list[tuple[str, int, Optional[str]]] = []
+    for sec in structure.get("sections") or []:
+        try:
+            name = str(sec["name"]).lower()
+            lines = int(sec["last_line"]) - int(sec["first_line"]) + 1
+        except (KeyError, TypeError, ValueError):
+            continue
+        if name not in SECTION_ENERGY or lines < 1 or name in ("intro", "outro"):
+            continue
+        bars = min(16, max(4, -(-lines * LINE_BARS // 4) * 4))
+        out.append((name, bars, sec.get("feeling")))
+    if not out:
+        return None
+    choruses = [e for e in out if e[0] == "chorus"]
+    if choruses and out[-1][0] != "chorus":
+        out.append(choruses[-1])
+    return [("intro", INTRO_BARS, None)] + out + [("outro", OUTRO_BARS, None)]
 
 
 def section_spans(sections: list[SectionPlan], bpm: float) -> list[tuple[int, int]]:
@@ -312,13 +363,14 @@ def render_song(
 
 
 def render_full_beat(
-    fingerprint: dict, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None
+    fingerprint: dict, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None,
+    structure: Optional[dict] = None,
 ) -> tuple[list[SectionPlan], list[np.ndarray], np.ndarray]:
     """
-    Full pipeline: plan the arrangement, render the song.
+    Full pipeline: plan the arrangement (from the words' structure when there is one), render the song.
     Returns (sections, per_section_audio, full_beat_audio). CPU-bound: call from a background job.
     """
-    sections, fp = build_beat_plan(fingerprint, lead=lead)
+    sections, fp = build_beat_plan(fingerprint, arrangement_from_structure(structure), lead=lead)
     mixes, full = render_song(sections, fp, seed, lead=lead)
     return sections, mixes, full
 

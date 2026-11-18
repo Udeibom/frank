@@ -76,7 +76,8 @@ def _arrangement_params(
 
 
 def _render_and_persist_sync(
-    project_id: str, fingerprint: dict, label: str, seed: int, lead: lead_mod.Lead | None = None
+    project_id: str, fingerprint: dict, label: str, seed: int, lead: lead_mod.Lead | None = None,
+    structure: dict | None = None,
 ) -> dict:
     """
     The entire heavy job, run in ONE worker thread: render the beat, encode MP3,
@@ -87,7 +88,7 @@ def _render_and_persist_sync(
     causing connection races in the storage client. Returns the version dict.
     """
     log_memory("beat: start render")
-    sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed, lead)
+    sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed, lead, structure)
     log_memory("beat: rendered")
     fp = beat_engine.fp_utils.normalize(fingerprint)
     return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead)
@@ -194,11 +195,16 @@ async def run_full_beat_job(
         # A new version gets a new seed, so asking for another one gives a different song, while
         # the same fingerprint and the same count always give the same song (repeatable).
         seed = derive_seed(json.dumps(fingerprint, sort_keys=True, default=str), count)
+        # The person's words decide the song's shape when they have been read (song-engine task 3.1).
+        try:
+            structure = await song_record.active_facet(project_id, "structure")
+        except Exception:  # noqa: BLE001  a missing record never stops a beat
+            structure = None
 
         # Entire heavy job (render + encode + upload + records) in one thread
         async with _one_at_a_time:
             version = await asyncio.to_thread(
-                _render_and_persist_sync, project_id, fingerprint, label, seed, lead
+                _render_and_persist_sync, project_id, fingerprint, label, seed, lead, structure
             )
 
         await projects_db.update_project_active_state(

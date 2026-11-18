@@ -37,8 +37,12 @@ def login() -> tuple[str, dict]:
 
 
 def call(h: dict, method: str, path: str, **kw):
-    for attempt in range(3):
-        r = c.request(method, API + path, headers=h, **kw)
+    for attempt in range(30):
+        try:
+            r = c.request(method, API + path, headers=h, **kw)
+        except httpx.HTTPError:
+            time.sleep(15)                              # this machine's network dropped, not the server
+            continue
         if r.status_code in (502, 503) and attempt < 2:
             time.sleep(20)                              # server restarting: say so in the output and try again
             print("  (server unavailable, retrying)", method, path)

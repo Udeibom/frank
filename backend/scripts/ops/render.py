@@ -25,8 +25,18 @@ OWNER = "tea-d2rince3jp1c73fkrol0"
 BASE = f"https://api.render.com/v1/services/{SERVICE}"
 
 
+def _get(url: str, **kw):
+    """GET with retries: this machine's network drops for minutes at a time."""
+    for attempt in range(40):
+        try:
+            return httpx.get(url, headers=H, timeout=30, **kw)
+        except httpx.HTTPError:
+            time.sleep(15)
+    raise SystemExit("network unavailable for 10 minutes")
+
+
 def events(n: int = 6) -> None:
-    for x in httpx.get(f"{BASE}/events?limit={n}", headers=H, timeout=30).json():
+    for x in _get(f"{BASE}/events?limit={n}").json():
         e = x["event"]
         print("EVENT", e["timestamp"][11:19], e["type"], str(e.get("details"))[:140])
 
@@ -35,7 +45,7 @@ def logs(minutes: int = 15) -> None:
     start = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=minutes)).isoformat()
     params = {"ownerId": OWNER, "resource": SERVICE, "limit": 100, "direction": "forward", "startTime": start}
     for _ in range(30):
-        r = httpx.get("https://api.render.com/v1/logs", headers=H, params=params, timeout=30).json()
+        r = _get("https://api.render.com/v1/logs", params=params).json()
         for line in r.get("logs", []):
             if "GET /health" not in line["message"] and "/status HTTP" not in line["message"]:
                 print(line["timestamp"][11:19], line["message"][:220])
@@ -48,7 +58,7 @@ def wait() -> None:
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip()
     status = "unknown"
     for _ in range(80):
-        d = httpx.get(f"{BASE}/deploys?limit=1", headers=H, timeout=30).json()[0]["deploy"]
+        d = _get(f"{BASE}/deploys?limit=1").json()[0]["deploy"]
         status = d["status"]
         if d["commit"]["id"] == head and status in ("live", "build_failed", "update_failed", "canceled", "deactivated"):
             print(status, head[:7])
