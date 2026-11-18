@@ -67,8 +67,8 @@ def test_target_is_a_song_note_or_the_tune(sung_note, melody):
     t = song_notes.Target(song_notes.scale_of("A minor"), None, melody, 0)
     got = target_note(sung_note, t)
     assert got % 12 in t.scale or (melody is not None and got % 12 == melody % 12)
-    if melody is not None and got % 12 == melody % 12 and got % 12 not in t.scale:
-        assert abs(got - sung_note) <= 2.0
+    # tuning never rewrites the tune: at most the neighbouring note (measured on real hums, Nov 18)
+    assert abs(got - sung_note) <= 1.5
 
 
 # ── properties 1 and 2: tuning ───────────────────────────────────────────
@@ -274,3 +274,11 @@ def test_the_engineer_says_one_kind_thing_about_the_recording_only():
     assert "beat" in engineer.check(voice + signal_room(b, 0.4), SR, beat=b)[0]
     for m in (msg, engineer.check(quiet, SR)[0]):
         assert not any(w in m.lower() for w in ("flat", "sharp", "off-key", "out of tune", "pitchy", "bad"))
+
+
+@given(st.integers(45, 80), st.sampled_from(["above", "below"]))
+@settings(max_examples=100, deadline=None)
+def test_without_chords_the_harmony_is_a_third_in_the_scale(sung_target, direction):
+    scale = song_notes.scale_of("A minor")
+    h = harmony.harmony_note(sung_target, None, scale, direction)
+    assert h % 12 in scale and 2 <= abs(h - sung_target) <= 5 and ((h > sung_target) == (direction == "above"))

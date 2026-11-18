@@ -145,14 +145,20 @@ def nearest_in(note: float, pcs: frozenset[int]) -> int:
     return base
 
 
-def target_note(sung: float, t: Target, melody_reach: float = 2.0) -> int:
+def target_note(sung: float, t: Target) -> int:
     """
-    Where a sung note should go (requirement 2.1): the tune's note when the singer is within two steps of it,
-    otherwise the nearest note of the song's scale.
+    Where a sung note should go (requirement 2.1). The nearest note stays the target when it belongs to the song
+    (or is the tune's note). Only a note that does not belong moves one step, to the neighbour that does,
+    preferring the tune's note.
+    Decision (Nov 18, measured on the founder's real hums): the spec's "within two steps of the tune" pulled
+    notes up to 1.8 steps onto the engine's tune, which rewrites the person's own melody instead of tuning it.
+    Tuning now never moves a note further than its neighbour.
     """
-    if t.melody is not None:
-        # the tune may sit in another octave from the singer: compare by the nearest octave
-        m = t.melody + 12 * round((sung - t.melody) / 12)
-        if abs(sung - m) <= melody_reach:
-            return int(m)
-    return nearest_in(sung, t.scale)
+    r = int(round(sung))
+    tune_pc = t.melody % 12 if t.melody is not None else None
+    if r % 12 in t.scale or r % 12 == tune_pc:
+        return r
+    nearby = [n for n in (r - 1, r + 1) if n % 12 in t.scale or n % 12 == tune_pc]
+    if not nearby:
+        return nearest_in(sung, t.scale)
+    return min(nearby, key=lambda n: (n % 12 != tune_pc, abs(n - sung)))

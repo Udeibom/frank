@@ -21,6 +21,19 @@ MUTATIONS = [
     ("app/services/refine/experiments.py", "{\"op\": \"swap_sound\", \"part\": \"keys\", \"sound\": \"electric piano\", \"section\": keys}",
      "{\"op\": \"swap_sound\", \"part\": \"keys\", \"sound\": \"electric piano\", \"section\": keys}, {\"op\": \"bigger\"}",
      "tests/test_properties_refine.py::test_each_experiment_differs_in_exactly_one_thing"),
+    # sing-it (spec 06)
+    ("app/services/audio/pitch.py", 'if abs(error) * 100.0 < max(settings["threshold_cents"], 1.0):', "if False:",
+     "tests/test_properties_sing.py::test_tuning_leaves_close_notes_alone_and_moves_others_closer"),
+    ("app/services/audio/harmony.py", "    return _scale_step(sung_target, scale, 2 * d)", "    return sung_target + 3 * d",
+     "tests/test_properties_sing.py::test_without_chords_the_harmony_is_a_third_in_the_scale"),
+    ("app/services/audio/harmony.py", "            if n % 12 in chord:\n                return n", "            if True:\n                return n + d",
+     "tests/test_properties_sing.py::test_every_harmony_note_is_a_chord_note"),
+    ("app/services/audio/align.py", "        out.append(float(np.clip(off * rule[\"strength\"], -cap, cap)))", "        out.append(float(off * 2))",
+     "tests/test_properties_sing.py::test_tightening_never_moves_more_than_a_quarter_beat_and_never_in_the_gentlest"),
+    ("app/services/audio/bleed.py", "    ok = reduction >= ACCEPT_REDUCTION_DB and voice_change > -ACCEPT_VOICE_DROP_DB", "    ok = True",
+     "tests/test_properties_sing.py::test_bleed_removal_keeps_a_clean_take_as_it_was"),
+    ("app/services/audio/song_notes.py", "    if r % 12 in t.scale or r % 12 == tune_pc:\n        return r", "    if True:\n        return r",
+     "tests/test_properties_sing.py::test_target_is_a_song_note_or_the_tune"),
 ]
 
 

@@ -59,3 +59,5 @@ yarn-error.log*
 # Kiro MCP config — contains a Supabase personal access token, never commit
 .kiro/settings/mcp.json
 .playwright-mcp/
+# Listening tests: audio never goes in the repo
+listening/

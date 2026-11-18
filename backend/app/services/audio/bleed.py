@@ -23,6 +23,7 @@ OVER_SUBTRACT = 1.5          # take a little more than the estimate: room echo m
 MAX_LAG_S = 0.15
 ACCEPT_REDUCTION_DB = 6.0
 ACCEPT_VOICE_DROP_DB = 2.0
+MIN_GAP_FRAMES = 50          # moments without singing needed to learn how the beat arrives
 VOICE_SHARE = 0.5            # a frame is singing when more than half its sound is not the beat
 
 
@@ -103,22 +104,26 @@ def remove(take: np.ndarray, beat: np.ndarray, sr: int, voiced: np.ndarray | Non
 
     def singing(g: np.ndarray) -> np.ndarray:
         """Frames whose sound in the voice's range is mostly NOT explained by the beat."""
-        flags = np.zeros(total_frames, dtype=bool)
+        share = np.ones(total_frames)
         for a, z in _chunks(n, sr):
             P = np.abs(librosa.stft(take[a:z], n_fft=N_FFT, hop_length=HOP))[lo_bin:hi_bin].astype(np.float64) ** 2
             Q = np.abs(librosa.stft(b[a:z], n_fft=N_FFT, hop_length=HOP))[lo_bin:hi_bin].astype(np.float64) ** 2
             left = np.maximum(P - (g[lo_bin:hi_bin, None] ** 2) * Q, 0.0).sum(axis=0) / np.maximum(P.sum(axis=0), 1e-20)
             f0 = a // HOP
             k = min(left.size, total_frames - f0)
-            flags[f0:f0 + k] |= left[:k] > VOICE_SHARE
+            share[f0:f0 + k] = left[:k]
             del P, Q
-        return np.convolve(flags.astype(float), np.ones(5), mode="same") > 0      # word edges count as voice
+        flags = np.convolve((share > VOICE_SHARE).astype(float), np.ones(5), mode="same") > 0   # word edges count as voice
+        if (~flags).sum() < MIN_GAP_FRAMES:
+            # loud bleed makes every moment look like singing at first: learn from the third least like singing
+            flags = share > np.percentile(share, 33)
+        return flags
 
     if voiced is None:
         g0, _ = learn(None)                      # the voice is not the beat, so this only overestimates a little
         voiced = singing(g0)
     g, used = learn(voiced)
-    if used < 50:
+    if used < MIN_GAP_FRAMES:
         return take.copy(), BleedReport(False, 0.0, 0.0, lag / sr * 1000, "not enough moments without singing to learn the beat")
     gain = g[:, None]
 

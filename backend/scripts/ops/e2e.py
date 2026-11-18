@@ -109,7 +109,7 @@ def sing_story(h: dict, pid: str, beat_id: str) -> str:
     print("   says:", lined["message"])
     cleaned = job(h, call(h, "POST", f"/projects/{pid}/voice/takes/{t2['id']}/remove-bleed")["job_id"], "take the music out")
     print("   says:", cleaned["message"], cleaned.get("report"))
-    harm = job(h, call(h, "POST", f"/projects/{pid}/voice/harmony", json={"take_id": t1["id"], "type": "above", "sections": ["chorus"]})["job_id"], "harmony")
+    harm = job(h, call(h, "POST", f"/projects/{pid}/voice/harmony", json={"take_id": t1["id"], "type": "above", "sections": ["intro"]})["job_id"], "harmony")
     print("   says:", harm.get("message"))
     guide = job(h, call(h, "POST", f"/projects/{pid}/voice/guide")["job_id"], "guide")
     print("   guide:", "ready" if guide.get("guide_url") else guide.get("message"))
