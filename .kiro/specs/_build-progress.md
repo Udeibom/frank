@@ -1,12 +1,22 @@
 # Build progress (read this first after an interruption)
 
-Reference point for resuming: "Continue from .kiro/specs/_build-progress.md, checkpoint 4."
+Reference point for resuming: "Continue from .kiro/specs/_build-progress.md, checkpoint 5."
 
 Deployed: frontend https://frank-bay-zeta.vercel.app · backend https://frank-api-pzjo.onrender.com (Render srv-dbtv8e0n74is73evdbdg)
 Ops (all in the repo, survive restarts): `backend/scripts/ops/render.py wait|logs|events|env`,
 `backend/scripts/ops/e2e.py` (full HTTP walkthrough on prod, now including demo story 3; `E2E_REFINE=0` skips it),
 `backend/scripts/ops/sql.py` (needs SUPABASE_ACCESS_TOKEN env), `backend/scripts/mutate_check.py` (proves the refine
 properties can fail). Plan of record: `.kiro/specs/_remaining-work.md`.
+
+## Checkpoint 5 (Nov 18): finish and intent (spec 11), taste memory (spec 09)
+- Spec 11: parts mixed separately (cached for the beat in use), finishing from an uncompressed render (two-pass
+  loudness, true peak, Listener check), before/after, waveform, intent check in their words, one surprise, parts zip.
+  VERIFIED ON PRODUCTION: E2E with the finish story OK in 1156 s (loudness -14.7, no clipping; zip 28 MB).
+  Renderer fix: parts start on the synth's 64-sample block and their echo is drained (renders no longer depend on
+  what was rendered before). Migration 009 is taste (008 went to sing-it).
+- Spec 09: signals, promotion/retirement, taste in briefs and direction order, taste page.
+  VERIFIED ON PRODUCTION: scripts/ops/rls_check.py "RLS OK" (two users).
+- Set-active beat/mix routes now check the version belongs to the song.
 
 ## Checkpoint 4 (Nov 18): sing it (spec 06)
 - Migration 008 applied (vocal_takes kind/parent/is_harmony/params/facts, user_settings, guide_renders).
@@ -43,7 +53,6 @@ properties can fail). Plan of record: `.kiro/specs/_remaining-work.md`.
 ## Known issues
 - One intermittent test failure seen once in a 130-test run (did not reproduce). Watch for it.
 - Beat render takes about 4 minutes on the free server; committing a beat direction re-renders the whole song.
-- `/beat/versions/active` and `/mix/versions/active` don't check the version belongs to the project (fix in spec 13 audit).
 
 ## Next, in order
-1. Spec 11 finish and intent. 2. Specs 09, 10, 02 rest, 12, then 13 demo runs.
+1. Spec 10 creative director. 2. Spec 02 rest. 3. Spec 12. 4. Spec 13 demo runs.

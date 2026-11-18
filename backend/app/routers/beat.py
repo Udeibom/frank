@@ -196,6 +196,12 @@ async def list_beat_versions(project_id: str) -> list[BeatVersionResponse]:
 async def set_active_beat_version(
     project_id: str, body: SetActiveBeatRequest
 ) -> dict:
+    try:
+        v = await beat_db.get_beat_version(body.beat_version_id)
+    except Exception:  # noqa: BLE001  .single() raises when nothing matches
+        v = None
+    if not v or v.get("project_id") != project_id:
+        raise HTTPException(status_code=404, detail="I can't find that version of the beat.")
     await projects_db.update_project_active_state(
         project_id, {"active_beat_version_id": body.beat_version_id}
     )

@@ -42,6 +42,16 @@ MUTATIONS = [
      "tests/test_properties_finish.py::test_the_mix_room_makes_at_most_three_changes_and_understands_parts"),
     ("app/services/audio/mixing.py", "            if st.get(\"muted\"):\n                continue", "            if False:\n                continue",
      "tests/test_properties_finish.py::test_each_part_has_its_own_level_and_can_be_muted"),
+    # taste memory (spec 09)
+    ("app/services/taste/rules.py", "PROMOTE_SONGS = 2", "PROMOTE_SONGS = 1",
+     "tests/test_properties_taste.py::test_one_signal_or_one_song_never_makes_a_preference"),
+    ("app/services/taste/rules.py", "    if best and signals[0].topic != \"other\":", "    if best:",
+     "tests/test_properties_taste.py::test_three_across_two_songs_is_enough_and_other_is_never_promoted"),
+    ("app/services/taste/rules.py", "            return Outcome(\"retired\", current.direction, 0.0, current.statement)", "            pass",
+     "tests/test_properties_taste.py::test_two_contradictions_in_a_row_retire_a_preference"),
+    ("app/services/taste/rules.py", "    return sum((1 if prefs[t] == d else -1) for t, d in signals_for_direction(kind, actions, section_names) if t in prefs)",
+     "    return 0",
+     "tests/test_properties_taste.py::test_the_proposer_offers_what_the_artist_likes_first_but_still_offers_the_rest"),
 ]
 
 

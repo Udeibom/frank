@@ -262,6 +262,12 @@ async def list_mix_versions(project_id: str) -> list[MixVersionResponse]:
 async def set_active_mix_version(
     project_id: str, body: SetActiveMixRequest
 ) -> dict:
+    try:
+        v = await mix_db.get_mix_version(body.mix_version_id)
+    except Exception:  # noqa: BLE001  .single() raises when nothing matches
+        v = None
+    if not v or v.get("project_id") != project_id:
+        raise HTTPException(status_code=404, detail="I can't find that mix.")
     await projects_db.update_project_active_state(
         project_id, {"active_mix_id": body.mix_version_id}
     )
