@@ -147,7 +147,9 @@ def finish_story(h: dict, pid: str) -> str:
     print("   surprise:", s["title"], "|", s["message"])
     assert call(h, "GET", f"/projects/{pid}/finish/surprise")["offered"]
     project = call(h, "GET", f"/projects/{pid}")
-    print("   status:", project.get("status"))
+    status = project.get("status") or (project.get("project") or {}).get("status")
+    print("   status:", status)
+    assert status == "exported", "a finished song is marked exported"
     return mixed["mix_version_id"]
 
 

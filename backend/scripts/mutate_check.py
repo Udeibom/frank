@@ -34,6 +34,14 @@ MUTATIONS = [
      "tests/test_properties_sing.py::test_bleed_removal_keeps_a_clean_take_as_it_was"),
     ("app/services/audio/song_notes.py", "    if r % 12 in t.scale or r % 12 == tune_pc:\n        return r", "    if True:\n        return r",
      "tests/test_properties_sing.py::test_target_is_a_song_note_or_the_tune"),
+    # finish and intent (spec 11)
+    ("app/services/generation/beat.py", "                    level = (LEAD_GAIN if part.lead else PART_GAIN.get(part.name, 0.7)) * gain",
+     "                    level = (LEAD_GAIN if part.lead else PART_GAIN.get(part.name, 0.7))",
+     "tests/test_properties_finish.py::test_the_parts_add_up_to_the_beat"),
+    ("app/routers/mix.py", "MAX_CHANGES = 3 ", "MAX_CHANGES = 9 ",
+     "tests/test_properties_finish.py::test_the_mix_room_makes_at_most_three_changes_and_understands_parts"),
+    ("app/services/audio/mixing.py", "            if st.get(\"muted\"):\n                continue", "            if False:\n                continue",
+     "tests/test_properties_finish.py::test_each_part_has_its_own_level_and_can_be_muted"),
 ]
 
 
