@@ -195,9 +195,13 @@ def _apply(op, sections: list[SectionPlan], seed: int) -> tuple[int, str]:
         return seed, f"I made {PLAIN_PART[op.part]} {'busier' if step > 0 else 'simpler'} {_scope_words(sections, op.section)}."
     if isinstance(op, (Bigger, Smaller)):
         step = 0.15 if isinstance(op, Bigger) else -0.15
+        moved = False
         for s in _where(sections, op.section):
-            s.energy = max(0.05, min(1.0, s.energy + step))
-            s.density = max(0.05, min(1.0, s.density + step * 0.6))
+            e, d = max(0.05, min(1.0, s.energy + step)), max(0.05, min(1.0, s.density + step * 0.6))
+            moved = moved or (e, d) != (s.energy, s.density)
+            s.energy, s.density = e, d
+        if not moved:
+            raise OpError(f"That's already as {'big' if step > 0 else 'calm'} as I can make it there.")
         return seed, f"I made it {'bigger' if step > 0 else 'calmer'} {_scope_words(sections, op.section)}."
     if isinstance(op, AddPart):
         hit = [s for s in _where(sections, op.section) if op.part not in s.layers]
@@ -232,6 +236,10 @@ def _apply(op, sections: list[SectionPlan], seed: int) -> tuple[int, str]:
     if isinstance(op, Reseed):
         targets = _where(sections, op.section)
         parts = [op.part] if op.part else list(PARTS)
+        if op.part:          # a new idea for a part that isn't playing would change nothing you could hear
+            targets = [s for s in targets if op.part in s.layers]
+            if not targets:
+                raise OpError(f"{PLAIN_PART[op.part].capitalize()} isn't playing there, so there's nothing to change.")
         for s in targets:
             for p in parts:
                 edit = s.parts.setdefault(p, {})

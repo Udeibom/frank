@@ -37,6 +37,7 @@ _ALLOWED_ACTIONS = {
     "toggle_harmony",
     "section_adjust",
     "analyze_mix",
+    "refine",
 }
 
 
@@ -120,6 +121,11 @@ async def mix_conversation(
     if not history:   # after a reload the page has nothing; the stored conversation is the memory
         history = convo.recent_messages(await convo.history(project_id, "mix"))
     params = {**DEFAULT_MIX_PARAMS, **body.mix_params}
+    from app.routers.beat import _version_reply
+
+    early = await _version_reply(project_id, "mix", body.message)
+    if early:
+        return MixConversationResponse(message=early["message"], mix_params=params, actions=early["actions"], render=False)
 
     system = await convo.with_earlier(project_id, "mix", await system_with_brief(project_id, MIX_ROOM_SYSTEM, "mix_engineer"))
     # First pass

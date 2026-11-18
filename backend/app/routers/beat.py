@@ -35,6 +35,7 @@ _ALLOWED_ACTIONS = {
     "beat_operations",
     "restore_version",
     "set_section_label",
+    "refine",
 }
 
 
@@ -87,6 +88,29 @@ async def mute_stem(project_id: str, body: MuteStemRequest, background: Backgrou
     return await _start_operations(project_id, [{"op": "remove_part", "part": body.stem_type, "section": body.section_index}], background)
 
 
+async def _version_reply(project_id: str, room: str, message: str) -> dict | None:
+    """
+    "Give me the second version back" is resolved here against the real versions, labels, dates and decisions
+    (refine-loop requirement 5.2), not left to the model. Clear: the action puts it back. Unclear: both to hear.
+    """
+    from app.routers.refine import go_back
+    from app.services.refine.resolve import is_about_versions
+
+    if not is_about_versions(message):
+        return None
+    out = await go_back(project_id, message, room, apply=False)  # type: ignore[arg-type]
+    if out["status"] == "none":
+        return None
+    if out["status"] == "resolved":
+        kind = "restore_version" if room == "beat" else "restore_mix_version"
+        actions = [ConversationAction(type=kind, params={"version_id": out["version"]["id"]})]
+    else:
+        actions = [ConversationAction(type="compare_versions", params={"layer": room, "candidates": out["candidates"]})]
+    reply = await convo.enforce_reply(project_id, room, out["message"])
+    await convo.record(project_id, room, message, reply, [a.model_dump() for a in actions])
+    return {"message": reply, "actions": actions}
+
+
 @router.post("/conversation", response_model=BeatConversationResponse)
 async def beat_conversation(
     project_id: str, body: BeatConversationRequest
@@ -95,6 +119,9 @@ async def beat_conversation(
     history = [{"role": m.role, "content": m.content} for m in body.history]
     if not history:   # after a reload the page has nothing; the stored conversation is the memory
         history = convo.recent_messages(await convo.history(project_id, "beat"))
+    early = await _version_reply(project_id, "beat", body.message)
+    if early:
+        return BeatConversationResponse(**early)
     messages = build_beat_room_messages(body.beat_state, history, body.message)
     system = await convo.with_earlier(project_id, "beat", await system_with_brief(project_id, BEAT_ROOM_SYSTEM, "beat_maker"))
     try:

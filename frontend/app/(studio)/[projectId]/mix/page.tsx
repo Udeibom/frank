@@ -14,6 +14,9 @@ import {
 } from "@/components/conversation/ConversationPanel"
 import { StemBalance } from "@/components/studio/StemBalance"
 import { MixVersions } from "@/components/studio/MixVersions"
+import { RefinePanel } from "@/components/studio/RefinePanel"
+import { VersionChoice } from "@/components/studio/VersionChoice"
+import { renameVersion } from "@/lib/api/refine"
 import { Button } from "@/components/ui/button"
 import {
   renderMix,
@@ -27,8 +30,8 @@ import { listTakes } from "@/lib/api/voice"
 import { listBeatVersions } from "@/lib/api/beat"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
-import type { ConversationMessage } from "@/types/api"
-import { SlidersHorizontal, Play, Pause, Loader2 } from "lucide-react"
+import type { ConversationAction, ConversationMessage, VersionCandidate } from "@/types/api"
+import { Play, Pause, Loader2, Ear } from "lucide-react"
 
 const DEFAULT_PARAMS: Partial<MixParams> = {
   vocal_gain_db: 0,
@@ -61,6 +64,31 @@ export default function MixRoomPage() {
   // Guards so we greet once and auto-assemble the first mix only once.
   const greetedRef = useRef(false)
   const autoAssembledRef = useRef(false)
+
+  // Refine loop (spec 08)
+  const [refineKey, setRefineKey] = useState(0)
+  const [refineConcern, setRefineConcern] = useState<string | null>(null)
+  const [candidates, setCandidates] = useState<VersionCandidate[] | null>(null)
+
+  const say = useCallback((content: string) => {
+    setTurns((t) => [...t, { id: crypto.randomUUID(), role: "assistant", content }])
+    historyRef.current.push({ role: "assistant", content })
+  }, [])
+
+  function startRefine(concern: string | null) {
+    setRefineConcern(concern)
+    setRefineKey((k) => k + 1)
+  }
+
+  /** Show the mix the server just made active, without waiting for the shared state to catch up. */
+  const adoptMix = useCallback(async (mixId: string) => {
+    const vs = await listMixVersions(projectId)
+    setVersions(vs)
+    const v = vs.find((x) => x.id === mixId) ?? vs[0] ?? null
+    setActiveVersion(v)
+    if (v?.mix_params) mixParamsRef.current = { ...DEFAULT_PARAMS, ...v.mix_params }
+    if (v) updateActiveState({ active_mix_id: v.id })
+  }, [projectId, updateActiveState])
 
   const loadVersions = useCallback(async () => {
     const vs = await listMixVersions(projectId)
@@ -180,8 +208,10 @@ export default function MixRoomPage() {
     setRendering(true)
     try {
       const { job_id } = await renderMix(projectId, mixParams, quality)
-      await pollJob(job_id)
-      await loadVersions()
+      const done = await pollJob(job_id)
+      const madeId = (done.result as { mix_version_id?: string } | null)?.mix_version_id
+      if (madeId) await adoptMix(madeId)
+      else await loadVersions()
     } catch {
       setTurns((t) => [
         ...t,
@@ -217,6 +247,12 @@ export default function MixRoomPage() {
       ])
       historyRef.current.push({ role: "assistant", content: res.message })
       setIsThinking(false)
+      for (const action of res.actions as ConversationAction[]) {
+        const ap = action.params as Record<string, unknown>
+        if (action.type === "refine") startRefine(typeof ap.concern === "string" ? ap.concern : null)
+        if (action.type === "compare_versions") setCandidates((ap.candidates as VersionCandidate[]) ?? [])
+        if (action.type === "restore_mix_version") await handleSetActive(String(ap.version_id))
+      }
       if (res.render) await doRender(res.mix_params)
     } catch {
       setIsThinking(false)
@@ -290,7 +326,46 @@ export default function MixRoomPage() {
                   Render full quality
                 </Button>
               )}
+              {hasMix && !rendering && (
+                <Button variant="outline" size="sm" onClick={() => startRefine(null)}>
+                  <Ear className="h-3.5 w-3.5" />
+                  Something feels off
+                </Button>
+              )}
             </div>
+
+            {refineKey > 0 && (
+              <div className="mb-8">
+                <RefinePanel
+                  projectId={projectId}
+                  room="mix"
+                  concern={refineConcern}
+                  startKey={refineKey}
+                  onSay={say}
+                  onCommitted={async (result) => {
+                    const id = result?.mix_version_id
+                    if (typeof id === "string") await adoptMix(id)
+                    else if (result?.beat_version_id) await doRender(mixParamsRef.current)   // the music changed: hear it in the mix
+                    else await loadVersions()
+                  }}
+                  onClose={() => setRefineKey(0)}
+                />
+              </div>
+            )}
+
+            {candidates && (
+              <div className="mb-8">
+                <VersionChoice
+                  candidates={candidates}
+                  onPick={async (id) => {
+                    setCandidates(null)
+                    await handleSetActive(id)
+                    say("That mix is back on. Everything after it is still kept.")
+                  }}
+                  onClose={() => setCandidates(null)}
+                />
+              </div>
+            )}
 
             {/* Stem balance */}
             {(hasVocal || hasBeat) && (
@@ -310,6 +385,10 @@ export default function MixRoomPage() {
               versions={versions}
               activeVersionId={activeVersion?.id ?? null}
               onSetActive={handleSetActive}
+              onRename={async (id, label) => {
+                await renameVersion(projectId, "mix", id, label)
+                setVersions((vs) => vs.map((v) => (v.id === id ? { ...v, label } : v)))
+              }}
             />
           </div>
         </div>

@@ -14,6 +14,9 @@ import {
 } from "@/components/conversation/ConversationPanel"
 import { BeatTimeline } from "@/components/studio/BeatTimeline"
 import { BeatVersions } from "@/components/studio/BeatVersions"
+import { RefinePanel } from "@/components/studio/RefinePanel"
+import { VersionChoice } from "@/components/studio/VersionChoice"
+import { renameVersion } from "@/lib/api/refine"
 import { Button } from "@/components/ui/button"
 import {
   generateBeat,
@@ -32,8 +35,8 @@ import { getFingerprint } from "@/lib/api/feel"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
 import type { MusicalFingerprint } from "@/types/project"
-import type { ConversationMessage, ConversationAction } from "@/types/api"
-import { Drum, Play, Pause, Loader2, Mic2 } from "lucide-react"
+import type { ConversationMessage, ConversationAction, VersionCandidate } from "@/types/api"
+import { Drum, Play, Pause, Loader2, Mic2, Ear } from "lucide-react"
 
 export default function BeatRoomPage() {
   const params = useParams()
@@ -54,6 +57,30 @@ export default function BeatRoomPage() {
   const [progress, setProgress] = useState(0)
 
   const historyRef = useRef<ConversationMessage[]>([])
+
+  // Refine loop: "something feels wrong" -> directions to hear (spec 08)
+  const [refineKey, setRefineKey] = useState(0)
+  const [refineConcern, setRefineConcern] = useState<string | null>(null)
+  const [candidates, setCandidates] = useState<VersionCandidate[] | null>(null)
+
+  const say = useCallback((content: string) => {
+    setTurns((t) => [...t, { id: crypto.randomUUID(), role: "assistant", content }])
+    historyRef.current.push({ role: "assistant", content })
+  }, [])
+
+  function startRefine(concern: string | null) {
+    setRefineConcern(concern)
+    setRefineKey((k) => k + 1)
+  }
+
+  /** Show a version the server just made active (an edit, a chosen idea) without waiting for the shared state. */
+  const adoptVersion = useCallback(async (versionId: string) => {
+    const vs = await listBeatVersions(projectId)
+    setVersions(vs)
+    const v = vs.find((x) => x.id === versionId) ?? vs[0] ?? null
+    setActiveVersion(v)
+    if (v) updateActiveState({ active_beat_version_id: v.id })
+  }, [projectId, updateActiveState])
 
   const loadVersions = useCallback(async () => {
     const vs = await listBeatVersions(projectId)
@@ -174,7 +201,9 @@ export default function BeatRoomPage() {
     try {
       const { job_id } = await startJob()
       const done = await pollJob(job_id)
-      await loadVersions()
+      const madeId = (done.result as { beat_version_id?: string } | null)?.beat_version_id
+      if (madeId) await adoptVersion(madeId)
+      else await loadVersions()
       const changes = (done.result as { changes?: string[] } | null)?.changes ?? []
       say(
         changes.length
@@ -213,6 +242,12 @@ export default function BeatRoomPage() {
         break
       case "restore_version":
         await handleSetActive(String(p.version_id))
+        break
+      case "refine":
+        startRefine(typeof p.concern === "string" ? p.concern : null)
+        break
+      case "compare_versions":
+        setCandidates((p.candidates as VersionCandidate[]) ?? [])
         break
       case "set_section_label":
         await updateSection(projectId, Number(p.section_index), {
@@ -371,12 +406,49 @@ export default function BeatRoomPage() {
                   )}
                   Hear it with my vocal
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={building}
+                  onClick={() => startRefine(null)}
+                >
+                  <Ear className="h-3.5 w-3.5" />
+                  Something feels off
+                </Button>
               </div>
 
               {describeLead(activeVersion?.params.lead_info) && (
                 <p className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-foreground">
                   {describeLead(activeVersion?.params.lead_info)}
                 </p>
+              )}
+
+              {refineKey > 0 && (
+                <RefinePanel
+                  projectId={projectId}
+                  room="beat"
+                  concern={refineConcern}
+                  startKey={refineKey}
+                  onSay={say}
+                  onCommitted={async (result) => {
+                    const id = result?.beat_version_id
+                    if (typeof id === "string") await adoptVersion(id)
+                    else await loadVersions()
+                  }}
+                  onClose={() => setRefineKey(0)}
+                />
+              )}
+
+              {candidates && (
+                <VersionChoice
+                  candidates={candidates}
+                  onPick={async (id) => {
+                    setCandidates(null)
+                    await handleSetActive(id)
+                    say("That one's back on. Everything after it is still kept.")
+                  }}
+                  onClose={() => setCandidates(null)}
+                />
               )}
 
               {/* Timeline */}
@@ -395,6 +467,10 @@ export default function BeatRoomPage() {
                 versions={versions}
                 activeVersionId={activeVersion?.id ?? null}
                 onSetActive={handleSetActive}
+                onRename={async (id, label) => {
+                  await renameVersion(projectId, "beat", id, label)
+                  setVersions((vs) => vs.map((v) => (v.id === id ? { ...v, label } : v)))
+                }}
               />
             </div>
           ) : (

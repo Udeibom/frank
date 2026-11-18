@@ -7,20 +7,31 @@
 
 import { useState } from "react"
 import type { BeatVersion } from "@/lib/api/beat"
-import { Play, Pause, Check, Layers } from "lucide-react"
+import { Play, Pause, Check, Layers, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface BeatVersionsProps {
   versions: BeatVersion[]
   activeVersionId: string | null
   onSetActive: (versionId: string) => void
+  /** Give a version the person's own name, e.g. "before I changed the chorus". */
+  onRename?: (versionId: string, label: string) => Promise<void> | void
 }
 
 export function BeatVersions({
   versions,
   activeVersionId,
   onSetActive,
+  onRename,
 }: BeatVersionsProps) {
+  const [editing, setEditing] = useState<string | null>(null)
+  const [draft, setDraft] = useState("")
+
+  async function saveName(id: string) {
+    const label = draft.trim()
+    setEditing(null)
+    if (label && onRename) await onRename(id, label)
+  }
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
 
@@ -72,7 +83,37 @@ export function BeatVersions({
           </button>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm text-foreground">{version.label}</p>
+            {editing === version.id ? (
+              <input
+                value={draft}
+                autoFocus
+                maxLength={80}
+                aria-label="Name this version"
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={() => saveName(version.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveName(version.id)
+                  if (e.key === "Escape") setEditing(null)
+                }}
+                className="w-full rounded border border-border bg-background px-2 py-0.5 text-sm"
+              />
+            ) : (
+              <p className="flex items-center gap-1.5 truncate text-sm text-foreground">
+                {version.label}
+                {onRename && (
+                  <button
+                    onClick={() => {
+                      setDraft(version.label ?? "")
+                      setEditing(version.id)
+                    }}
+                    aria-label={`Rename ${version.label ?? "this version"}`}
+                    className="text-muted-foreground/60 hover:text-primary"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
+              </p>
+            )}
             <p className="text-[11px] text-muted-foreground/60">
               {version.params.sections?.length ?? 0} sections
             </p>

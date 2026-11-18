@@ -70,3 +70,8 @@ def count_mix_versions_sync(project_id: str) -> int:
         .execute()
     )
     return result.count or 0
+
+
+async def update_mix_version_label(version_id: str, label: str) -> dict:
+    result = get_supabase().table("mix_versions").update({"label": label}).eq("id", version_id).execute()
+    return result.data[0] if result.data else {}

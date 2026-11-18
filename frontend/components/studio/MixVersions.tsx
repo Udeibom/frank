@@ -8,13 +8,14 @@
 
 import { useState } from "react"
 import type { MixVersion } from "@/lib/api/mix"
-import { Play, Pause, Check, Layers } from "lucide-react"
+import { Play, Pause, Check, Layers, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface MixVersionsProps {
   versions: MixVersion[]
   activeVersionId: string | null
   onSetActive: (versionId: string) => void
+  onRename?: (versionId: string, label: string) => Promise<void> | void
 }
 
 function summarize(v: MixVersion): string {
@@ -38,7 +39,16 @@ export function MixVersions({
   versions,
   activeVersionId,
   onSetActive,
+  onRename,
 }: MixVersionsProps) {
+  const [editing, setEditing] = useState<string | null>(null)
+  const [draft, setDraft] = useState("")
+
+  async function saveName(id: string) {
+    const label = draft.trim()
+    setEditing(null)
+    if (label && onRename) await onRename(id, label)
+  }
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
 
@@ -89,7 +99,37 @@ export function MixVersions({
             )}
           </button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm text-foreground">{v.label}</p>
+            {editing === v.id ? (
+              <input
+                value={draft}
+                autoFocus
+                maxLength={80}
+                aria-label="Name this mix"
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={() => saveName(v.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveName(v.id)
+                  if (e.key === "Escape") setEditing(null)
+                }}
+                className="w-full rounded border border-border bg-background px-2 py-0.5 text-sm"
+              />
+            ) : (
+              <p className="flex items-center gap-1.5 truncate text-sm text-foreground">
+                {v.label}
+                {onRename && (
+                  <button
+                    onClick={() => {
+                      setDraft(v.label ?? "")
+                      setEditing(v.id)
+                    }}
+                    aria-label={`Rename ${v.label ?? "this mix"}`}
+                    className="text-muted-foreground/60 hover:text-primary"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
+              </p>
+            )}
             <p className="truncate text-[11px] text-muted-foreground/60">
               {summarize(v)}
             </p>

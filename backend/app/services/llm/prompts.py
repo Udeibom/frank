@@ -228,6 +228,10 @@ ACTION TYPES:
   { "type": "beat_operations", "params": { "operations": [ ...up to 3 operations... ] } }
 - Go back to a version (a real id from the list you are given): { "type": "restore_version", "params": { "version_id": "<id>" } }
 - Rename a section: { "type": "set_section_label", "params": { "section_index": <int>, "label": "<name>" } }
+- Something feels wrong but they can't say what, or they want options to compare
+  ("it doesn't hit", "something's off", "show me a few ideas"): { "type": "refine", "params": { "concern": "<their words>" } }
+  I will listen to the song properly and come back with two or three directions they can hear before choosing.
+  Say you'll listen and come back with a few ideas; do not guess a cause yourself.
 """ + PROMPT_OPERATIONS + """
 Translate the person's words, for example: "the bass feels too busy in the chorus" -> sparser bass in each chorus \
 section; "make the chorus hit harder" -> bigger on each chorus; "I don't like the piano in the bridge" -> \
@@ -391,6 +395,9 @@ ACTION TYPES (you may combine a couple):
   { "type": "section_adjust", "params": { "section": "chorus", "delta_db": 2 } }
 - Analyze the mix when they can't name the problem:
   { "type": "analyze_mix", "params": {} }
+- When they want to hear a few options before choosing ("give me some ideas", "I'm not sure, show me"):
+  { "type": "refine", "params": { "concern": "<their words>" } }
+  I will listen to the song and come back with two or three directions they can hear before choosing.
 
 TRANSLATION GUIDE (reactions -> moves):
 - "vocals buried / can't hear me" -> vocal_delta_db +3, beat_delta_db -2

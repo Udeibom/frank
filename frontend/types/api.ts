@@ -190,3 +190,52 @@ export interface ApiError {
   detail: string
   status: number
 }
+
+// ── Refine loop (spec 08) ──────────────────────────────────────────────
+
+/** One way to fix what feels wrong. `actions` are typed changes the backend validated. */
+export interface RefineDirection {
+  title: string
+  plain: string
+  kind: "beat" | "mix"
+  actions: Record<string, unknown>[]
+  changes: string[]
+  sections: number[]
+  preview_url: string | null
+  before_url: string | null
+}
+
+export interface RefineFinding {
+  id: string
+  plain: string
+  sections: number[]
+}
+
+/** The result of a refine job: what Frank heard and the directions to try. */
+export interface RefineProposal {
+  proposal_id: string
+  message: string
+  experiment: boolean
+  directions: RefineDirection[]
+  findings: RefineFinding[]
+  could_not_check: string[]
+}
+
+export interface RefinePreview {
+  n: number
+  preview_url: string
+  before_url: string | null
+}
+
+export interface RefineChooseResponse {
+  job_id: string
+  kind: "beat" | "mix"
+  message: string
+}
+
+export interface VersionCandidate {
+  id: string
+  label: string | null
+  render_url: string | null
+  created_at: string
+}
