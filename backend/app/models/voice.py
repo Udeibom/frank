@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Optional, Any
+from pydantic import BaseModel, Field
+from typing import Literal, Optional, Any
 from app.models.conversation import ConversationMessage, ConversationAction
 
 
@@ -19,16 +19,22 @@ class UploadTakeResponse(BaseModel):
 
 
 class CorrectPitchRequest(BaseModel):
-    mode: str = "light"  # light | moderate | full
+    mode: Literal["light", "moderate", "full"] = "light"
+class AlignRequest(BaseModel):
+    mode: Literal["moderate", "full"] = "moderate"     # the gentlest setting never moves timing
+class SwapRequest(BaseModel):
+    phrase_index: int = Field(ge=0)
+    take_id: str
 
 
 class CompRequest(BaseModel):
-    take_ids: list[str]
+    take_ids: list[str] = Field(max_length=8)
 
 
 class HarmonyRequest(BaseModel):
     take_id: str
-    type: str = "above"  # above | below | both
+    type: Literal["above", "below", "both"] = "above"
+    sections: Optional[list[Literal["intro", "verse", "pre-chorus", "chorus", "bridge", "outro"]]] = None
 
 
 class SetActiveVocalRequest(BaseModel):

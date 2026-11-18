@@ -78,6 +78,55 @@ def sung_take() -> bytes:
     return buf.getvalue()
 
 
+def sing_story(h: dict, pid: str, beat_id: str) -> str:
+    """Demo story 1's vocal session (spec 06). Returns the id of the take to mix."""
+    beat = next(v for v in call(h, "GET", f"/projects/{pid}/beat/versions") if v["id"] == beat_id)
+    beat_audio, sr = sf.read(io.BytesIO(c.get(beat["render_url"]).content), dtype="float32", always_2d=True)
+    take = sung_take()
+    voice, _ = sf.read(io.BytesIO(take), dtype="float32")
+    lead_in = 0.4                                                  # the recording ran 0.4 s before the beat came in
+    placed = np.concatenate([np.zeros(int(lead_in * 44100), dtype=np.float32), voice])
+    form = {"beat_version_id": beat_id, "beat_offset_s": "0", "lead_in_s": str(lead_in), "headphones": "true"}
+
+    def send(audio: np.ndarray, extra: dict) -> dict:
+        buf = io.BytesIO()
+        sf.write(buf, audio, 44100, format="WAV")
+        up = call(h, "POST", f"/projects/{pid}/voice/takes", files={"file": ("take.wav", buf.getvalue(), "audio/wav")}, data=extra)
+        done = job(h, up["analysis_job_id"], "after take")
+        print("   engineer:", done.get("engineer"), "| facts:", {k: done["facts"].get(k) for k in ("seconds", "sections", "on_the_notes", "bleed")})
+        return up["take"]
+
+    t1 = send(placed, form)
+    assert t1["params"].get("song_time"), "the take was placed in song time"
+    bleed_beat = beat_audio.mean(axis=1)[: placed.size - int(lead_in * 44100)]
+    leaky = placed.copy()
+    leaky[int(lead_in * 44100): int(lead_in * 44100) + bleed_beat.size] += 0.35 * bleed_beat
+    t2 = send(np.clip(leaky, -1, 1), {**form, "headphones": "false"})
+
+    tuned = job(h, call(h, "POST", f"/projects/{pid}/voice/takes/{t1['id']}/correct", json={"mode": "moderate"})["job_id"], "tune")
+    print("   says:", tuned["message"])
+    lined = job(h, call(h, "POST", f"/projects/{pid}/voice/takes/{t1['id']}/align", json={"mode": "full"})["job_id"], "line up")
+    print("   says:", lined["message"])
+    cleaned = job(h, call(h, "POST", f"/projects/{pid}/voice/takes/{t2['id']}/remove-bleed")["job_id"], "take the music out")
+    print("   says:", cleaned["message"], cleaned.get("report"))
+    harm = job(h, call(h, "POST", f"/projects/{pid}/voice/harmony", json={"take_id": t1["id"], "type": "above", "sections": ["chorus"]})["job_id"], "harmony")
+    print("   says:", harm.get("message"))
+    guide = job(h, call(h, "POST", f"/projects/{pid}/voice/guide")["job_id"], "guide")
+    print("   guide:", "ready" if guide.get("guide_url") else guide.get("message"))
+    comp = job(h, call(h, "POST", f"/projects/{pid}/voice/comp", json={"take_ids": [t1["id"], t2["id"]]})["job_id"], "best of")
+    print("   says:", comp["message"], "| lines:", len(comp["segments"]))
+    other = t2["id"] if comp["segments"][0]["take_id"] == t1["id"] else t1["id"]
+    sw = job(h, call(h, "POST", f"/projects/{pid}/voice/comp/{comp['comp_id']}/swap", json={"phrase_index": 0, "take_id": other})["job_id"], "swap a line")
+    assert sw["segments"][0]["take_id"] == other
+    takes = call(h, "GET", f"/projects/{pid}/voice/takes")
+    kinds = sorted(t["kind"] for t in takes)
+    print("   versions kept:", kinds)
+    assert {"take", "tuned", "harmony"} <= set(kinds)
+    tuned_id = tuned.get("take_id") or t1["id"]
+    call(h, "POST", f"/projects/{pid}/voice/active", json={"vocal_id": tuned_id, "vocal_type": "take"})
+    return tuned_id
+
+
 def refine_story(h: dict, pid: str) -> None:
     """Demo story 3 (spec 08): something feels wrong -> directions -> hear one -> use it -> go back."""
     beats_before = len(call(h, "GET", f"/projects/{pid}/beat/versions"))
@@ -116,10 +165,13 @@ def main() -> None:
         call(h, "POST", f"/projects/{pid}/lyrics", json={"content": "I walk alone down the quiet road\nThe lights are low and the night is cold\nBut I will sing until the morning comes", "label": "v1"})
         res = job(h, call(h, "POST", f"/projects/{pid}/beat/generate", json={"fingerprint": fp})["job_id"], "beat")
         print("  beat", {k: v for k, v in res.items() if k != "render_url"})
-        up = call(h, "POST", f"/projects/{pid}/voice/takes", files={"file": ("take.wav", sung_take(), "audio/wav")})
-        tid = up.get("id") or (up.get("take") or {}).get("id")
-        call(h, "POST", f"/projects/{pid}/voice/active", json={"vocal_id": tid, "vocal_type": "take"})
-        time.sleep(8)
+        if os.environ.get("E2E_SING", "1") == "1":
+            sing_story(h, pid, res["beat_version_id"])
+        else:
+            up = call(h, "POST", f"/projects/{pid}/voice/takes", files={"file": ("take.wav", sung_take(), "audio/wav")})
+            tid = up.get("id") or (up.get("take") or {}).get("id")
+            call(h, "POST", f"/projects/{pid}/voice/active", json={"vocal_id": tid, "vocal_type": "take"})
+            time.sleep(8)
         mixid = job(h, call(h, "POST", f"/projects/{pid}/mix/render", json={"mix_params": {}, "quality": "full"})["job_id"], "mix")["mix_version_id"]
         listened = job(h, call(h, "POST", f"/projects/{pid}/listen", json={"concern": "the chorus doesn't lift"})["job_id"], "listen")
         for f in listened["findings"]["findings"]:

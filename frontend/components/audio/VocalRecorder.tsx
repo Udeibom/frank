@@ -1,23 +1,38 @@
 "use client"
 
 /**
- * VocalRecorder — the centerpiece of the Voice Room. A large, unmistakable
- * record button with a live level meter and timer. Can play the beat through
- * (for singing along) and warns — but never blocks — if headphones aren't
- * detected, so the beat doesn't bleed into the mic. Records only; all
- * processing happens on the backend.
+ * VocalRecorder — the centerpiece of the Voice Room (sing-it spec 06).
+ * A large record button with a live level meter and timer. The person picks where to start; Frank counts them in
+ * (one bar of the beat, or four clicks at the very top), plays the beat and, if they like, the tune softly on a
+ * voice-like sound to sing along with. They can practise a part on repeat without recording. The guide only plays
+ * in their ears; the take is lined up with the beat on the server. Headphones are suggested, never required.
  */
 
 import { useEffect, useRef, useState } from "react"
 import { useRecorder } from "@/hooks/useRecorder"
 import { Button } from "@/components/ui/button"
-import { Mic, Square, Loader2, Headphones } from "lucide-react"
+import { SessionPlayer } from "@/lib/audio/sessionPlayer"
+import type { TakePlacement } from "@/lib/api/voice"
+import { Mic, Square, Loader2, Headphones, Repeat, Music2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+export interface SongSection {
+  index: number
+  label: string
+  start: number
+  end: number
+}
 
 interface VocalRecorderProps {
   beatUrl: string | null
+  beatVersionId: string | null
+  sections: SongSection[]
+  secondsPerBeat: number
+  guideUrl: string | null
+  guideNote: string | null
+  onWantGuide: () => Promise<void>
   uploading: boolean
-  onRecorded: (blob: Blob, fileExtension: string) => void
+  onRecorded: (blob: Blob, fileExtension: string, placement: TakePlacement | null, headphones: boolean | null) => void
 }
 
 function formatTime(seconds: number): string {
@@ -28,136 +43,231 @@ function formatTime(seconds: number): string {
 
 export function VocalRecorder({
   beatUrl,
+  beatVersionId,
+  sections,
+  secondsPerBeat,
+  guideUrl,
+  guideNote,
+  onWantGuide,
   uploading,
   onRecorded,
 }: VocalRecorderProps) {
   const recorder = useRecorder()
   const [withBeat, setWithBeat] = useState(true)
-  const [likelyHeadphones, setLikelyHeadphones] = useState<boolean | null>(null)
-  const beatAudioRef = useRef<HTMLAudioElement | null>(null)
+  const [headphones, setHeadphones] = useState(false)
+  const [startAt, setStartAt] = useState(-1)           // index into `sections`, or -1 for the top of the song
+  const [guideOn, setGuideOn] = useState(false)
+  const [guideLevel, setGuideLevel] = useState(0.5)
+  const [practising, setPractising] = useState(false)
+  const [loadingGuide, setLoadingGuide] = useState(false)
+  const playerRef = useRef<SessionPlayer | null>(null)
+  const placementRef = useRef<TakePlacement | null>(null)
   const pendingRef = useRef(false)
 
-  // Best-effort headphone detection via output device labels
+  const player = () => (playerRef.current ??= new SessionPlayer())
+  useEffect(() => () => playerRef.current?.close(), [])
+  // Decode the beat and guide ahead of time so recording starts without a wait.
+  useEffect(() => {
+    if (beatUrl) player().load(beatUrl).catch(() => {})
+    if (guideUrl) player().load(guideUrl).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beatUrl, guideUrl])
+
+  // Best-effort headphone guess from output device names; the person can always change it.
   useEffect(() => {
     if (!navigator.mediaDevices?.enumerateDevices) return
     navigator.mediaDevices.enumerateDevices().then((devices) => {
       const outputs = devices.filter((d) => d.kind === "audiooutput")
-      const headphoneLike = outputs.some((d) =>
-        /head|airpod|earbud|bluetooth/i.test(d.label),
-      )
-      // Only claim headphones if we actually see a matching label
-      setLikelyHeadphones(headphoneLike ? true : null)
+      if (outputs.some((d) => /head|airpod|earbud|bluetooth/i.test(d.label))) setHeadphones(true)
     })
   }, [])
 
-  // When a recording finishes, hand the blob up
+  // When a recording finishes, hand the blob up with where it sits against the beat
   useEffect(() => {
     if (!pendingRef.current || !recorder.audioBlob) return
     pendingRef.current = false
-    onRecorded(recorder.audioBlob, recorder.fileExtension)
+    onRecorded(recorder.audioBlob, recorder.fileExtension, placementRef.current, withBeat && beatUrl ? headphones : null)
     recorder.reset()
-  }, [recorder.audioBlob, recorder.fileExtension, onRecorded, recorder])
+  }, [recorder.audioBlob, recorder.fileExtension, onRecorded, recorder, headphones, withBeat, beatUrl])
+
+  const section = startAt >= 0 ? sections[startAt] : undefined
+  const sectionStart = section?.start ?? 0
+  const bar = 4 * secondsPerBeat
+  // Count-in: one bar of the beat before the part, or four clicks at the very top of the song.
+  const playFrom = Math.max(0, sectionStart - bar)
+  const clicks = sectionStart - bar < 0 ? 4 : 0
+
+  async function toggleGuide() {
+    if (guideOn) {
+      setGuideOn(false)
+      return
+    }
+    if (!guideUrl) {
+      setLoadingGuide(true)
+      try {
+        await onWantGuide()
+      } finally {
+        setLoadingGuide(false)
+      }
+    }
+    setGuideOn(true)
+  }
+
+  async function practise() {
+    if (!beatUrl) return
+    if (practising) {
+      player().stop()
+      setPractising(false)
+      return
+    }
+    setPractising(true)
+    await player().play(beatUrl, guideOn ? guideUrl : null, {
+      from: sectionStart,
+      loopTo: section?.end ?? null,
+      secondsPerBeat,
+      guideLevel,
+    })
+  }
 
   async function startRecording() {
-    // Play the beat along with recording if requested
-    if (withBeat && beatUrl) {
-      const beat = new Audio(beatUrl)
-      beat.currentTime = 0
-      beatAudioRef.current = beat
-      beat.play().catch(() => {})
-    }
+    player().stop()
+    setPractising(false)
     await recorder.start()
+    placementRef.current = null
+    if (withBeat && beatUrl) {
+      const beatStarts = await player().play(beatUrl, guideOn ? guideUrl : null, {
+        from: playFrom,
+        clicks,
+        secondsPerBeat,
+        guideLevel,
+      })
+      const startedAt = recorder.getStartedAt()
+      if (beatVersionId && startedAt !== null) {
+        placementRef.current = {
+          beat_version_id: beatVersionId,
+          beat_offset_s: playFrom,
+          lead_in_s: (beatStarts - startedAt) / 1000,
+        }
+      }
+    }
   }
 
   function stopRecording() {
     pendingRef.current = true
     recorder.stop()
-    beatAudioRef.current?.pause()
+    player().stop()
   }
 
   const isRecording = recorder.status === "recording"
+  const showOptions = beatUrl && !isRecording && !uploading
 
   return (
     <div className="flex flex-col items-center gap-5">
-      {/* Headphone tip — informs, never blocks */}
-      {beatUrl && withBeat && likelyHeadphones !== true && (
-        <div className="flex items-center gap-2 rounded-full bg-amber-500/10 px-4 py-1.5 text-xs text-amber-200/80">
+      {beatUrl && withBeat && !headphones && (
+        <div className="flex items-center gap-2 rounded-full bg-amber-500/10 px-4 py-1.5 text-xs text-amber-200/80" role="note">
           <Headphones className="h-3.5 w-3.5" />
-          Use headphones so the beat doesn&apos;t get picked up by your mic
+          Use headphones so the beat doesn&apos;t get into your mic. If it does, I can take it out afterwards.
         </div>
       )}
 
-      {/* The record button */}
+      {showOptions && sections.length > 0 && withBeat && (
+        <div className="flex flex-wrap items-center justify-center gap-2" role="group" aria-label="Where to start singing">
+          <span className="text-xs text-muted-foreground">Start from</span>
+          <select
+            value={startAt}
+            onChange={(e) => setStartAt(Number(e.target.value))}
+            className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+            aria-label="Start from"
+          >
+            <option value={-1}>the very start</option>
+            {sections.map((s, i) => (
+              <option key={s.index} value={i}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <Button variant="outline" size="sm" onClick={practise} aria-pressed={practising}>
+            <Repeat className="h-3.5 w-3.5" />
+            {practising ? "Stop practising" : section ? `Practise ${section.label.toLowerCase()} on repeat` : "Practise"}
+          </Button>
+        </div>
+      )}
+
       <button
         onClick={isRecording ? stopRecording : startRecording}
         disabled={uploading}
         className={cn(
           "flex h-24 w-24 items-center justify-center rounded-full transition-all",
-          isRecording
-            ? "bg-red-500 text-white scale-105 animate-pulse-amber"
-            : "bg-primary text-primary-foreground hover:scale-105",
+          isRecording ? "bg-red-500 text-white scale-105 animate-pulse-amber" : "bg-primary text-primary-foreground hover:scale-105",
           uploading && "opacity-60",
         )}
         aria-label={isRecording ? "Stop recording" : "Start recording"}
       >
-        {uploading ? (
-          <Loader2 className="h-8 w-8 animate-spin" />
-        ) : isRecording ? (
-          <Square className="h-8 w-8 fill-current" />
-        ) : (
-          <Mic className="h-9 w-9" />
-        )}
+        {uploading ? <Loader2 className="h-8 w-8 animate-spin" /> : isRecording ? <Square className="h-8 w-8 fill-current" /> : <Mic className="h-9 w-9" />}
       </button>
 
-      {/* Timer + level meter while recording */}
       {isRecording ? (
         <div className="flex flex-col items-center gap-2">
-          <span className="text-sm font-medium text-foreground tabular-nums">
-            {formatTime(recorder.durationSeconds)}
-          </span>
-          <div className="flex h-2 w-40 items-center gap-[2px]">
+          <span className="text-sm font-medium text-foreground tabular-nums">{formatTime(recorder.durationSeconds)}</span>
+          <div className="flex h-2 w-40 items-center gap-[2px]" aria-hidden>
             {Array.from({ length: 20 }).map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "h-full flex-1 rounded-full transition-colors",
-                  i / 20 < recorder.inputLevel
-                    ? "bg-primary"
-                    : "bg-muted",
-                )}
-              />
+              <div key={i} className={cn("h-full flex-1 rounded-full transition-colors", i / 20 < recorder.inputLevel ? "bg-primary" : "bg-muted")} />
             ))}
           </div>
+          {withBeat && beatUrl && (
+            <p className="text-xs text-muted-foreground">
+              {clicks ? "Four clicks, then the music." : "One bar of the music, then you're on."}
+            </p>
+          )}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          {uploading ? "Saving your take…" : "Tap to record"}
-        </p>
+        <p className="text-sm text-muted-foreground">{uploading ? "Saving your take…" : "Tap to record"}</p>
       )}
 
-      {/* Record-with-beat toggle */}
-      {beatUrl && !isRecording && !uploading && (
-        <div className="flex gap-2">
-          <Button
-            variant={withBeat ? "default" : "outline"}
-            size="sm"
-            onClick={() => setWithBeat(true)}
-          >
+      {showOptions && (
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button variant={withBeat ? "default" : "outline"} size="sm" onClick={() => setWithBeat(true)}>
             Sing with the beat
           </Button>
-          <Button
-            variant={!withBeat ? "default" : "outline"}
-            size="sm"
-            onClick={() => setWithBeat(false)}
-          >
+          <Button variant={!withBeat ? "default" : "outline"} size="sm" onClick={() => setWithBeat(false)}>
             Just my voice
           </Button>
         </div>
       )}
 
-      {recorder.error && (
-        <p className="text-xs text-red-400">{recorder.error}</p>
+      {showOptions && withBeat && (
+        <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
+          <Button variant={guideOn ? "default" : "outline"} size="sm" onClick={toggleGuide} disabled={loadingGuide} aria-pressed={guideOn}>
+            {loadingGuide ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Music2 className="h-3.5 w-3.5" />}
+            Sing along with the tune
+          </Button>
+          {guideOn && guideUrl && (
+            <label className="flex items-center gap-2">
+              Tune volume
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={guideLevel}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  setGuideLevel(v)
+                  playerRef.current?.setGuideLevel(v)
+                }}
+                aria-label="How loud the tune plays"
+              />
+            </label>
+          )}
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={headphones} onChange={(e) => setHeadphones(e.target.checked)} className="accent-amber-500" />
+            I&apos;m wearing headphones
+          </label>
+        </div>
       )}
+      {guideNote && showOptions && <p className="max-w-sm text-center text-xs text-muted-foreground">{guideNote}</p>}
+
+      {recorder.error && <p className="text-xs text-red-400">{recorder.error}</p>}
     </div>
   )
 }

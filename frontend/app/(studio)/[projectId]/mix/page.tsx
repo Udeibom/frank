@@ -111,10 +111,10 @@ export default function MixRoomPage() {
       listMixVersions(projectId),
     ]).then(([takes, beats, mixes]) => {
       const vocalTakes = takes.filter(
-        (t) => !(t.label ?? "").toLowerCase().startsWith("harmony"),
+        (t) => !(t.is_harmony || (t.label ?? "").toLowerCase().startsWith("harmony")),
       )
       const harmonies = takes.filter((t) =>
-        (t.label ?? "").toLowerCase().startsWith("harmony"),
+        t.is_harmony || (t.label ?? "").toLowerCase().startsWith("harmony"),
       )
       const haveVocal = vocalTakes.length > 0
       const haveBeat = beats.length > 0

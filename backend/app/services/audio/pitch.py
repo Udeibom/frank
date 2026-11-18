@@ -163,66 +163,96 @@ def _snap_to_grid(
     return out
 
 
-def correct_pitch(wav_bytes: bytes, mode: str = "light") -> bytes:
-    """
-    Apply pitch correction to a vocal take. Returns new WAV bytes.
+# ── tuning to the song's own notes (sing-it spec 06, requirement 2) ──────
 
-    Approach: detect the contour, find the overall tuning error toward the
-    nearest chromatic grid, and apply a single corrective shift scaled by the
-    mode's strength. (A full per-note re-pitch would be segment-spliced; for the
-    MVP a confidence-weighted global nudge gives a natural, musical result
-    without the artefacts of aggressive per-frame correction — except in "full"
-    mode, which snaps harder for the autotuned effect.)
+LOCK_STEP_S = 0.05           # "Lock it in" flattens the line in steps this long
+SPLICE_FADE_S = 0.008
+
+
+def plan_moves(notes: list, song, mode: str) -> list[dict]:
     """
+    Decide each sung note's move (pure: no audio). A note already within the mode's threshold of its target is
+    never touched (property 1); every move brings a note closer to its target (property 2).
+    A wrong note (a whole step or more from the target) is moved all the way in every mode, so it never ends up
+    stranded between two notes; the fine error inside a note is removed at the mode's strength.
+    """
+    from app.services.audio.song_notes import target_note
+
     settings = CORRECTION_MODES.get(mode, CORRECTION_MODES["light"])
-
-    # Analyze pitch at the reduced rate (fast), but keep the full-rate audio for
-    # the actual pitch shift so output quality isn't degraded.
-    y_full, sr_full = librosa.load(io.BytesIO(wav_bytes), sr=SR, mono=True)
-    if y_full.size == 0:
-        return wav_bytes
-    y_lo = librosa.resample(y_full, orig_sr=sr_full, target_sr=PITCH_SR)
-
-    f0, voiced_prob = _analyze(y_lo, PITCH_SR)
-
-    # Error in cents from the nearest semitone, per voiced frame
-    errors_cents: list[float] = []
-    weights: list[float] = []
-    for hz, prob in zip(f0, voiced_prob):
-        if hz is None or np.isnan(hz) or prob < 0.3:
+    moves: list[dict] = []
+    for n in notes:
+        if not np.isfinite(n.centre):
             continue
-        midi = librosa.hz_to_midi(hz)
-        nearest = round(midi)
-        cents = (midi - nearest) * 100.0
-        errors_cents.append(cents)
-        weights.append(float(prob))
+        t = song.at((n.start + n.end) / 2)
+        target = target_note(n.centre, t)
+        error = target - n.centre
+        if abs(error) * 100.0 < max(settings["threshold_cents"], 1.0):
+            continue
+        whole = float(round(error))                     # semitones of wrong note
+        fine = error - whole
+        shift = whole + settings["strength"] * fine
+        moves.append({"start": n.start, "end": n.end, "from": round(n.centre, 2), "to": target, "shift": round(shift, 4),
+                      "section": t.section, "before_cents": round(abs(error) * 100), "after_cents": round(abs(error - shift) * 100)})
+    return moves
 
-    if not errors_cents:
-        return wav_bytes
 
-    errors = np.array(errors_cents)
-    w = np.array(weights)
+def _splice(out: np.ndarray, src: np.ndarray, start: int, end: int, shift: float, sr: int) -> None:
+    fade = int(SPLICE_FADE_S * sr)
+    start, end = max(0, start - fade), min(src.shape[0], end + fade)
+    if end - start < fade * 3 or abs(shift) < 1e-3:
+        return
+    seg = _pitch_shift(src[start:end], sr, shift)
+    n = min(seg.shape[0], end - start)
+    seg = seg[:n].astype(np.float32)
+    ramp = np.linspace(0.0, 1.0, fade, dtype=np.float32)
+    seg[:fade] = seg[:fade] * ramp + out[start:start + fade] * (1 - ramp)
+    seg[n - fade:n] = seg[n - fade:n] * (1 - ramp) + out[start + n - fade:start + n] * ramp
+    out[start:start + n] = seg
 
-    # Confidence-weighted average tuning error
-    avg_error_cents = float(np.average(errors, weights=w))
 
-    # Only correct if the average error exceeds the mode threshold
-    if abs(avg_error_cents) < settings["threshold_cents"]:
-        return wav_bytes
+def tune(mono: np.ndarray, sr: int, mode: str, song, notes: list | None = None) -> tuple[np.ndarray, list[dict]]:
+    """
+    Tune a mono take toward the song's notes. Gentle modes move each note by one amount, so slides and vibrato
+    inside the note are kept (requirement 2.3); "Lock it in" also straightens the line inside each note.
+    Returns (new audio, the moves made). The input is never changed.
+    """
+    from app.services.audio import vocal_notes
 
-    if mode == "full":
-        # "Lock it in" — real per-note snapping to the chromatic grid, so each
-        # off note is pulled to pitch (the produced/autotuned sound). A single
-        # global shift can't do this: +40 and -40 cent notes average to ~0.
-        corrected = _snap_to_grid(y_full.astype(np.float32), sr_full, f0, PITCH_SR)
-    else:
-        # "light"/"moderate" — remove the consistent tuning bias with a single
-        # clean shift (no splice artifacts). Natural, gentle.
-        correction_semitones = -(avg_error_cents / 100.0) * settings["strength"]
-        corrected = _pitch_shift(
-            y_full.astype(np.float32), sr_full, correction_semitones
-        )
+    if notes is None:
+        notes = vocal_notes.sung_notes(mono, sr)
+    moves = plan_moves(notes, song, mode)
+    out = mono.astype(np.float32).copy()
+    src = mono.astype(np.float32)
+    by_start = {round(n.start, 4): n for n in notes}
+    for m in moves:
+        a, b = int(m["start"] * sr), int(m["end"] * sr)
+        if mode != "full":
+            _splice(out, src, a, b, m["shift"], sr)
+            continue
+        note = by_start.get(round(m["start"], 4))
+        frames = note.frames if note is not None else np.array([m["from"]])
+        step = max(1, int(LOCK_STEP_S * sr))
+        for k, x in enumerate(range(a, b, step)):
+            lo = int(k * len(frames) * step / max(1, b - a))
+            hi = max(lo + 1, int((k + 1) * len(frames) * step / max(1, b - a)))
+            here = np.nanmedian(frames[lo:hi]) if np.any(np.isfinite(frames[lo:hi])) else m["from"]
+            _splice(out, src, x, min(b, x + step), float(m["to"] - here), sr)
+    return out, moves
 
+
+def tune_take(wav_bytes: bytes, mode: str, song=None) -> tuple[bytes, list[dict]]:
+    """WAV in, WAV out, plus the moves. `song` is a SongNotes; without one every note of the twelve is allowed."""
+    from app.services.audio.song_notes import SongNotes
+
+    y, sr = librosa.load(io.BytesIO(wav_bytes), sr=SR, mono=True)
+    if y.size == 0:
+        return wav_bytes, []
+    out, moves = tune(y, sr, mode, song or SongNotes())
     buf = io.BytesIO()
-    sf.write(buf, corrected, sr_full, format="WAV", subtype="PCM_16")
-    return buf.getvalue()
+    sf.write(buf, np.clip(out, -1.0, 1.0), sr, format="WAV", subtype="PCM_16")
+    return buf.getvalue(), moves
+
+
+def correct_pitch(wav_bytes: bytes, mode: str = "light", song=None) -> bytes:
+    """Kept for callers that only want the audio."""
+    return tune_take(wav_bytes, mode, song)[0]

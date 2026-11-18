@@ -317,13 +317,22 @@ Always a JSON object:
   "actions": [ ... ]
 }
 
-ACTION TYPES:
-- Tune the active take:
+ACTION TYPES (each works on the take you are told is active unless you give a take_id from the list):
+- Tune it to the song's own notes:
   { "type": "correct_pitch", "params": { "mode": "light|moderate|full" } }
-- Put together the best version (needs 2+ takes):
+  light = "just the obvious bits", moderate = "tighten it up", full = "really lock it in"
+- Line it up with the beat (lines that start early or late move toward it):
+  { "type": "line_up", "params": { "mode": "moderate|full" } }
+- Take the music out of the vocal (when the beat got into the mic):
+  { "type": "remove_bleed", "params": {} }
+- Put together the best version, line by line (needs 2+ takes):
   { "type": "build_comp", "params": {} }
-- Add a harmony:
-  { "type": "add_harmony", "params": { "type": "above|below|both" } }
+- Add a harmony that follows the chords, optionally only in some parts of the song:
+  { "type": "add_harmony", "params": { "type": "above|below|both", "sections": ["chorus"] } }
+- The sing-along guide (the tune played softly while they record):
+  { "type": "guide", "params": { "on": true, "level": 0.5 } }
+- Use what they sang as the song's tune (only when there is no tune yet):
+  { "type": "use_as_melody", "params": {} }
 
 RULES:
 - If they just want to talk or feel unsure, reassure them, no action.
@@ -336,12 +345,26 @@ def build_voice_room_messages(
     take_count: int,
     history: list[dict],
     user_message: str,
+    takes: list[dict] | None = None,
 ) -> list[dict]:
-    """Build the message array for a Voice Room conversation turn."""
-    context = (
-        f"The singer has {take_count} take(s) recorded. "
-        "Offer help gently; never criticize their voice."
-    )
+    """Build the message array for a Voice Room conversation turn. `takes` are plain facts per take."""
+    lines = [f"The singer has {take_count} take(s) recorded. Offer help gently; never criticize their voice."]
+    for t in (takes or [])[:8]:
+        bits = [f"{t['label']} (id={t['id']}{', ACTIVE' if t.get('active') else ''})"]
+        if t.get("kind") and t["kind"] != "take":
+            bits.append(f"made by {t['kind'].replace('_', ' ')}")
+        if t.get("seconds"):
+            bits.append(f"{t['seconds']} s long")
+        if t.get("sections"):
+            bits.append("covers " + ", ".join(t["sections"]))
+        if t.get("on_the_notes") is not None:
+            bits.append(f"{round(100 * t['on_the_notes'])}% of notes already sit on the song's notes")
+        if t.get("sits_ms") is not None:
+            bits.append(f"sits {abs(round(t['sits_ms']))} ms {'behind' if t['sits_ms'] > 0 else 'ahead of'} the beat")
+        if t.get("bleed"):
+            bits.append("the beat got into the mic")
+        lines.append("- " + "; ".join(bits))
+    context = "\n".join(lines) + "\n(Internal facts: describe them in plain words, never quote numbers like ms or %.)"
     messages: list[dict] = [{"role": "system", "content": context}]
     for turn in history[-20:]:
         role = turn.get("role", "user")

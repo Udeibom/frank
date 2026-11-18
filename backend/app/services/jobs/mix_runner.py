@@ -133,7 +133,7 @@ async def _resolve_layers(project_id: str) -> dict:
     # Harmony: the most recent take labeled as a harmony, if any
     takes = await voice_db.list_takes(project_id)
     for t in takes:
-        if (t.get("label") or "").lower().startswith("harmony"):
+        if t.get("is_harmony") or (t.get("label") or "").lower().startswith("harmony"):
             harmony_url = t["audio_url"]
             break
 

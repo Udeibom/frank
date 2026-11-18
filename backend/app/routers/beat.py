@@ -154,7 +154,7 @@ async def preview_with_vocal(
     """
     takes = await voice_db.list_takes(project_id)
     has_vocal = any(
-        not (t.get("label") or "").lower().startswith("harmony") for t in takes
+        not (t.get("is_harmony") or (t.get("label") or "").lower().startswith("harmony")) for t in takes
     )
     if not has_vocal:
         raise HTTPException(

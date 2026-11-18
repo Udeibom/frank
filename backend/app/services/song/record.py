@@ -39,11 +39,24 @@ def _vocal_summary(take_count: int, take: Optional[dict], comp: Optional[dict]) 
     if not take_count and not comp:
         return None
     active = "best-of-takes version" if comp else ("a recorded take" if take else "none chosen")
-    return {
+    facts = (take or {}).get("facts") or {}
+    out: dict[str, Any] = {
         "takes_recorded": take_count,
         "active": active,
-        "tuned": bool(take and take.get("processed_url")),
+        "tuned": bool(take and (take.get("processed_url") or take.get("kind") == "tuned")),
     }
+    if take:
+        # what the active take is, in facts the team can turn into words (sing-it requirement 9)
+        out["active_take"] = {
+            "kind": take.get("kind") or "take",
+            "seconds": facts.get("seconds"),
+            "sections": facts.get("sections"),
+            "on_the_notes": facts.get("on_the_notes"),
+            "sits_behind_beat_ms": facts.get("sits_ms"),
+            "beat_in_the_mic": (facts.get("bleed") or 0) > 0.12,
+            "beat_taken_out": take.get("kind") == "cleaned",
+        }
+    return out
 
 
 def _mix_summary(version: Optional[dict]) -> Optional[dict[str, Any]]:

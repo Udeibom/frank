@@ -22,6 +22,8 @@ interface UseRecorderResult {
   stop: () => void
   reset: () => void
   error: string | null
+  /** performance.now() when the recorder really started capturing; lines a take up with the beat. */
+  getStartedAt: () => number | null
 }
 
 function extensionForMime(mime: string): string {
@@ -47,6 +49,7 @@ export function useRecorder(): UseRecorderResult {
   const analyserRef = useRef<AnalyserNode | null>(null)
   const rafRef = useRef<number | null>(null)
   const recordedMimeRef = useRef<string>("audio/webm")
+  const startedAtRef = useRef<number | null>(null)
   const [mimeType, setMimeType] = useState("audio/webm")
 
   const cleanup = useCallback(() => {
@@ -119,7 +122,17 @@ export function useRecorder(): UseRecorderResult {
         setAudioUrl(URL.createObjectURL(blob))
       }
       mediaRecorderRef.current = recorder
+      startedAtRef.current = null
+      const started = new Promise<void>((resolve) => {
+        recorder.onstart = () => {
+          startedAtRef.current = performance.now()
+          resolve()
+        }
+        setTimeout(resolve, 1500) // never hang if a browser skips the event
+      })
       recorder.start()
+      await started
+      if (startedAtRef.current === null) startedAtRef.current = performance.now()
 
       setStatus("recording")
       setDurationSeconds(0)
@@ -170,5 +183,6 @@ export function useRecorder(): UseRecorderResult {
     stop,
     reset,
     error,
+    getStartedAt: () => startedAtRef.current,
   }
 }
