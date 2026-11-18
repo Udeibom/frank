@@ -15,6 +15,9 @@ from app.services.generation.composer import Part, NoteEvent
 
 SAMPLE_RATE = 44100
 DRUM_CHANNEL = 9
+MAX_DRAIN_SECONDS = 6.0     # longest a part's echo is allowed to ring before the next part starts
+DRAIN_BLOCK = 4096
+SYNTH_BLOCK = 64            # FluidSynth's processing block, in samples
 TAIL_SECONDS = 1.5          # how long the last notes of a section are allowed to ring
 
 
@@ -59,9 +62,25 @@ class SynthSession:
         # alone breaks the 512 MB free server (ship-it spec 13, requirement 2.1; measured Nov 17).
         self._fs = fluidsynth.Synth(samplerate=float(SAMPLE_RATE), **{"synth.dynamic-sample-loading": 1})
         self._sfid = self._fs.sfload(_soundfont_path())
+        self._consumed = 0          # samples taken from the synth so far (see _align)
+
+    def _take(self, n: int) -> bytes:
+        self._consumed += n
+        return self._fs.get_samples(n)
+
+    def _align(self) -> None:
+        """
+        FluidSynth applies notes at the start of its 64-sample blocks. A render that starts mid-block shifts every
+        note by up to 1.4 ms, so the same part rendered after other parts came out different (found Nov 18).
+        Starting every render on a block boundary makes a part sound the same whatever was rendered before it.
+        """
+        off = self._consumed % SYNTH_BLOCK
+        if off:
+            self._take(SYNTH_BLOCK - off)
 
     def render(self, part: Part, bpm: float, total_beats: float) -> np.ndarray:
         fs = self._fs
+        self._align()
         channel = DRUM_CHANNEL if part.is_drums else 0
         if part.is_drums:
             fs.program_select(channel, self._sfid, 128, 0)  # GM drum kit
@@ -85,7 +104,7 @@ class SynthSession:
             n = end - start
             if n <= 0:
                 return
-            raw = fs.get_samples(n)
+            raw = self._take(n)
             frame = np.frombuffer(raw, dtype=np.int16).reshape(-1, 2)
             out[start:start + frame.shape[0]] = frame[: end - start]
 
@@ -101,9 +120,20 @@ class SynthSession:
         if cursor < out.shape[0]:
             render_into(cursor, out.shape[0])
 
-        # Silence any lingering notes before the next part reuses this channel
+        # Silence any lingering notes before the next part reuses this channel, then let the synth's own echo
+        # die out and throw it away. Without this the echo of one part started the NEXT part's render, at the
+        # wrong time (found Nov 18 when the song's parts, rendered separately, did not add up to the beat).
         fs.all_notes_off(channel)
+        self._drain()
         return out
+
+    def _drain(self) -> None:
+        quiet = 0
+        for _ in range(int(MAX_DRAIN_SECONDS * SAMPLE_RATE / DRAIN_BLOCK)):
+            block = np.frombuffer(self._take(DRAIN_BLOCK), dtype=np.int16)
+            quiet = quiet + 1 if (block.size == 0 or int(np.abs(block).max()) <= 1) else 0
+            if quiet >= 3:
+                return
 
     def close(self) -> None:
         if self._fs is not None:

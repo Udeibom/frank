@@ -38,7 +38,12 @@ _ALLOWED_ACTIONS = {
     "section_adjust",
     "analyze_mix",
     "refine",
+    "part_adjust",
 }
+MAX_CHANGES = 3                 # keep feedback loops tight (spec 11 requirement 1.2)
+PARTS = ("drums", "bass", "keys", "melody", "pad", "strings", "arp", "extras")
+PART_WORDS = {"piano": "keys", "keys": "keys", "drum": "drums", "drums": "drums", "bass": "bass", "tune": "melody",
+              "melody": "melody", "pad": "pad", "background": "pad", "strings": "strings", "arp": "arp", "extras": "extras"}
 
 
 def _clamp_db(v: float) -> float:
@@ -55,7 +60,10 @@ def apply_actions(params: dict, actions: list[dict]) -> tuple[dict, bool]:
     p["vocal_effects"] = list(p.get("vocal_effects", []))
     p["beat_effects"] = list(p.get("beat_effects", []))
     p["section_gain_db"] = dict(p.get("section_gain_db", {}))
+    p["parts"] = {k: dict(v, sections=dict(v.get("sections") or {})) for k, v in (p.get("parts") or {}).items()}
     render = False
+    changing = [a for a in actions if a.get("type") not in ("analyze_mix", "refine")][:MAX_CHANGES]
+    actions = changing + [a for a in actions if a.get("type") in ("analyze_mix", "refine")]
 
     for action in actions:
         atype = action.get("type")
@@ -88,6 +96,25 @@ def apply_actions(params: dict, actions: list[dict]) -> tuple[dict, bool]:
             if section:
                 cur = p["section_gain_db"].get(section, 0.0)
                 p["section_gain_db"][section] = _clamp_db(cur + float(ap.get("delta_db", 0)))
+                render = True
+
+        elif atype == "part_adjust":
+            part = PART_WORDS.get(str(ap.get("part", "")).lower())
+            if part:
+                st = p["parts"].setdefault(part, {})
+                if "level_delta_db" in ap:
+                    idx = ap.get("section_index")
+                    if isinstance(idx, int) and idx >= 0:
+                        cur = float(st["sections"].get(str(idx), 0.0)) if "sections" in st else 0.0
+                        st.setdefault("sections", {})[str(idx)] = _clamp_db(cur + float(ap.get("level_delta_db", 0)))
+                    else:
+                        st["level_db"] = _clamp_db(float(st.get("level_db", 0.0)) + float(ap.get("level_delta_db", 0)))
+                if ap.get("tone") in ("warmer", "brighter", "clearer", None) and "tone" in ap:
+                    st["tone"] = ap.get("tone")
+                if "space" in ap:
+                    st["space"] = bool(ap.get("space"))
+                if "muted" in ap:
+                    st["muted"] = bool(ap.get("muted"))
                 render = True
 
         elif atype == "analyze_mix":
@@ -129,7 +156,8 @@ async def mix_conversation(
 
     system = await convo.with_earlier(project_id, "mix", await system_with_brief(project_id, MIX_ROOM_SYSTEM, "mix_engineer"))
     # First pass
-    messages = build_mix_room_messages(params, history, body.message)
+    song = await _song_shape(project_id)
+    messages = build_mix_room_messages(params, history, body.message, song=song)
     try:
         result = chat_structured(system, messages)
     except Exception as exc:
@@ -146,7 +174,7 @@ async def mix_conversation(
     # second pass so it can suggest a concrete fix in plain language.
     if any(a.get("type") == "analyze_mix" for a in raw_actions):
         analysis = await _analyze_active_mix(project_id)
-        messages = build_mix_room_messages(params, history, body.message, analysis)
+        messages = build_mix_room_messages(params, history, body.message, analysis, song=song)
         try:
             result = chat_structured(system, messages)
         except Exception:
@@ -156,6 +184,8 @@ async def mix_conversation(
             if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS and a.get("type") != "analyze_mix"
         ]
 
+    changing = [a for a in raw_actions if a.get("type") not in ("analyze_mix", "refine")][:MAX_CHANGES]
+    raw_actions = changing + [a for a in raw_actions if a.get("type") in ("analyze_mix", "refine")]
     new_params, render = apply_actions(params, raw_actions)
     actions = [ConversationAction(type=a["type"], params=a.get("params", {})) for a in raw_actions]
 
@@ -167,6 +197,27 @@ async def mix_conversation(
         actions=actions,
         render=render,
     )
+
+
+async def _song_shape(project_id: str) -> dict:
+    """The active beat's sections and the parts it plays (composition only). Never raises."""
+    import asyncio
+
+    from app.db import beat as beat_db
+    from app.services.generation import beat as beat_engine
+
+    try:
+        state = await projects_db.get_project_active_state(project_id) or {}
+        v = await beat_db.get_beat_version(state["active_beat_version_id"]) if state.get("active_beat_version_id") else None
+        params = (v or {}).get("params") or {}
+        if not params.get("sections"):
+            return {}
+        sections, fp = beat_engine.sections_from_params(params)
+        seed = params.get("seed") if isinstance(params.get("seed"), int) else beat_engine.default_seed(fp)
+        parts = await asyncio.to_thread(beat_engine.families_in, sections, fp, seed, beat_engine.lead_from_params(params))
+        return {"sections": [{"index": s.index, "name": s.label or s.name} for s in sections], "parts": parts}
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 def _download_and_analyze(url: str) -> dict:

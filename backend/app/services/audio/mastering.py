@@ -154,3 +154,112 @@ def _encode_mastered_mp3(audio: np.ndarray) -> bytes:
         for p in (wav_path, mp3_path):
             if p and os.path.exists(p):
                 os.remove(p)
+
+
+# ── finishing from an uncompressed mix (finish-and-intent spec 11, requirement 2) ──
+
+LOUDNESS_TOLERANCE = 1.0     # units of the streaming loudness scale
+TRUE_PEAK_DB = -1.0
+
+
+def _wav_file(audio: np.ndarray) -> str:
+    """(samples, channels) float -> a temporary 24-bit WAV path (no quality lost before the final encode)."""
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wf:
+        sf.write(wf, audio, SR, format="WAV", subtype="PCM_24")
+        return wf.name
+
+
+def _ffmpeg(args: list[str], timeout: int = 300) -> subprocess.CompletedProcess:
+    return subprocess.run(["ffmpeg", "-hide_banner", "-y", *args], capture_output=True, timeout=timeout)
+
+
+def measure_loudness(wav_path: str) -> dict | None:
+    """FFmpeg loudnorm's first pass: the song's loudness, true peak and range, as numbers."""
+    import json
+    import re
+
+    r = _ffmpeg(["-i", wav_path, "-af", f"loudnorm=I={TARGET_LUFS}:TP={TRUE_PEAK_DB}:LRA=11:print_format=json", "-f", "null", "-"])
+    m = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", r.stderr.decode(errors="replace"))
+    if not m:
+        return None
+    data = json.loads(m.group(0))
+    try:
+        return {k: float(data[k]) for k in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")}
+    except (KeyError, ValueError):
+        return None
+
+
+def encode_finished(wav_path: str, measured: dict | None, extra_gain_db: float = 0.0) -> bytes:
+    """Second pass: loudness to the target with the measured values (linear, no pumping), 320 kbps MP3."""
+    out = wav_path[:-4] + ".finished.mp3"
+    try:
+        if measured is None:
+            af = f"volume={extra_gain_db}dB,loudnorm=I={TARGET_LUFS}:TP={TRUE_PEAK_DB}:LRA=11"
+        else:
+            af = (f"volume={extra_gain_db}dB,loudnorm=I={TARGET_LUFS}:TP={TRUE_PEAK_DB}:LRA=11:"
+                  f"measured_I={measured['input_i']}:measured_TP={measured['input_tp']}:measured_LRA={measured['input_lra']}:"
+                  f"measured_thresh={measured['input_thresh']}:offset={measured['target_offset']}:linear=true")
+        r = _ffmpeg(["-i", wav_path, "-af", af, "-ar", str(SR), "-b:a", "320k", out])
+        if r.returncode != 0:
+            raise RuntimeError(f"Finishing encode failed: {r.stderr.decode(errors='replace')[-300:]}")
+        with open(out, "rb") as f:
+            return f.read()
+    finally:
+        if os.path.exists(out):
+            os.remove(out)
+
+
+def encode_plain(audio: np.ndarray) -> bytes:
+    """The mix as it is, at full quality (320 kbps from the uncompressed render): the 'before'. (channels, samples)."""
+    path = _wav_file(np.ascontiguousarray(audio.T))
+    out = path[:-4] + ".plain.mp3"
+    try:
+        r = _ffmpeg(["-i", path, "-b:a", "320k", out])
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.decode(errors="replace")[-300:])
+        with open(out, "rb") as f:
+            return f.read()
+    finally:
+        for p in (path, out):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def check_finished(mp3: bytes) -> dict:
+    """The Listener's own ears on the result: loudness and clipping (requirement 2.1)."""
+    from app.services.listener import dsp
+
+    audio = _decode_with_ffmpeg(mp3)                   # (samples, channels)
+    return {"loudness": dsp.loudness(audio, SR), "clipping": dsp.clipping_share(audio), "peak_db": dsp.peak_db(audio)}
+
+
+def finish(audio: np.ndarray) -> tuple[bytes, dict]:
+    """
+    The finishing step from an UNCOMPRESSED mix shaped (channels, samples) as the mixer makes it: gentle chain, two-pass loudness to the
+    streaming target with a true-peak ceiling, then measured. One corrective pass if it misses; then honest.
+    """
+    from app.services.listener import config as cfg
+
+    silent = audio.size == 0 or float(np.abs(audio).max()) < 1e-6
+    if silent:
+        return encode_plain(audio), {"loudness": None, "clipping": 0.0, "passes": 0, "on_target": False}
+    work = np.ascontiguousarray(audio.T, dtype=np.float32)          # (samples, channels), this module's shape
+    _process_in_place(_master_chain(), work)
+    path = _wav_file(work)
+    del work
+    try:
+        measured = measure_loudness(path)
+        mp3 = encode_finished(path, measured)
+        report = check_finished(mp3)
+        passes = 1
+        miss = None if report["loudness"] is None else TARGET_LUFS - report["loudness"]
+        if (miss is not None and abs(miss) > LOUDNESS_TOLERANCE) or (report["clipping"] or 0) > cfg.CLIPPING_SHARE:
+            mp3 = encode_finished(path, measured, extra_gain_db=round(miss or -0.5, 2))
+            report = check_finished(mp3)
+            passes = 2
+    finally:
+        os.remove(path)
+    lu = report["loudness"]
+    report.update(passes=passes, on_target=lu is not None and abs(TARGET_LUFS - lu) <= LOUDNESS_TOLERANCE
+                  and (report["clipping"] or 0) <= cfg.CLIPPING_SHARE)
+    return mp3, report

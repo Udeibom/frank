@@ -15,6 +15,7 @@ _CONTENT_TYPES = {
     "flac": "audio/flac",
     "m4a": "audio/mp4",
     "mp4": "audio/mp4",
+    "zip": "application/zip",
 }
 
 _MAX_UPLOAD_ATTEMPTS = 3
@@ -103,3 +104,25 @@ def create_signed_url(bucket: str, path: str, expires_in: int = 3600) -> str:
     supabase = get_supabase()
     result = supabase.storage.from_(bucket).create_signed_url(path, expires_in)
     return result["signedURL"]
+
+
+def remove_objects(urls: list[str]) -> int:
+    """
+    Remove stored files by their URLs. Only for CACHED audio that can be re-made exactly (song parts); creative
+    work is never removed. Returns how many were asked to be removed. Failures are left for the next clean-up.
+    """
+    from app.config import get_settings
+    from app.services.storage.signing import parse_storage_url
+
+    by_bucket: dict[str, list[str]] = {}
+    for u in urls:
+        ref = parse_storage_url(u, get_settings().supabase_url)
+        if ref is not None:
+            bucket, path = ref
+            by_bucket.setdefault(bucket, []).append(path)
+    for bucket, paths in by_bucket.items():
+        try:
+            get_supabase().storage.from_(bucket).remove(paths)
+        except Exception:  # noqa: BLE001
+            pass
+    return sum(len(p) for p in by_bucket.values())

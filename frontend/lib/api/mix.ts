@@ -1,7 +1,16 @@
 import { api } from "./client"
 import type { ConversationMessage, ConversationAction } from "@/types/api"
 
+export interface PartSettings {
+  level_db?: number
+  muted?: boolean
+  tone?: "warmer" | "brighter" | "clearer" | null
+  space?: boolean
+  sections?: Record<string, number>
+}
+
 export interface MixParams {
+  parts?: Record<string, PartSettings>
   vocal_gain_db: number
   beat_gain_db: number
   harmony_gain_db: number

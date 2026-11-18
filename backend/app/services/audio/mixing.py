@@ -22,6 +22,7 @@ background job and keeps only what it needs.
 
 from __future__ import annotations
 import io
+from typing import Callable
 import numpy as np
 import soundfile as sf
 from pedalboard import (
@@ -127,6 +128,41 @@ def _apply_section_gains(
     return beat
 
 
+PART_TONES = ("warmer", "brighter", "clearer")
+
+
+def _part_board(settings: dict) -> Pedalboard:
+    """One part's tone and space, in plain words (finish-and-intent spec 11, requirement 1.1)."""
+    plugins = []
+    tone = settings.get("tone")
+    if tone == "warmer":
+        plugins.append(LowShelfFilter(cutoff_frequency_hz=220, gain_db=2.5))
+        plugins.append(HighShelfFilter(cutoff_frequency_hz=6000, gain_db=-1.5))
+    elif tone == "brighter":
+        plugins.append(HighShelfFilter(cutoff_frequency_hz=4500, gain_db=3.0))
+    elif tone == "clearer":
+        plugins.append(HighpassFilter(cutoff_frequency_hz=120))
+        plugins.append(HighShelfFilter(cutoff_frequency_hz=3500, gain_db=1.5))
+    if settings.get("space"):
+        plugins.append(Reverb(room_size=0.45, wet_level=0.2, dry_level=0.9))
+    return Pedalboard(plugins)
+
+
+def _section_index_gains(audio: np.ndarray, per_index_db: dict, sections: list[dict], bpm: int) -> np.ndarray:
+    """Per-section level for ONE part ("bring the piano down in the bridge"), by section position."""
+    if not per_index_db or not sections:
+        return audio
+    samples_per_beat = SR * 60.0 / max(bpm, 1)
+    cursor = 0
+    for i, s in enumerate(sections):
+        length = int(int(s.get("bars", 4)) * 4 * samples_per_beat)
+        g = per_index_db.get(str(i), per_index_db.get(i))
+        if g:
+            audio[:, cursor:min(cursor + length, audio.shape[1])] *= _db_to_linear(float(g))
+        cursor += length
+    return audio
+
+
 def render_mix(
     vocal_wav: bytes | None,
     beat_wav: bytes | None,
@@ -134,6 +170,7 @@ def render_mix(
     mix_params: dict,
     beat_sections: list[dict] | None = None,
     beat_bpm: int = 90,
+    parts: list[tuple[str, Callable[[], bytes]]] | None = None,
 ) -> np.ndarray:
     """
     Combine the layers into one stereo float32 mix (channels-first), applying
@@ -154,7 +191,24 @@ def render_mix(
             mix = grown
         mix[:, : layer.shape[1]] += layer
 
-    if beat_wav:
+    if parts:
+        # The beat as its parts: each fetched, treated, levelled and added, then released (512 MB server).
+        # The whole-beat settings (its level, effects, per-section levels) still apply to every part.
+        settings_for = mix_params.get("parts") or {}
+        beat_board = _beat_effect_board(mix_params.get("beat_effects", []))
+        for name, fetch in parts:
+            st = settings_for.get(name) or {}
+            if st.get("muted"):
+                continue
+            part = _load_stereo(fetch())
+            part = _apply(_part_board(st), part)
+            part = _section_index_gains(part, st.get("sections") or {}, beat_sections or [], beat_bpm)
+            part = _apply(beat_board, part)
+            part = _apply_section_gains(part, mix_params.get("section_gain_db", {}), beat_sections or [], beat_bpm)
+            part *= _db_to_linear(float(st.get("level_db", 0.0)) + float(mix_params.get("beat_gain_db", -6.0)))
+            _add(part)
+            del part
+    elif beat_wav:
         beat = _load_stereo(beat_wav)
         beat = _apply(_beat_effect_board(mix_params.get("beat_effects", [])), beat)
         beat = _apply_section_gains(

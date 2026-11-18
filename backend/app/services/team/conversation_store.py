@@ -52,6 +52,11 @@ async def record(project_id: str, room: str, user_message: str, reply: str, acti
         await asyncio.to_thread(lambda: get_supabase().table("conversation_turns").insert(rows).execute())
     except Exception:  # noqa: BLE001
         log.warning("could not store conversation turn", exc_info=True)
+    # The person's first description of the song becomes the intent statement (spec 11, requirement 3.1).
+    from app.services.finish.intent import capture, looks_like_description
+
+    if looks_like_description(room, user_message):
+        await capture(project_id, room, user_message)
 
 
 def _summary_row(project_id: str, room: str) -> Optional[dict]:

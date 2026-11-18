@@ -127,6 +127,30 @@ def sing_story(h: dict, pid: str, beat_id: str) -> str:
     return tuned_id
 
 
+def finish_story(h: dict, pid: str) -> str:
+    """Spec 11: the intent check, one part changed, finishing with before/after, separate parts, the surprise."""
+    intent = call(h, "GET", f"/projects/{pid}/finish/intent")
+    print("   asks:", intent["question"])
+    assert intent["intent"], "the first description was kept"
+    call(h, "POST", f"/projects/{pid}/finish/intent", json={"yes": True})
+    parts = call(h, "GET", f"/projects/{pid}/finish/parts")
+    print("   parts:", parts["parts"], "ready:", parts["ready"])
+    mixed = job(h, call(h, "POST", f"/projects/{pid}/mix/render",
+                        json={"mix_params": {"parts": {"keys": {"level_db": -6}, "drums": {"tone": "warmer"}}}, "quality": "full"})["job_id"], "mix by parts")
+    assert call(h, "GET", f"/projects/{pid}/finish/parts")["ready"], "the parts were made"
+    fin = job(h, call(h, "POST", f"/projects/{pid}/export", json={"mix_version_id": mixed["mix_version_id"], "apply_mastering": True})["job_id"], "finish")
+    print("   finish:", fin.get("finish"), "| before:", bool(fin.get("before_url")), "| waveform points:", len(fin.get("waveform") or []))
+    assert fin.get("before_url") and fin.get("waveform") and (fin.get("finish") or {}).get("on_target")
+    z = job(h, call(h, "POST", f"/projects/{pid}/finish/parts.zip")["job_id"], "separate parts")
+    print("   zip:", z["parts"], z["bytes"], "bytes")
+    s = job(h, call(h, "POST", f"/projects/{pid}/finish/surprise")["job_id"], "surprise")
+    print("   surprise:", s["title"], "|", s["message"])
+    assert call(h, "GET", f"/projects/{pid}/finish/surprise")["offered"]
+    project = call(h, "GET", f"/projects/{pid}")
+    print("   status:", project.get("status"))
+    return mixed["mix_version_id"]
+
+
 def refine_story(h: dict, pid: str) -> None:
     """Demo story 3 (spec 08): something feels wrong -> directions -> hear one -> use it -> go back."""
     beats_before = len(call(h, "GET", f"/projects/{pid}/beat/versions"))
@@ -161,6 +185,8 @@ def main() -> None:
         print("project", pid)
         fp = {"tempo_bpm": 88, "key": "A minor", "mode": "minor", "energy_level": 0.55, "density": 0.45, "brightness": 0.35,
               "warmth": 0.7, "tempo_feel": "steady", "genre_proximity": ["soul"], "instrumentation_hints": ["piano"]}
+        said = call(h, "POST", f"/projects/{pid}/feel/conversation", json={"message": "standing alone in the rain after losing someone"})
+        print("  feel lab says:", said["message"][:160])
         call(h, "POST", f"/projects/{pid}/feel/fingerprint", json={"fingerprint": fp, "conversation_summary": "warm and slow"})
         call(h, "POST", f"/projects/{pid}/lyrics", json={"content": "I walk alone down the quiet road\nThe lights are low and the night is cold\nBut I will sing until the morning comes", "label": "v1"})
         res = job(h, call(h, "POST", f"/projects/{pid}/beat/generate", json={"fingerprint": fp})["job_id"], "beat")
@@ -178,6 +204,8 @@ def main() -> None:
             print("   -", f["severity"], f["plain"])
         if os.environ.get("E2E_REFINE", "1") == "1":
             refine_story(h, pid)
+        if os.environ.get("E2E_FINISH", "1") == "1":
+            mixid = finish_story(h, pid)
         job(h, call(h, "POST", f"/projects/{pid}/export", json={"mix_version_id": mixid, "apply_mastering": True})["job_id"], "export")
         dl = call(h, "GET", f"/projects/{pid}/export")[0]
         mp3 = c.get(dl["audio_url"]).content

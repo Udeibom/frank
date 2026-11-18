@@ -24,6 +24,7 @@ from app.routers import (
     intake,
     listen,
     refine,
+    finish,
 )
 
 settings = get_settings()
@@ -93,6 +94,7 @@ app.include_router(song.router, dependencies=_owned)
 app.include_router(intake.router, dependencies=_owned)
 app.include_router(listen.router, dependencies=_owned)
 app.include_router(refine.router, dependencies=_owned)
+app.include_router(finish.router, dependencies=_owned)
 # jobs.py checks job -> project ownership inside its route.
 app.include_router(jobs.router)
 

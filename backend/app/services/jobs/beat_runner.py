@@ -92,7 +92,8 @@ def _render_and_persist_sync(
     sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed, lead, structure, report=report)
     log_memory("beat: rendered")
     fp = beat_engine.fp_utils.normalize(fingerprint)
-    return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead, song_gain=report.get("song_gain"))
+    return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead, song_gain=report.get("song_gain"),
+                         section_gains=report.get("section_gains"))
 
 
 def _rerender_and_persist_sync(
@@ -109,7 +110,8 @@ def _rerender_and_persist_sync(
     report: dict = {}
     mixes, full = beat_engine.rerender_all(sections, fp, seed, lead, report=report)
     return _persist_sync(
-        project_id, sections, mixes, full, fp, label, seed, lead, changes, operations, song_gain=report.get("song_gain")
+        project_id, sections, mixes, full, fp, label, seed, lead, changes, operations, song_gain=report.get("song_gain"),
+        section_gains=report.get("section_gains"),
     )
 
 
@@ -125,6 +127,7 @@ def _persist_sync(
     changes: list[str] | None = None,
     operations: list[dict] | None = None,
     song_gain: float | None = None,
+    section_gains: list[float] | None = None,
 ) -> dict:
     """
     Upload the assembled render + one mixed file per section, and write records.
@@ -143,6 +146,8 @@ def _persist_sync(
         params["operations"] = operations or []
     if song_gain is not None:
         params["song_gain"] = song_gain        # previews of later changes play at this level
+    if section_gains is not None:
+        params["section_gains"] = section_gains   # the parts can be rendered one at a time at the same level
     version = beat_db.create_beat_version_sync(project_id, render_url, label, params)
 
     for section, mix in zip(sections, section_mixes):
@@ -298,6 +303,78 @@ async def run_operations_job(job_id: str, project_id: str, operations: list[dict
     except Exception as exc:  # noqa: BLE001
         try:
             await jobs_db.mark_failed(job_id, "Frank couldn't make that change — want to try again?")
+        except Exception:  # noqa: BLE001
+            pass
+        raise exc
+
+
+# ── the song's parts for mixing (finish-and-intent spec 11, requirement 1) ──
+
+def _parts_sync(project_id: str, version: dict) -> dict:
+    """
+    Render and store one file per part family for this beat version, at exactly its level inside the beat.
+    Older beats did not save their section levels: one silent full render learns them first (slower, once).
+    Parts of this song's OTHER beat versions are removed: they are a cache and can be re-made exactly.
+    """
+    from app.services.storage.files import remove_objects
+
+    params = version.get("params") or {}
+    sections, fp = beat_engine.sections_from_params(params)
+    seed = params.get("seed")
+    seed = seed if isinstance(seed, int) else beat_engine.default_seed(fp)
+    lead = beat_engine.lead_from_params(params)          # the tune THIS version was built with
+    gains, song_gain = params.get("section_gains"), params.get("song_gain")
+    if not gains or song_gain is None or len(gains) != len(sections):
+        report: dict = {}
+        beat_engine.render_song(sections, fp, seed, lead=lead, report=report)
+        gains, song_gain = report["section_gains"], report["song_gain"]
+    urls: dict[str, str] = {}
+
+    def on_part(name: str, audio: np.ndarray) -> None:
+        url = upload_audio("beats", to_mp3_bytes(audio), extension="mp3", name_prefix=f"part-{name}")
+        beat_db.create_stem_sync(project_id, version["id"], name, beat_db.PART_SECTION, url)
+        urls[name] = url
+
+    log_memory("parts: start")
+    beat_engine.render_parts(sections, fp, seed, lead, gains, song_gain, on_part)
+    log_memory("parts: rendered")
+    old = [s for s in beat_db.list_part_stems_sync(project_id) if s["beat_version_id"] != version["id"]]
+    if old:
+        remove_objects([s["audio_url"] for s in old])
+        beat_db.delete_stems_sync([s["id"] for s in old])
+    return {"beat_version_id": version["id"], "parts": urls}
+
+
+def cached_parts(project_id: str, beat_version_id: str) -> dict[str, str]:
+    """The stored part files of a beat version (name -> url), or {} when they have not been made."""
+    rows = [s for s in beat_db.list_part_stems_sync(project_id) if s["beat_version_id"] == beat_version_id]
+    return {s["stem_type"]: s["audio_url"] for s in rows}
+
+
+async def ensure_parts(project_id: str, beat_version_id: str) -> dict[str, str]:
+    """Parts for a beat version, making them first when needed (inside the heavy gate)."""
+    found = await asyncio.to_thread(cached_parts, project_id, beat_version_id)
+    if found:
+        return found
+    version = await beat_db.get_beat_version(beat_version_id)
+    if not version:
+        return {}
+    async with _one_at_a_time:
+        out = await asyncio.to_thread(_parts_sync, project_id, version)
+    return out["parts"]
+
+
+async def run_parts_job(job_id: str, project_id: str, beat_version_id: str) -> None:
+    try:
+        await jobs_db.mark_processing(job_id)
+        parts = await ensure_parts(project_id, beat_version_id)
+        if not parts:
+            await jobs_db.mark_failed(job_id, "I can't find that beat any more.")
+            return
+        await jobs_db.mark_complete(job_id, {"beat_version_id": beat_version_id, "parts": sorted(parts)})
+    except Exception as exc:  # noqa: BLE001
+        try:
+            await jobs_db.mark_failed(job_id, "Frank couldn't separate the parts just now. Want to try again?")
         except Exception:  # noqa: BLE001
             pass
         raise exc

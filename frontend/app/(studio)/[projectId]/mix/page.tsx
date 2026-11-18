@@ -17,6 +17,7 @@ import { MixVersions } from "@/components/studio/MixVersions"
 import { RefinePanel } from "@/components/studio/RefinePanel"
 import { VersionChoice } from "@/components/studio/VersionChoice"
 import { renameVersion } from "@/lib/api/refine"
+import { getParts, PART_NAMES, type SongParts } from "@/lib/api/finish"
 import { Button } from "@/components/ui/button"
 import {
   renderMix,
@@ -69,6 +70,30 @@ export default function MixRoomPage() {
   const [refineKey, setRefineKey] = useState(0)
   const [refineConcern, setRefineConcern] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<VersionCandidate[] | null>(null)
+  const [songParts, setSongParts] = useState<SongParts | null>(null)
+  const [partTick, setPartTick] = useState(0)        // re-draw after a part change (params live in a ref)
+
+  useEffect(() => {
+    getParts(projectId).then(setSongParts).catch(() => setSongParts(null))
+  }, [projectId, revision])
+
+  /** "Keys a bit softer", "Drums off": one part of the music, then a new mix (spec 11, requirement 1). */
+  async function changePart(part: string, change: { level_delta_db?: number; muted?: boolean }) {
+    const current = mixParamsRef.current.parts ?? {}
+    const st = { ...(current[part] ?? {}) }
+    if (change.level_delta_db) st.level_db = Math.max(-24, Math.min(12, (st.level_db ?? 0) + change.level_delta_db))
+    if (change.muted !== undefined) st.muted = change.muted
+    mixParamsRef.current = { ...mixParamsRef.current, parts: { ...current, [part]: st } }
+    setPartTick((x) => x + 1)
+    const name = PART_NAMES[part] ?? part
+    say(
+      songParts?.ready
+        ? `${name} ${change.muted === true ? "off" : change.muted === false ? "back on" : change.level_delta_db! > 0 ? "a bit louder" : "a bit softer"}. Mixing it now…`
+        : "First I'll separate the music into its parts. That happens once and takes a few minutes; after that each change is quick.",
+    )
+    await doRender(mixParamsRef.current)
+    if (!songParts?.ready) getParts(projectId).then(setSongParts).catch(() => {})
+  }
 
   const say = useCallback((content: string) => {
     setTurns((t) => [...t, { id: crypto.randomUUID(), role: "assistant", content }])
@@ -79,6 +104,16 @@ export default function MixRoomPage() {
     setRefineConcern(concern)
     setRefineKey((k) => k + 1)
   }
+
+  // Arriving from the Export Room with "Not yet": start listening with the person's own words.
+  useEffect(() => {
+    const concern = new URLSearchParams(window.location.search).get("refine")
+    if (concern !== null) {
+      startRefine(concern || null)
+      window.history.replaceState(null, "", window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /** Show the mix the server just made active, without waiting for the shared state to catch up. */
   const adoptMix = useCallback(async (mixId: string) => {
@@ -376,6 +411,10 @@ export default function MixRoomPage() {
                   hasHarmony={hasHarmony}
                   harmonyEnabled={mixParamsRef.current.harmony_enabled ?? true}
                   onToggleHarmony={handleToggleHarmony}
+                  parts={songParts?.parts}
+                  partSettings={partTick >= 0 ? mixParamsRef.current.parts : undefined}
+                  busy={rendering}
+                  onPart={changePart}
                 />
               </div>
             )}

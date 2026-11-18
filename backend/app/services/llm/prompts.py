@@ -414,6 +414,13 @@ ACTION TYPES (you may combine a couple):
   { "type": "apply_effect", "params": { "target": "vocal|beat", "effect": "warm|space|smooth|clarity|closer|clean_low|sit_back", "on": true } }
 - Toggle the harmony:
   { "type": "toggle_harmony", "params": { "on": true } }
+- Change ONE part of the music (drums, bass, keys, melody, pad, strings, arp, extras), everywhere or in one
+  section by its position (section_index from the list you are given). Any of: level_delta_db, tone
+  ("warmer" | "brighter" | "clearer" | null), space (true/false), muted (true/false):
+  { "type": "part_adjust", "params": { "part": "keys", "level_delta_db": -3, "section_index": 5 } }
+  "bring the piano down in the bridge" -> part_adjust keys -3 in the bridge's section_index.
+  Call the parts by what they sound like: "the drums", "the piano/keys", "the bass", "the tune", "the soft
+  background" (pad), "the strings", "the running pattern" (arp), "the little touches" (extras).
 - Make a section louder/softer (by section name: intro, verse, chorus, bridge, outro):
   { "type": "section_adjust", "params": { "section": "chorus", "delta_db": 2 } }
 - Analyze the mix when they can't name the problem:
@@ -432,7 +439,7 @@ TRANSLATION GUIDE (reactions -> moves):
 - "chorus should be bigger" -> section_adjust chorus +2
 
 RULES:
-- Small moves. You can always nudge further next turn.
+- Small moves. You can always nudge further next turn. At most three changes per reply; say each one.
 - Never claim it's finished. Always leave room to keep shaping.
 - After changes, a new mix is rendered automatically — your message should invite
   them to listen and react.
@@ -444,12 +451,17 @@ def build_mix_room_messages(
     history: list[dict],
     user_message: str,
     analysis: dict | None = None,
+    song: dict | None = None,
 ) -> list[dict]:
-    """Build the message array for a Mix Room conversation turn."""
+    """Build the message array for a Mix Room conversation turn. `song`: {sections: [...], parts: [...]}."""
     import json as _json
 
     lines = ["Current mix balance (internal — describe in plain words):"]
     lines.append(_json.dumps(mix_params))
+    if song and song.get("sections"):
+        lines.append("Sections (section_index: name): " + ", ".join(f"{s['index']}: {s['name']}" for s in song["sections"]))
+    if song and song.get("parts"):
+        lines.append("Parts playing in the music: " + ", ".join(song["parts"]))
     if analysis:
         lines.append("")
         lines.append(

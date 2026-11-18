@@ -296,8 +296,11 @@ def _tone_tilt(audio: np.ndarray, fp: dict) -> np.ndarray:
     return audio
 
 
-def _render_section(synth, s: SectionPlan, ctx, progression: dict, bpm: float, length: int, mix_chain: bool) -> np.ndarray:
-    """One section's audio (float32, its bars plus the ringing tail), set to the loudness its job in the song asks for."""
+def _render_section(synth, s: SectionPlan, ctx, progression: dict, bpm: float, length: int, mix_chain: bool) -> tuple[np.ndarray, float]:
+    """
+    One section's audio (float32, its bars plus the ringing tail), set to the loudness its job in the song asks
+    for. Also returns that gain, so the song's parts can later be rendered one at a time at the same level.
+    """
     parts = composer.compose_section(
         section=s.name, progression=progression, bars=s.bars, energy=s.energy, density=s.density, layers=s.layers, ctx=ctx,
     )
@@ -312,10 +315,12 @@ def _render_section(synth, s: SectionPlan, ctx, progression: dict, bpm: float, l
         del stem
     body = acc[:length]
     rms = float(np.sqrt(np.mean(np.square(body, dtype=np.float64)))) if body.size else 0.0
+    gain = 1.0
     if rms > SILENCE_RMS:
         gain_db = _target_db(s) - 20.0 * np.log10(rms / 32768.0)
-        acc *= float(10.0 ** (max(MIN_GAIN_DB, min(MAX_GAIN_DB, gain_db)) / 20.0))
-    return acc
+        gain = float(10.0 ** (max(MIN_GAIN_DB, min(MAX_GAIN_DB, gain_db)) / 20.0))
+        acc *= gain
+    return acc, gain
 
 
 def _finish(song: np.ndarray, fp: dict, mix_chain: bool, song_gain: Optional[float], report: Optional[dict]) -> np.ndarray:
@@ -355,11 +360,15 @@ def render_song(
     tail = int(TAIL_SECONDS * SAMPLE_RATE)
     song = np.zeros((spans[-1][1] + tail, 2), dtype=np.float32)
     _, contexts, progressions = plan_contexts(sections, fp, seed, lead)
+    gains: list[float] = []
     with SynthSession() as synth:
         for s, ctx, (start, end) in zip(sections, contexts, spans):
-            acc = _render_section(synth, s, ctx, progressions[s.name], bpm, end - start, mix_chain)
+            acc, gain = _render_section(synth, s, ctx, progressions[s.name], bpm, end - start, mix_chain)
+            gains.append(gain)
             song[start : start + acc.shape[0]] += acc            # the tail rings over the next section
             del acc
+    if report is not None:
+        report["section_gains"] = [round(g, 6) for g in gains]
     full = _finish(song, fp, mix_chain, None, report)
     del song
     per_section = [full[a:b] for a, b in spans]      # views, not copies: callers only read them
@@ -418,7 +427,7 @@ def render_excerpt(
             origin = spans[r[0]][0]
             for i in r:
                 start, end = spans[i]
-                acc = _render_section(synth, sections[i], contexts[i], progressions[sections[i].name], bpm, end - start, mix_chain)
+                acc, _ = _render_section(synth, sections[i], contexts[i], progressions[sections[i].name], bpm, end - start, mix_chain)
                 at = pos + start - origin
                 n = min(acc.shape[0], out.shape[0] - at)
                 out[at : at + n] += acc[:n]
@@ -503,3 +512,72 @@ def rerender_all(
 ) -> tuple[list[np.ndarray], np.ndarray]:
     """Re-render every section after an edit. Returns (per_section_audio, full_beat_audio)."""
     return render_song(sections, fp, seed, lead=lead, report=report)
+
+
+# ── the song's parts, one at a time (finish-and-intent spec 11, requirement 1) ──
+
+# Parts that are built from or belong with another part are mixed with it ("the piano" includes its last chord).
+PART_FAMILY = {"finale_keys": "keys", "finale_pad": "pad", "finale_bass": "bass", "finale_drums": "drums",
+               "color": "extras", "color_once": "extras", "riser": "extras", "sweep": "extras"}
+FAMILIES = ("drums", "bass", "keys", "melody", "pad", "strings", "arp", "extras")
+
+
+def part_family(name: str) -> str:
+    return PART_FAMILY.get(name, name if name in FAMILIES else "extras")
+
+
+def families_in(sections: list[SectionPlan], fp: dict, seed: int, lead: Optional[lead_mod.Lead] = None) -> list[str]:
+    """Which part families the song actually plays (composition only, cheap)."""
+    _, contexts, progressions = plan_contexts(sections, fp, seed, lead)
+    found: set[str] = set()
+    for s, ctx in zip(sections, contexts):
+        for p in composer.compose_section(s.name, progressions[s.name], s.bars, s.energy, s.density, layers=s.layers, ctx=ctx):
+            if p.events:
+                found.add(part_family(p.name))
+    return [f for f in FAMILIES if f in found]
+
+
+def render_parts(
+    sections: list[SectionPlan], fp: dict, seed: int, lead: Optional[lead_mod.Lead], section_gains: list[float],
+    song_gain: float, on_part, mix_chain: bool = True,
+) -> list[str]:
+    """
+    Render each part family across the whole song, ONE AT A TIME, at exactly the level it has inside the full beat
+    (same per-section gain, same song gain, same tone). `on_part(family, int16 stereo)` receives each and should
+    encode and release it. Memory: one song-length buffer at a time. Played together at 0 dB the parts are the beat
+    before its final glue (which the mix applies to the whole song instead).
+    Returns the families rendered.
+    """
+    bpm = float(fp["tempo_bpm"])
+    spans = section_spans(sections, bpm)
+    tail = int(TAIL_SECONDS * SAMPLE_RATE)
+    _, contexts, progressions = plan_contexts(sections, fp, seed, lead)
+    done: list[str] = []
+    with SynthSession() as synth:
+        for family in families_in(sections, fp, seed, lead):
+            song = np.zeros((spans[-1][1] + tail, 2), dtype=np.float32)
+            for s, ctx, (start, end), gain in zip(sections, contexts, spans, section_gains):
+                parts = composer.compose_section(
+                    section=s.name, progression=progressions[s.name], bars=s.bars, energy=s.energy, density=s.density,
+                    layers=s.layers, ctx=ctx,
+                )
+                for part in parts:
+                    if part_family(part.name) != family or not part.events:
+                        continue
+                    stem = synth.render(part, bpm, s.bars * 4)
+                    if mix_chain:
+                        stem = polish.treat_part(part.name, stem.astype(np.float32), bpm)
+                    n = min(stem.shape[0], song.shape[0] - start)
+                    level = (LEAD_GAIN if part.lead else PART_GAIN.get(part.name, 0.7)) * gain
+                    song[start:start + n] += stem[:n].astype(np.float32) * level
+                    del stem
+            song = _tone_tilt(song, fp)
+            song *= np.float32(song_gain)
+            fade = min(int(FADE_OUT_SECONDS * SAMPLE_RATE), song.shape[0])
+            if fade > 0:
+                song[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=np.float32)[:, None]
+            np.clip(song, -32768, 32767, out=song)
+            on_part(family, song.astype(np.int16))
+            del song
+            done.append(family)
+    return done

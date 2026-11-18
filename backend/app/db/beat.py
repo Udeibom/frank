@@ -129,3 +129,22 @@ async def list_stems(beat_version_id: str) -> list[dict]:
         .execute()
     )
     return result.data or []
+
+
+# ─── Song parts (finish-and-intent spec 11) ──────────────
+# One MP3 per part family for the whole song (section = 'all'). A CACHE: re-made exactly from the saved plan and
+# seed whenever needed, so only the beat being mixed keeps its parts (the free tier has 1 GB of storage).
+
+PART_SECTION = "all"
+
+
+def list_part_stems_sync(project_id: str) -> list[dict]:
+    result = (
+        get_supabase().table("beat_stems").select("*").eq("project_id", project_id).eq("section", PART_SECTION).execute()
+    )
+    return result.data or []
+
+
+def delete_stems_sync(stem_ids: list[str]) -> None:
+    if stem_ids:
+        get_supabase().table("beat_stems").delete().in_("id", stem_ids).execute()
