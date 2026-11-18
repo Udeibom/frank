@@ -52,6 +52,13 @@ MUTATIONS = [
     ("app/services/taste/rules.py", "    return sum((1 if prefs[t] == d else -1) for t, d in signals_for_direction(kind, actions, section_names) if t in prefs)",
      "    return 0",
      "tests/test_properties_taste.py::test_the_proposer_offers_what_the_artist_likes_first_but_still_offers_the_rest"),
+    # creative director (spec 10)
+    ("app/services/song/brief.py", "    if facet == \"references\":\n        return _references_text(content)\n", "",
+     "tests/test_creative_director.py::test_a_named_artist_reaches_no_prompt_only_the_feeling_does"),
+    ("app/services/team/identity.py", "        result[\"message\"] = ASK\n", "",
+     "tests/test_creative_director.py::test_names_are_spotted_and_answered_with_one_plain_question"),
+    ("app/services/team/identity.py", "    if tune_mode == \"full\" and (hates_tuning or RAW_VOICE.search(keep)):", "    if tune_mode in (\"full\", \"light\", \"moderate\"):",
+     "tests/test_creative_director.py::test_lock_it_in_is_questioned_only_when_they_want_it_raw"),
 ]
 
 
