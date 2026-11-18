@@ -109,6 +109,7 @@ async def beat_conversation(
         for a in result.get("actions", [])
         if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS
     ]
+    result["message"] = await convo.enforce_reply(project_id, "beat", result.get("message", ""))
     await convo.record(project_id, "beat", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return BeatConversationResponse(message=result.get("message", ""), actions=actions)
 

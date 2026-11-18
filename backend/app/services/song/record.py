@@ -155,10 +155,29 @@ async def system_with_brief(project_id: str, system: str, role: Optional[str] = 
 
     from app.services.song.brief import build_brief
 
+    from app.services.team import roles as team
+
+    log = logging.getLogger(__name__)
+    room = next((r for r, br in team.ROLE_FOR_BRIEF.items() if br == role), "feel")
     try:
         record = await get_record(project_id)
+        # The song moves to "refining" by itself once a first full draft exists (spec 07, requirement 4.3).
+        if record.phase == "creating" and has_first_draft(record):
+            try:
+                await projects_db.update_project_active_state(project_id, {"phase": "refining"})
+                record.phase = "refining"
+            except Exception:  # noqa: BLE001
+                log.warning("could not switch the song to refining", exc_info=True)
         brief = build_brief(record, role)
+        phase = record.phase
     except Exception:  # noqa: BLE001
-        logging.getLogger(__name__).warning("could not build the song brief", exc_info=True)
-        return system
-    return f"{system}\n\n--- THE SONG SO FAR (the whole team shares this; do not contradict it) ---\n{brief}"
+        log.warning("could not build the song brief", exc_info=True)
+        return f"{system}\n\n{team.team_block(room, 'creating', False)}"
+    from app.services.team import conversation_store as convo
+
+    try:
+        previous = [t["content"] for t in (await convo.history(project_id, room)) if t["role"] == "assistant"]
+    except Exception:  # noqa: BLE001
+        previous = []
+    return (f"{system}\n\n{team.team_block(room, phase, team.may_mention(previous))}"
+            f"\n\n--- THE SONG SO FAR (the whole team shares this; do not contradict it) ---\n{brief}")

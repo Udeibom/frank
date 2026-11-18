@@ -32,7 +32,7 @@ SOUNDS: dict[str, int] = {
 }
 MIN_BARS, MAX_BARS, MAX_SECTIONS = 1, 32, 16
 
-Scope = Optional[int]
+Scope = Union[int, list[int], None]
 PartName = Literal["drums", "bass", "keys", "melody", "pad", "strings", "arp"]
 
 
@@ -83,7 +83,7 @@ class SwapSound(_Op):
 
 class AddFill(_Op):
     op: Literal["add_fill"]
-    section: int
+    section: Union[int, list[int]]
 
 
 class Reseed(_Op):
@@ -144,9 +144,10 @@ def parse(raw: list[dict]) -> list:
 def _where(sections: list[SectionPlan], scope: Scope) -> list[SectionPlan]:
     if scope is None:
         return sections
-    if not 0 <= scope < len(sections):
+    idx = [scope] if isinstance(scope, int) else list(scope)
+    if not idx or any(not 0 <= i < len(sections) for i in idx):
         raise OpError("That part of the song doesn't exist any more.")
-    return [sections[scope]]
+    return [sections[i] for i in dict.fromkeys(idx)]
 
 
 def _name(sections: list[SectionPlan], s: SectionPlan) -> str:
@@ -159,7 +160,16 @@ def _name(sections: list[SectionPlan], s: SectionPlan) -> str:
 
 
 def _scope_words(sections: list[SectionPlan], scope: Scope) -> str:
-    return "everywhere" if scope is None else f"in {_name(sections, sections[scope])}"
+    if scope is None:
+        return "everywhere"
+    idx = [scope] if isinstance(scope, int) else list(dict.fromkeys(scope))
+    targets = [sections[i] for i in idx]
+    if len(targets) > 1 and len({t.name for t in targets}) == 1:
+        word = PLAIN_SECTION.get(targets[0].name, targets[0].name)
+        every = len(targets) == sum(x.name == targets[0].name for x in sections)
+        return f"in {'every' if every else 'those'} {word}" + ("" if every else "s")
+    names = [_name(sections, t) for t in targets]
+    return "in " + (names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1])
 
 
 def _renumber(sections: list[SectionPlan]) -> None:
@@ -213,11 +223,12 @@ def _apply(op, sections: list[SectionPlan], seed: int) -> tuple[int, str]:
             s.parts.setdefault(op.part, {})["preset"] = SOUNDS[key]
         return seed, f"{PLAIN_PART[op.part].capitalize()} now plays on {key} {_scope_words(sections, op.section)}."
     if isinstance(op, AddFill):
-        s = _where(sections, op.section)[0]
-        if "drums" not in s.layers:
+        hit = [s for s in _where(sections, op.section) if "drums" in s.layers]
+        if not hit:
             raise OpError("There are no drums there to play a fill.")
-        s.parts.setdefault("drums", {})["fill"] = True
-        return seed, f"I added a drum fill at the end of {_name(sections, s)}."
+        for s in hit:
+            s.parts.setdefault("drums", {})["fill"] = True
+        return seed, f"I added a drum fill at the end {_scope_words(sections, op.section).replace('in ', 'of ', 1)}."
     if isinstance(op, Reseed):
         targets = _where(sections, op.section)
         parts = [op.part] if op.part else list(PARTS)
@@ -290,7 +301,8 @@ def apply_operations(sections: list[SectionPlan], seed: int, raw: list[dict]) ->
 # For the Beat Room prompt: the vocabulary the model may use.
 PROMPT_OPERATIONS = """\
 OPERATIONS (put them in one action: {"type": "beat_operations", "params": {"operations": [ ... ]}}):
-section is the [number] of a section from the beat you are shown, or null for every section.
+section is the [number] of a section from the beat you are shown, a list of numbers (e.g. every chorus: [2, 4, 6]),
+or null for every section. Prefer a list over null when the person names a kind of section.
 part is one of: drums, bass, keys, melody, pad, strings, arp.
 - {"op": "busier", "part": P, "section": S}        more going on in that part
 - {"op": "sparser", "part": P, "section": S}       simpler, more space

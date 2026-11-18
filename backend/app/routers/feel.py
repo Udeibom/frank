@@ -55,6 +55,7 @@ async def feel_conversation(
         if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS
     ]
 
+    result["message"] = await convo.enforce_reply(project_id, "feel", result.get("message", ""))
     await convo.record(project_id, "feel", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return FeelConversationResponse(
         message=result.get("message", ""),

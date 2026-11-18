@@ -437,6 +437,41 @@ def compose_arp(progression: dict, bars: int, energy: float, ctx: Optional[Secti
     return part
 
 
+def _held_busy(part: Part, edit: Optional[dict]) -> Part:
+    """
+    "Busier" and "simpler" for the parts whose pattern is not chosen by how busy the section is (the soft background,
+    the strings, the running pattern). Simpler: fewer voices (the top note of each chord goes) and, for the running
+    pattern, every other note. Busier: the chord doubled an octave up. Every note stays a note of the chord.
+    """
+    busy = float((edit or {}).get("busy", 0.0))
+    if busy == 0.0 or not part.events:
+        return part
+    if busy < 0:
+        if part.name == "arp":
+            ev = sorted(part.events, key=lambda e: e.start)
+            part.events = ev[::2]
+            for e in part.events:
+                e.duration = min(e.duration * 2.0, 0.9)
+            if busy <= -2:
+                part.events = part.events[::2]
+            return part
+        by_start: dict[float, list[NoteEvent]] = {}
+        for e in part.events:
+            by_start.setdefault(round(e.start, 3), []).append(e)
+        keep: list[NoteEvent] = []
+        drop = 2 if busy <= -2 else 1
+        for group in by_start.values():
+            group.sort(key=lambda e: e.note)
+            keep += group[: max(1, len(group) - drop)]
+        part.events = keep
+        return part
+    extra = [NoteEvent(e.note + 12, e.start, e.duration, max(1, int(e.velocity * 0.7)))
+             for e in part.events if e.note + 12 <= 100]
+    part.events += extra if busy < 2 else extra + [NoteEvent(e.note - 12, e.start, e.duration, max(1, int(e.velocity * 0.6)))
+                                                    for e in part.events if e.note - 12 >= 36 and e.velocity > 30][: len(extra)]
+    return part
+
+
 def _trim_overlaps(part: Part) -> Part:
     """
     Make sure a note ends before the next note of the SAME pitch begins. A pattern from the style data
@@ -562,13 +597,13 @@ def compose_section(
             add(compose_melody(progression, bars, energy, d, c))
     if "pad" in active:
         c, _ = setting("pad")
-        add(compose_pad(progression, bars, energy, c))
+        add(_held_busy(compose_pad(progression, bars, energy, c), ctx.parts.get("pad")))
     if "strings" in active:
         c, _ = setting("strings")
-        add(compose_strings(progression, bars, energy, c))
+        add(_held_busy(compose_strings(progression, bars, energy, c), ctx.parts.get("strings")))
     if "arp" in active:
         c, _ = setting("arp")
-        add(compose_arp(progression, bars, energy, c))
+        add(_held_busy(compose_arp(progression, bars, energy, c), ctx.parts.get("arp")))
     if ctx.moments:
         from app.services.generation import touches   # imported here: touches builds on this module
         parts = touches.apply_moments(parts, ctx.moments, progression, bars, ctx)

@@ -208,5 +208,6 @@ async def voice_conversation(
         for a in result.get("actions", [])
         if isinstance(a, dict) and a.get("type") in allowed
     ]
+    result["message"] = await convo.enforce_reply(project_id, "voice", result.get("message", ""))
     await convo.record(project_id, "voice", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return VoiceConversationResponse(message=result.get("message", ""), actions=actions)

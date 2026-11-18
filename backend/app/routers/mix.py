@@ -153,6 +153,7 @@ async def mix_conversation(
     new_params, render = apply_actions(params, raw_actions)
     actions = [ConversationAction(type=a["type"], params=a.get("params", {})) for a in raw_actions]
 
+    result["message"] = await convo.enforce_reply(project_id, "mix", result.get("message", ""))
     await convo.record(project_id, "mix", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return MixConversationResponse(
         message=result.get("message", ""),

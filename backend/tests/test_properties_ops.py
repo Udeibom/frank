@@ -128,3 +128,29 @@ def test_every_change_sentence_is_plain():
     assert len(changes) == len(raw)
     for c in changes:
         assert not jargon.search(c), c
+
+
+@settings(max_examples=20, deadline=None)
+@given(st.sampled_from(["busier", "sparser"]), st.sampled_from(["pad", "strings", "arp"]))
+def test_busier_and_simpler_change_every_part_they_are_asked_about(kind, part):
+    """Found live Nov 19: 'sparser' on the soft background did nothing. No edit may be a silent no-op."""
+    sections = plan()
+    hit = [s.index for s in sections if part in s.layers]
+    if not hit:
+        return
+    a = score(sections)
+    after, _, _ = ops.apply_operations(sections, SEED, [{"op": kind, "part": part, "section": hit}])
+    b = score(after)
+    for i in hit:
+        uid = sections[i].uid
+        n_a, n_b = len(a[(uid, part)][1]), len(b[(uid, part)][1])
+        assert (n_b > n_a) if kind == "busier" else (n_b < n_a), (part, kind, n_a, n_b)
+
+
+def test_a_list_of_sections_names_them_in_plain_words():
+    sections = plan()
+    choruses = [s.index for s in sections if s.name == "chorus"]
+    _, _, changes = ops.apply_operations(sections, SEED, [{"op": "sparser", "part": "bass", "section": choruses}])
+    assert changes == ["I made the bass simpler in every chorus."]
+    with pytest.raises(ops.OpError):
+        ops.apply_operations(sections, SEED, [{"op": "bigger", "section": [0, 99]}])

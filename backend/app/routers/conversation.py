@@ -42,6 +42,7 @@ async def idea_conversation(
         if isinstance(a, dict) and a.get("type") == "suggest_lyrics"
     ]
 
+    result["message"] = await convo.enforce_reply(project_id, "idea", result.get("message", ""))
     await convo.record(project_id, "idea", body.message, result.get("message", ""), actions)
     return ConversationResponse(message=result.get("message", ""), actions=actions)
 

@@ -43,6 +43,7 @@ async def history(project_id: str, room: str) -> list[dict[str, Any]]:
 
 async def record(project_id: str, room: str, user_message: str, reply: str, actions: Optional[list] = None) -> None:
     """Store one exchange. Best effort: a storage failure is logged, never shown to the person."""
+    actions = [a if isinstance(a, dict) else getattr(a, "model_dump", lambda: a)() for a in (actions or [])]
     rows = [
         {"project_id": project_id, "room": room, "role": "user", "content": user_message[:8000], "actions": []},
         {"project_id": project_id, "room": room, "role": "assistant", "content": reply[:8000], "actions": actions or []},
@@ -94,3 +95,13 @@ async def with_earlier(project_id: str, room: str, system: str) -> str:
 def recent_messages(turns: list[dict], limit: int = KEEP_TURNS) -> list[dict]:
     """The last exchanges in the shape the model expects."""
     return [{"role": t["role"], "content": t["content"]} for t in turns[-limit:] if t.get("content")]
+
+
+async def enforce_reply(project_id: str, room: str, message: str) -> str:
+    """Code-side team rules on a reply before anyone sees it: no specialist named twice within three replies."""
+    from app.services.team import roles
+
+    if not roles.mentions(message):
+        return message
+    previous = [t["content"] for t in await history(project_id, room) if t["role"] == "assistant"]
+    return message if roles.may_mention(previous) else roles.strip_mention(message)
