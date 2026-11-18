@@ -99,6 +99,9 @@ def team_block(room: str, phase: str, may_mention: bool) -> str:
                      "are asking for.")
     lines.append("If a request fights the feeling the person described, say so once, kindly, give three directions, "
                  "and build what they ask if they still want it.")
+    from app.services.team.identity import TEAM_RULE
+
+    lines.append(TEAM_RULE)      # creative-director spec 10, requirement 2
     return "\n".join(lines)
 
 

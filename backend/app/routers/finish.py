@@ -40,6 +40,23 @@ async def answer_intent(project_id: str, body: IntentAnswer) -> dict:
     return await intent_svc.answer(project_id, body.yes, body.said)
 
 
+@router.get("/identity")
+async def identity_view(project_id: str) -> dict:
+    """What makes this song theirs, in plain words (creative-director spec 10, requirement 1.2)."""
+    from app.services.song import record as song_record
+
+    content = await song_record.active_facet(project_id, "identity_brief") or {}
+    return {"identity": content or None}
+
+
+@router.post("/identity")
+async def identity_refresh(project_id: str) -> dict:
+    from app.services.team.identity import refresh
+
+    content = await refresh(project_id, force=True)
+    return {"identity": content}
+
+
 @router.get("/surprise")
 async def surprise_state(project_id: str) -> dict:
     return {"offered": await surprise_svc.offered_before(project_id)}

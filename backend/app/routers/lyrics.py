@@ -44,6 +44,9 @@ async def save_lyrics_version(
         project_id, {"active_lyrics_id": version["id"]}
     )
 
+    from app.services.team.identity import refresh_soon
+
+    refresh_soon(project_id)                 # what makes the song theirs may have changed (spec 10)
     return LyricsVersionResponse(**version)
 
 

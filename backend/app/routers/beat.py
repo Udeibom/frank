@@ -126,6 +126,9 @@ async def beat_conversation(
     system = await convo.with_earlier(project_id, "beat", await system_with_brief(project_id, BEAT_ROOM_SYSTEM, "beat_maker"))
     try:
         result = chat_structured(system, messages)
+        from app.services.team.identity import handle_reply
+
+        await handle_reply(project_id, result, body.message, "beat")   # a named artist becomes a feeling (spec 10)
     except Exception as exc:
         raise HTTPException(
             status_code=502,

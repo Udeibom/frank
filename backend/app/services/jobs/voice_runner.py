@@ -332,7 +332,11 @@ async def run_after_take_job(job_id: str, project_id: str, take: dict, wav_bytes
 MODE_WORDS = {"light": "Just the obvious mistakes", "moderate": "Tightened up", "full": "Locked in"}
 
 
-def _tune_sync(project_id: str, take: dict, mode: str, song: song_notes.SongNotes) -> dict:
+def _tune_sync(project_id: str, take: dict, mode: str, song: song_notes.SongNotes, note: str | None = None) -> dict:
+    return _with_note(_tune_core(project_id, take, mode, song), note)
+
+
+def _tune_core(project_id: str, take: dict, mode: str, song: song_notes.SongNotes) -> dict:
     mono = _read_mono(_fetch(take["audio_url"]))
     out, moves = pitch_svc.tune(mono, pitch_svc.SR, mode, song)
     if not moves:
@@ -346,8 +350,22 @@ def _tune_sync(project_id: str, take: dict, mode: str, song: song_notes.SongNote
 
 
 async def run_tune_job(job_id: str, project_id: str, take: dict, mode: str) -> None:
+    from app.services.team import identity
+
     song = await song_notes.for_project(project_id)
-    await _job(job_id, "Frank couldn't tune that take. Want to try again?", _tune_sync, project_id, take, mode, song)
+    note = None
+    if mode == "full":
+        ident, hates = await identity.context(project_id)
+        found = identity.drift_notes(ident, tune_mode=mode, hates_tuning=hates)
+        note = await identity.mention_once(project_id, "tune_full", found[0]) if found else None
+    await _job(job_id, "Frank couldn't tune that take. Want to try again?", _tune_sync, project_id, take, mode, song, note)
+
+
+def _with_note(result: dict, note: str | None) -> dict:
+    """The Creative Director's one line rides on the result; the person's call still wins (the change is made)."""
+    if note and isinstance(result.get("message"), str):
+        result["message"] = f"{result['message']} {note}"
+    return result
 
 
 # ── timing ───────────────────────────────────────────────────────────────

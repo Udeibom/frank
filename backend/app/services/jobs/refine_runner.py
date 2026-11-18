@@ -93,6 +93,16 @@ async def run_propose_job(job_id: str, project_id: str, concern: Optional[str]) 
         if not directions:
             await jobs_db.mark_failed(job_id, "I couldn't find a change to try on this song yet. Build a beat or record a take first?")
             return
+        # The Creative Director: an option that would take away something theirs says so, once (spec 10, req 3).
+        from app.services.team import identity
+
+        ident, _ = await identity.context(project_id)
+        for d in directions:
+            found = identity.drift_notes(ident, direction=d.model_dump(), their_tune=basis["lead"] is not None)
+            note = await identity.mention_once(project_id, "direction:" + found[0], found[0]) if found else None
+            if note:
+                message = f"{message} One thing about \u201c{d.title}\u201d: {note}"
+                break
         row = await asyncio.to_thread(refine_db.insert_proposal, {
             "project_id": project_id, "concern": concern, "findings": found, "experiment": experiment,
             "directions": [d.model_dump() for d in directions],

@@ -48,7 +48,32 @@ def _facet_text(record: SongRecord, facet: str) -> Optional[str]:
         return None
     if facet == "melody":
         return _melody_text(content)
+    if facet == "references":
+        return _references_text(content)
+    if facet == "identity_brief":
+        return _identity_text(content)
     return _dump(content)
+
+
+def _references_text(content: dict[str, Any]) -> Optional[str]:
+    """
+    Music the person named becomes only the FEELING they love in it (creative-director spec 10, requirement 2).
+    The names never reach any prompt: nobody on the team aims at sounding like someone.
+    """
+    loved = [w for item in content.get("items", []) for w in item.get("loved", []) if isinstance(w, str)]
+    return ("things they love in music they named: " + ", ".join(dict.fromkeys(loved))) if loved else None
+
+
+def _identity_text(content: dict[str, Any]) -> Optional[str]:
+    """What makes this song theirs, in plain words (spec 10, requirement 1)."""
+    bits = []
+    for key, label in (("own_words", "their own words"), ("own_images", "their images"), ("keep", "keep"), ("avoid", "avoid")):
+        vals = [v for v in content.get(key, []) if isinstance(v, str)]
+        if vals:
+            bits.append(f"{label}: " + "; ".join(vals[:6]))
+    if content.get("voice"):
+        bits.append(f"their voice: {content['voice']}")
+    return " | ".join(bits) if bits else None
 
 
 def _required_header(record: SongRecord) -> str:

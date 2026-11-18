@@ -30,6 +30,9 @@ async def idea_conversation(
     system = await convo.with_earlier(project_id, "idea", await system_with_brief(project_id, IDEA_ROOM_SYSTEM, "songwriter"))
     try:
         result = chat_structured(system, messages)
+        from app.services.team.identity import handle_reply
+
+        await handle_reply(project_id, result, body.message, "idea")   # a named artist becomes a feeling (spec 10)
     except Exception as exc:
         raise HTTPException(
             status_code=502,
@@ -42,6 +45,18 @@ async def idea_conversation(
         if isinstance(a, dict) and a.get("type") == "suggest_lyrics"
     ]
 
+    # The Creative Director: a suggestion that drops one of their own images says so, once (spec 10, req 3).
+    from app.services.team import identity
+
+    for a in actions:
+        old = identity.section_text(body.current_lyrics or "", str((a.get("params") or {}).get("section_label") or ""))
+        if old:
+            ident, _ = await identity.context(project_id)
+            found = identity.drift_notes(ident, old_text=old, new_text=str((a.get("params") or {}).get("content") or ""))
+            note = await identity.mention_once(project_id, f"lyric:{found[0]}", found[0]) if found else None
+            if note:
+                result["message"] = f"{result.get('message', '')} {note}".strip()
+                break
     result["message"] = await convo.enforce_reply(project_id, "idea", result.get("message", ""))
     await convo.record(project_id, "idea", body.message, result.get("message", ""), actions)
     return ConversationResponse(message=result.get("message", ""), actions=actions)

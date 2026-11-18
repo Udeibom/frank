@@ -160,6 +160,9 @@ async def mix_conversation(
     messages = build_mix_room_messages(params, history, body.message, song=song)
     try:
         result = chat_structured(system, messages)
+        from app.services.team.identity import handle_reply
+
+        await handle_reply(project_id, result, body.message, "mix")   # a named artist becomes a feeling (spec 10)
     except Exception as exc:
         raise HTTPException(
             status_code=502, detail="Frank lost the thread for a second — say that again?"

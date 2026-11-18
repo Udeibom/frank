@@ -220,6 +220,9 @@ export function StudioNav({ projectId }: { projectId: string }) {
 
       {/* What Frank knows about the song so far */}
       <SongSummary projectId={projectId} />
+      <Link href={`/${projectId}/yours`} className="mb-3 px-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
+        What makes this song yours
+      </Link>
 
       {/* Log out — small and out of the way */}
       <button

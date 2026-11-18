@@ -131,6 +131,9 @@ async def choose(project_id: str, proposal_id: str, n: int, background: Backgrou
     from app.services.taste.signals import record_choice
 
     await record_choice(project_id, directions[n], [s.name for s in basis["sections"]], bool(row.get("experiment")))
+    from app.services.team.identity import refresh_soon
+
+    refresh_soon(project_id)
     message = f"I'm putting “{d.title}” into the song now. Your earlier version stays. Have a listen when it's ready: how does that feel?"
     room = "beat" if d.kind == "beat" else "mix"
     await convo.record(project_id, room, f"Use “{d.title}”", message, [{"type": "refine_choose", "params": {"proposal": proposal_id, "n": n}}])

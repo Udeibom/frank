@@ -274,6 +274,9 @@ async def set_active_vocal(
             raise HTTPException(status_code=404, detail="I can't find that version.")
     else:
         await _owned_take(project_id, body.vocal_id)
+    from app.services.team.identity import refresh_soon
+
+    refresh_soon(project_id)                 # a take kept is a major choice (spec 10)
     key = "active_comp_id" if body.vocal_type == "comp" else "active_vocal_id"
     updates: dict = {key: body.vocal_id}
     if body.vocal_type != "comp":
@@ -321,6 +324,9 @@ async def voice_conversation(
     system = await convo.with_earlier(project_id, "voice", await system_with_brief(project_id, VOICE_ROOM_SYSTEM, "vocal_producer"))
     try:
         result = chat_structured(system, messages)
+        from app.services.team.identity import handle_reply
+
+        await handle_reply(project_id, result, body.message, "voice")   # a named artist becomes a feeling (spec 10)
     except Exception as exc:
         raise HTTPException(
             status_code=502, detail="Frank stepped away for a second — try again?"
