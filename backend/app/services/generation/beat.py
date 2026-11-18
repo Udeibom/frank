@@ -88,6 +88,11 @@ class SectionPlan:
     layers: list[str]    # which parts are present
     repeat: int = 0      # how many sections of this kind came before it
     final: bool = False  # the last section of its kind
+    # Stable identity for seeding. A section keeps its own notes when it is moved; a repeated copy gets a new one.
+    uid: Optional[int] = None
+    # Per-part edits (song-engine requirement 5.3): {part: {"busy": -1..1, "preset": GM program, "reseed": n,
+    # "fill": bool}}. Missing parts or keys mean "as the style decides".
+    parts: dict = field(default_factory=dict)
     # Rendered stems: stem_type -> int16 stereo audio
     stems: dict[str, np.ndarray] = field(default_factory=dict)
 
@@ -201,7 +206,8 @@ def plan_contexts(
         contexts.append(
             composer.SectionContext(
                 name=s.name,
-                index=s.index,
+                index=s.uid if s.uid is not None else s.index,
+                parts=s.parts,
                 repeat=s.repeat,
                 final=s.final,
                 seed=seed,
@@ -334,6 +340,8 @@ def sections_from_params(params: dict) -> tuple[list[SectionPlan], dict]:
                 energy=s["energy"],
                 density=s["density"],
                 layers=list(s["layers"]),
+                uid=s.get("uid"),
+                parts=dict(s.get("parts") or {}),
             )
         )
     sections.sort(key=lambda x: x.index)
@@ -377,29 +385,3 @@ def rerender_all(
 ) -> tuple[list[np.ndarray], np.ndarray]:
     """Re-render every section after an edit. Returns (per_section_audio, full_beat_audio)."""
     return render_song(sections, fp, seed, lead=lead)
-
-
-def apply_section_instruction(
-    section: SectionPlan, instruction: str | None, fp: dict
-) -> None:
-    """
-    Nudge a section's parameters based on a plain-language instruction keyword.
-    The LLM passes along the user's intent; we translate it to concrete changes.
-    This is what makes "the verse feels too empty" a real, explainable edit.
-    """
-    text = (instruction or "").lower()
-
-    if any(w in text for w in ("empty", "sparse", "bare", "fuller", "full", "more")):
-        section.density = _clamp(section.density + 0.25)
-        # Add a layer the section doesn't have yet
-        for candidate in ("melody", "pad", "bass"):
-            if candidate not in section.layers:
-                section.layers.append(candidate)
-                break
-    if any(w in text for w in ("busy", "cluttered", "too much", "simpler", "strip", "less")):
-        section.density = _clamp(section.density - 0.25)
-    if any(w in text for w in ("harder", "bigger", "energy", "punch", "powerful")):
-        section.energy = _clamp(section.energy + 0.2)
-        section.density = _clamp(section.density + 0.1)
-    if any(w in text for w in ("softer", "calmer", "gentler", "quieter", "back")):
-        section.energy = _clamp(section.energy - 0.2)

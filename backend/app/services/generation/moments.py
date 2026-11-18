@@ -45,6 +45,7 @@ class Facts:
     repeat: int
     final: bool
     next_name: Optional[str]
+    uid: Optional[int] = None    # stable identity: a moved section keeps its own moments
 
 
 def facts_from(sections: list) -> list[Facts]:
@@ -52,7 +53,8 @@ def facts_from(sections: list) -> list[Facts]:
     out: list[Facts] = []
     for i, s in enumerate(sections):
         nxt = sections[i + 1].name if i + 1 < len(sections) else None
-        out.append(Facts(s.index, s.name, s.bars, s.repeat, s.final, nxt))
+        uid = getattr(s, "uid", None)
+        out.append(Facts(s.index, s.name, s.bars, s.repeat, s.final, nxt, s.index if uid is None else uid))
     return out
 
 
@@ -87,7 +89,7 @@ def plan_moments(facts: list[Facts], seed: int, warmth: float, brightness: float
     last = facts[-1].index if facts else None
 
     for f in facts:
-        rng = rng_for(seed, "moments", f.index, f.name)
+        rng = rng_for(seed, "moments", f.index if f.uid is None else f.uid, f.name)
         moments = plan[f.index]
         big = f.bars >= 8
 

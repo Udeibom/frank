@@ -1,4 +1,7 @@
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, BackgroundTasks
+from pydantic import BaseModel, Field
 
 from app.models.beat import (
     GenerateBeatRequest,
@@ -16,12 +19,8 @@ from app.models.conversation import ConversationAction
 from app.services.llm.groq_client import chat_structured
 from app.services.song.record import system_with_brief
 from app.services.llm.prompts import BEAT_ROOM_SYSTEM, build_beat_room_messages
-from app.services.jobs.beat_runner import (
-    run_full_beat_job,
-    run_edit_section_job,
-    run_add_stem_job,
-    run_mute_stem_job,
-)
+from app.services.jobs.beat_runner import run_full_beat_job, run_operations_job
+from app.services.generation import ops as ops_mod
 from app.services.jobs.mix_runner import run_vocal_preview_job
 from app.db import jobs as jobs_db
 from app.db import beat as beat_db
@@ -32,9 +31,7 @@ router = APIRouter(prefix="/projects/{project_id}/beat", tags=["beat"])
 
 _ALLOWED_ACTIONS = {
     "generate_full_beat",
-    "edit_section",
-    "add_stem",
-    "mute_stem",
+    "beat_operations",
     "restore_version",
     "set_section_label",
 }
@@ -50,75 +47,43 @@ async def generate_beat(
     return JobResponse(job_id=job["id"])
 
 
-@router.post("/generate-section", response_model=JobResponse)
-async def generate_section(
-    project_id: str, body: EditSectionRequest, background: BackgroundTasks
-) -> JobResponse:
-    """Re-render a single section (as a new version) in the background."""
-    job = await jobs_db.create_job(project_id, job_type="edit_section")
-    background.add_task(
-        run_edit_section_job,
-        job["id"],
-        project_id,
-        body.section_index,
-        body.instruction,
-    )
+class OperationsRequest(BaseModel):
+    operations: list[dict[str, Any]] = Field(min_length=1, max_length=8)
+
+
+async def _start_operations(project_id: str, operations: list[dict], background: BackgroundTasks) -> JobResponse:
+    """Validate first (a bad change is refused at once, in plain words), then render in the background."""
+    try:
+        ops_mod.parse(operations)
+    except ops_mod.OpError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    job = await jobs_db.create_job(project_id, job_type="beat_operations")
+    background.add_task(run_operations_job, job["id"], project_id, operations)
     return JobResponse(job_id=job["id"])
+
+
+@router.post("/operations", response_model=JobResponse)
+async def beat_operations(project_id: str, body: OperationsRequest, background: BackgroundTasks) -> JobResponse:
+    """Apply typed edit operations to the active beat as a new version (song-engine spec 04, requirement 5.3)."""
+    return await _start_operations(project_id, body.operations, background)
+
+
+@router.post("/generate-section", response_model=JobResponse)
+async def generate_section(project_id: str, body: EditSectionRequest, background: BackgroundTasks) -> JobResponse:
+    """Older clients: "start this section fresh" is a new idea for every part of that section."""
+    return await _start_operations(project_id, [{"op": "try_another", "section": body.section_index}], background)
 
 
 @router.post("/add-stem", response_model=JobResponse)
-async def add_stem(
-    project_id: str, body: AddStemRequest, background: BackgroundTasks
-) -> JobResponse:
-    """Add a layer to one or all sections (as a new version) in the background."""
-    job = await jobs_db.create_job(project_id, job_type="add_stem")
-    background.add_task(
-        run_add_stem_job,
-        job["id"],
-        project_id,
-        body.stem_type,
-        body.section_index,
-    )
-    return JobResponse(job_id=job["id"])
+async def add_stem(project_id: str, body: AddStemRequest, background: BackgroundTasks) -> JobResponse:
+    """Older clients: add a part to one or all sections."""
+    return await _start_operations(project_id, [{"op": "add_part", "part": body.stem_type, "section": body.section_index}], background)
 
 
 @router.post("/mute-stem", response_model=JobResponse)
-async def mute_stem(
-    project_id: str, body: MuteStemRequest, background: BackgroundTasks
-) -> JobResponse:
-    """Remove a layer from one or all sections (as a new version)."""
-    job = await jobs_db.create_job(project_id, job_type="mute_stem")
-    background.add_task(
-        run_mute_stem_job, job["id"], project_id, body.stem_type, body.section_index
-    )
-    return JobResponse(job_id=job["id"])
-
-
-@router.post("/conversation", response_model=BeatConversationResponse)
-async def beat_conversation(
-    project_id: str, body: BeatConversationRequest
-) -> BeatConversationResponse:
-    """Beat Room conversation — turns reactions into beat edits."""
-    history = [{"role": m.role, "content": m.content} for m in body.history]
-    messages = build_beat_room_messages(body.beat_state, history, body.message)
-
-    system = await system_with_brief(project_id, BEAT_ROOM_SYSTEM, "beat_maker")
-    try:
-        result = chat_structured(system, messages)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=502,
-            detail="Frank zoned out for a second — say that again?",
-        ) from exc
-
-    actions = [
-        ConversationAction(type=a["type"], params=a.get("params", {}))
-        for a in result.get("actions", [])
-        if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS
-    ]
-    return BeatConversationResponse(
-        message=result.get("message", ""), actions=actions
-    )
+async def mute_stem(project_id: str, body: MuteStemRequest, background: BackgroundTasks) -> JobResponse:
+    """Older clients: take a part out of one or all sections."""
+    return await _start_operations(project_id, [{"op": "remove_part", "part": body.stem_type, "section": body.section_index}], background)
 
 
 @router.post("/preview-with-vocal", response_model=JobResponse)

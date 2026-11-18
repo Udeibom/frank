@@ -11,7 +11,46 @@ import asyncio
 from typing import Any, Callable, TypeVar
 
 T = TypeVar("T")
-HEAVY = asyncio.Semaphore(1)
+
+
+def release_memory() -> None:
+    """
+    Give freed memory back to the system. Worker threads leave freed audio buffers inside malloc's arenas: measured
+    Nov 18, a beat then a listen kept 353 MB resident with threads, 277 MB after malloc_trim. On the 512 MB server
+    that difference is what made the next job (an export) run out of memory.
+    """
+    import ctypes
+    import gc
+
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except OSError:
+        pass                                    # not glibc (macOS dev machine): nothing to trim
+
+
+class _HeavyGate:
+    """One heavy job at a time; memory is released and logged when each one ends."""
+
+    def __init__(self) -> None:
+        self._sem = asyncio.Semaphore(1)
+
+    async def __aenter__(self) -> "_HeavyGate":
+        await self._sem.acquire()
+        return self
+
+    async def __aexit__(self, *exc: Any) -> None:
+        try:
+            release_memory()
+            log_memory("after heavy job")
+        finally:
+            self._sem.release()
+
+    def locked(self) -> bool:
+        return self._sem.locked()
+
+
+HEAVY = _HeavyGate()
 
 
 async def run_heavy(fn: Callable[..., T], *args: Any, **kwargs: Any) -> T:

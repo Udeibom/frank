@@ -44,6 +44,7 @@ export interface BeatVersion {
     fingerprint?: Partial<MusicalFingerprint>
     sections?: BeatSection[]
     lead_info?: LeadInfo
+    changes?: string[]
   }
   created_at: string
 }
@@ -60,6 +61,17 @@ export async function generateBeat(
   return api.post<{ job_id: string }>(`/projects/${projectId}/beat/generate`, {
     fingerprint,
   })
+}
+
+/** One typed change to the beat (backend generation/ops.py). The model emits these; the UI can too. */
+export type BeatOperation = { op: string } & Record<string, unknown>
+
+/** Apply typed changes to the active beat; the job result's `changes` says what changed, in plain words. */
+export async function applyBeatOperations(
+  projectId: string,
+  operations: BeatOperation[],
+): Promise<{ job_id: string }> {
+  return api.post<{ job_id: string }>(`/projects/${projectId}/beat/operations`, { operations })
 }
 
 export async function editSection(

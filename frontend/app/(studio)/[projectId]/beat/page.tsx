@@ -17,15 +17,14 @@ import { BeatVersions } from "@/components/studio/BeatVersions"
 import { Button } from "@/components/ui/button"
 import {
   generateBeat,
-  editSection,
-  addStem,
-  muteStem,
   sendBeatMessage,
   listBeatVersions,
   setActiveBeatVersion,
   updateSection,
   previewWithVocal,
   describeLead,
+  applyBeatOperations,
+  type BeatOperation,
   type BeatVersion,
   type BeatSection,
 } from "@/lib/api/beat"
@@ -170,28 +169,21 @@ export default function BeatRoomPage() {
       { id: placeholderId, role: "assistant", content: pendingMessage },
     ])
     setBuilding(true)
+    const say = (content: string) =>
+      setTurns((t) => t.map((turn) => (turn.id === placeholderId ? { ...turn, content } : turn)))
     try {
       const { job_id } = await startJob()
-      await pollJob(job_id)
+      const done = await pollJob(job_id)
       await loadVersions()
-      setTurns((t) =>
-        t.map((turn) =>
-          turn.id === placeholderId
-            ? { ...turn, content: "Done — have a listen and tell me how it feels." }
-            : turn,
-        ),
+      const changes = (done.result as { changes?: string[] } | null)?.changes ?? []
+      say(
+        changes.length
+          ? `${changes.join(" ")} Have a listen. How does that feel?`
+          : "Done. Have a listen and tell me how it feels.",
       )
-    } catch {
-      setTurns((t) =>
-        t.map((turn) =>
-          turn.id === placeholderId
-            ? {
-                ...turn,
-                content: "Frank hit a snag making that — want to try again?",
-              }
-            : turn,
-        ),
-      )
+    } catch (err) {
+      // The server's reason is already in plain words ("The drums aren't playing there...").
+      say(err instanceof Error && err.message ? err.message : "Frank hit a snag making that. Want to try again?")
     } finally {
       setBuilding(false)
     }
@@ -213,32 +205,10 @@ export default function BeatRoomPage() {
           "Building your beat… this takes a minute.",
         )
         break
-      case "edit_section":
+      case "beat_operations":
         await runJobWithStatus(
-          () => editSection(projectId, Number(p.section_index), String(p.instruction ?? "")),
-          "Reworking that part…",
-        )
-        break
-      case "add_stem":
-        await runJobWithStatus(
-          () =>
-            addStem(
-              projectId,
-              String(p.stem_type),
-              p.section_index == null ? null : Number(p.section_index),
-            ),
-          "Layering that in…",
-        )
-        break
-      case "mute_stem":
-        await runJobWithStatus(
-          () =>
-            muteStem(
-              projectId,
-              String(p.stem_type),
-              p.section_index == null ? null : Number(p.section_index),
-            ),
-          "Taking that out…",
+          () => applyBeatOperations(projectId, (p.operations as BeatOperation[]) ?? []),
+          "Working on that… this usually takes a minute or two.",
         )
         break
       case "restore_version":

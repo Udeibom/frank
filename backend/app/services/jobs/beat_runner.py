@@ -67,6 +67,8 @@ def _arrangement_params(
                 "energy": s.energy,
                 "density": s.density,
                 "layers": s.layers,
+                "uid": s.uid if s.uid is not None else s.index,
+                "parts": s.parts,
             }
             for s in sections
         ],
@@ -98,10 +100,12 @@ def _rerender_and_persist_sync(
     label: str,
     seed: int,
     lead: lead_mod.Lead | None = None,
+    changes: list[str] | None = None,
+    operations: list[dict] | None = None,
 ) -> dict:
     """Re-render an edited arrangement and persist it, all in one thread."""
     mixes, full = beat_engine.rerender_all(sections, fp, seed, lead)
-    return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead)
+    return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead, changes, operations)
 
 
 def _persist_sync(
@@ -113,6 +117,8 @@ def _persist_sync(
     label: str,
     seed: int,
     lead: lead_mod.Lead | None = None,
+    changes: list[str] | None = None,
+    operations: list[dict] | None = None,
 ) -> dict:
     """
     Upload the assembled render + one mixed file per section, and write records.
@@ -125,9 +131,11 @@ def _persist_sync(
     full_mp3 = to_mp3_bytes(full_audio)
     render_url = upload_audio("beats", full_mp3, extension="mp3", name_prefix="beat")
 
-    version = beat_db.create_beat_version_sync(
-        project_id, render_url, label, _arrangement_params(sections, fp, seed, lead)
-    )
+    params = _arrangement_params(sections, fp, seed, lead)
+    if changes:
+        params["changes"] = changes            # what this version changed, in plain words
+        params["operations"] = operations or []
+    version = beat_db.create_beat_version_sync(project_id, render_url, label, params)
 
     for section, mix in zip(sections, section_mixes):
         section_mp3 = to_mp3_bytes(mix)
@@ -246,128 +254,37 @@ async def _follow_newest_tune(
     return new_fp, newest
 
 
-async def run_edit_section_job(
-    job_id: str,
-    project_id: str,
-    section_index: int,
-    instruction: str | None,
-) -> None:
+async def run_operations_job(job_id: str, project_id: str, operations: list[dict]) -> None:
     """
-    Apply a plain-language edit to one section and re-render the beat as a NEW
-    version (the previous version is preserved, per the versioning principle).
+    Apply typed edit operations (generation/ops.py) to the active beat and render the result as a NEW version.
+    The previous version is kept. The job result says, in plain words, exactly what changed. An operation that
+    cannot be applied fails the job with its plain reason and creates nothing.
     """
+    from app.services.generation import ops as ops_mod
+
     try:
         await jobs_db.mark_processing(job_id)
         sections, fp, seed, lead = await _load_active_arrangement(project_id)
-
-        for s in sections:
-            if s.index == section_index:
-                beat_engine.apply_section_instruction(s, instruction, fp)
-                break
-
+        try:
+            sections, seed, changes = ops_mod.apply_operations(sections, seed, operations)
+        except ops_mod.OpError as exc:
+            await jobs_db.mark_failed(job_id, str(exc))
+            return
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
         async with _one_at_a_time:
             version = await asyncio.to_thread(
-                _rerender_and_persist_sync, project_id, sections, fp, label, seed, lead
+                _rerender_and_persist_sync, project_id, sections, fp, label, seed, lead, changes, operations
             )
-        await projects_db.update_project_active_state(
-            project_id, {"active_beat_version_id": version["id"]}
-        )
+        await projects_db.update_project_active_state(project_id, {"active_beat_version_id": version["id"]})
         await jobs_db.mark_complete(
             job_id,
-            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label, "lead_used": _lead_used(version)},
+            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label,
+             "lead_used": _lead_used(version), "changes": changes},
         )
     except Exception as exc:  # noqa: BLE001
         try:
-            await jobs_db.mark_failed(
-                job_id, "Frank couldn't make that change — want to try again?"
-            )
-        except Exception:  # noqa: BLE001
-            pass
-        raise exc
-
-
-async def run_mute_stem_job(
-    job_id: str,
-    project_id: str,
-    stem_type: str,
-    section_index: int | None,
-) -> None:
-    """
-    Remove a layer (stem_type) from one section (or all sections if
-    section_index is None) and re-render as a new version. Used by
-    "remove the keys from the bridge".
-    """
-    try:
-        await jobs_db.mark_processing(job_id)
-        sections, fp, seed, lead = await _load_active_arrangement(project_id)
-
-        for s in sections:
-            if section_index is None or s.index == section_index:
-                if stem_type in s.layers:
-                    s.layers.remove(stem_type)
-
-        count = await beat_db.count_beat_versions(project_id)
-        label = f"Beat v{count + 1}"
-        async with _one_at_a_time:
-            version = await asyncio.to_thread(
-                _rerender_and_persist_sync, project_id, sections, fp, label, seed, lead
-            )
-        await projects_db.update_project_active_state(
-            project_id, {"active_beat_version_id": version["id"]}
-        )
-        await jobs_db.mark_complete(
-            job_id,
-            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label, "lead_used": _lead_used(version)},
-        )
-    except Exception as exc:  # noqa: BLE001
-        try:
-            await jobs_db.mark_failed(
-                job_id, "Frank couldn't take that out — want to try again?"
-            )
-        except Exception:  # noqa: BLE001
-            pass
-        raise exc
-
-
-async def run_add_stem_job(
-    job_id: str,
-    project_id: str,
-    stem_type: str,
-    section_index: int | None,
-) -> None:
-    """
-    Add a layer (stem_type) to one section (or all sections if section_index is
-    None) and re-render as a new version. Used by "add a bassline", etc.
-    """
-    try:
-        await jobs_db.mark_processing(job_id)
-        sections, fp, seed, lead = await _load_active_arrangement(project_id)
-
-        for s in sections:
-            if section_index is None or s.index == section_index:
-                if stem_type not in s.layers:
-                    s.layers.append(stem_type)
-
-        count = await beat_db.count_beat_versions(project_id)
-        label = f"Beat v{count + 1}"
-        async with _one_at_a_time:
-            version = await asyncio.to_thread(
-                _rerender_and_persist_sync, project_id, sections, fp, label, seed, lead
-            )
-        await projects_db.update_project_active_state(
-            project_id, {"active_beat_version_id": version["id"]}
-        )
-        await jobs_db.mark_complete(
-            job_id,
-            {"beat_version_id": version["id"], "render_url": version["render_url"], "label": label, "lead_used": _lead_used(version)},
-        )
-    except Exception as exc:  # noqa: BLE001
-        try:
-            await jobs_db.mark_failed(
-                job_id, "Frank couldn't add that in — want to try again?"
-            )
+            await jobs_db.mark_failed(job_id, "Frank couldn't make that change — want to try again?")
         except Exception:  # noqa: BLE001
             pass
         raise exc

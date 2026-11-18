@@ -18,11 +18,11 @@ What makes this sound like music and not a loop:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Optional
 
 from app.services.generation import theory
-from app.services.generation.rng import rng_for
+from app.services.generation.rng import derive_seed, rng_for
 from app.services.generation.styles import StyleChoice, default_choice
 
 # General MIDI percussion notes (channel 9)
@@ -81,6 +81,7 @@ class SectionContext:
     next_energy: Optional[float] = None
     moments: list = field(default_factory=list)   # planned one-off moments for this section (moments.py)
     lead: Any = None                               # the person's own tune (lead.Lead), when this section plays it
+    parts: dict = field(default_factory=dict)      # per-part edits from the plan (SectionPlan.parts)
 
 
 # ─────────────────────────────────────────────
@@ -199,6 +200,8 @@ def _fill_for(ctx: SectionContext, energy: float, bar: int, bars: int, rng) -> O
     """
     style = ctx.style
     last = bar == bars - 1
+    if last and (ctx.parts.get("drums") or {}).get("fill"):
+        return rng.choice(["roll", "toms"]), 8                 # the person asked for a fill here
     into_bigger = ctx.next_name == "chorus" or (ctx.next_energy is not None and ctx.next_energy > energy * 1.05)
     if last and ctx.next_name is not None and into_bigger:
         kind = rng.choices(["roll", "toms", "stop"], weights=[0.45, 0.35, 0.2])[0]
@@ -525,24 +528,47 @@ def compose_section(
     ctx = ctx or SectionContext(name=section)
     active = layers if layers is not None else layers_for_section(section, energy, density, ctx.repeat, ctx.final, ctx.style)
     parts: list[Part] = []
+
+    def setting(name: str) -> tuple[SectionContext, float]:
+        """The context and busyness for one part, after the person's edits to that part."""
+        edit = ctx.parts.get(name) or {}
+        part_ctx = ctx
+        if edit.get("reseed"):
+            part_ctx = replace(ctx, seed=derive_seed(ctx.seed, "reseed", name, int(edit["reseed"])))
+        busy = max(0.0, min(1.0, density + 0.3 * float(edit.get("busy", 0.0))))
+        return part_ctx, busy
+
+    def add(part: Part) -> None:
+        preset = (ctx.parts.get(part.name) or {}).get("preset")
+        if preset is not None and not part.is_drums and not part.lead:
+            part.preset = int(preset)
+        parts.append(part)
+
     if "keys" in active:
-        parts.append(compose_chords(progression, bars, energy, density, ctx))
+        c, d = setting("keys")
+        add(compose_chords(progression, bars, energy, d, c))
     if "bass" in active:
-        parts.append(compose_bass(progression, bars, energy, density, ctx))
+        c, d = setting("bass")
+        add(compose_bass(progression, bars, energy, d, c))
     if "drums" in active:
-        parts.append(compose_drums(bars, energy, density, ctx))
+        c, d = setting("drums")
+        add(compose_drums(bars, energy, d, c))
     if "melody" in active:
         if ctx.lead is not None:
             from app.services.generation import lead as lead_mod   # imported here: lead builds on this module
             parts.append(Part("melody", lead_mod.LEAD_PROGRAM, False, lead_mod.lead_events(ctx.lead, bars, energy, ctx.seed, ctx.index), lead=True))
         else:
-            parts.append(compose_melody(progression, bars, energy, density, ctx))
+            c, d = setting("melody")
+            add(compose_melody(progression, bars, energy, d, c))
     if "pad" in active:
-        parts.append(compose_pad(progression, bars, energy, ctx))
+        c, _ = setting("pad")
+        add(compose_pad(progression, bars, energy, c))
     if "strings" in active:
-        parts.append(compose_strings(progression, bars, energy, ctx))
+        c, _ = setting("strings")
+        add(compose_strings(progression, bars, energy, c))
     if "arp" in active:
-        parts.append(compose_arp(progression, bars, energy, ctx))
+        c, _ = setting("arp")
+        add(compose_arp(progression, bars, energy, c))
     if ctx.moments:
         from app.services.generation import touches   # imported here: touches builds on this module
         parts = touches.apply_moments(parts, ctx.moments, progression, bars, ctx)

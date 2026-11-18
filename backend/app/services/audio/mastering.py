@@ -30,10 +30,28 @@ TARGET_LUFS = -14.0  # common streaming loudness target
 
 
 def _load_stereo(wav_bytes: bytes) -> np.ndarray:
-    data, sr = sf.read(io.BytesIO(wav_bytes), dtype="float32")
-    if data.ndim == 1:
-        data = np.column_stack([data, data])
-    return data.T.astype(np.float32)  # (channels, samples)
+    """Float32 audio shaped (samples, 2): one copy of the song, which the chain then processes in place."""
+    data, sr = sf.read(io.BytesIO(wav_bytes), dtype="float32", always_2d=True)
+    if data.shape[1] == 1:
+        data = np.repeat(data, 2, axis=1)
+    return np.ascontiguousarray(data[:, :2])
+
+
+CHUNK_SECONDS = 5.0
+
+
+def _process_in_place(board: Pedalboard, audio: np.ndarray) -> np.ndarray:
+    """
+    Run the chain a few seconds at a time, keeping its state between chunks (reset=False), writing back into the
+    same buffer. Same result as one pass; memory stays at one song plus one chunk (ship-it spec 13, req 2.1).
+    """
+    step = int(CHUNK_SECONDS * SR)
+    board.reset()
+    for start in range(0, audio.shape[0], step):
+        end = min(start + step, audio.shape[0])
+        y = board(np.ascontiguousarray(audio[start:end].T), SR, reset=False)
+        audio[start:start + y.shape[1]] = y.T
+    return audio
 
 
 def _master_chain() -> Pedalboard:
@@ -104,7 +122,7 @@ def _encode_mastered_mp3(audio: np.ndarray) -> bytes:
     wav_path = mp3_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wf:
-            sf.write(wf, audio.T, SR, format="WAV", subtype="PCM_16")
+            sf.write(wf, audio, SR, format="WAV", subtype="PCM_16")
             wav_path = wf.name
         mp3_path = wav_path[:-4] + ".mastered.mp3"
 
