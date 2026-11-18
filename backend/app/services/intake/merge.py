@@ -58,19 +58,20 @@ def conflict_question(conflicts: list[Conflict], source: str = "words") -> Optio
     hints came from ("words"), the other side being what was already settled (the tune or the talk).
     """
     by_field = {c.field: c for c in conflicts}
+    feel = "feel" if source.endswith("s") else "feels"         # "your words feel", "your tune feels"
     if "mode" in by_field:
         c = by_field["mode"]
         new = "heavier" if c.suggested == "minor" else "brighter"
         old = "brighter" if c.suggested == "minor" else "heavier"
         return (
-            f"Your {source} feel {new} than the sound we've settled on so far, which feels {old}. "
+            f"Your {source} {feel} {new} than the sound we've settled on so far, which feels {old}. "
             f"Which should the music lean into most: the feeling of your {source}, what we have so far, or both?"
         )
     if "energy_level" in by_field:
         c = by_field["energy_level"]
         louder = float(c.suggested) > float(c.settled)
         return (
-            f"Your {source} feel {'bigger and more urgent' if louder else 'quieter and more hushed'} than what we've "
+            f"Your {source} {feel} {'bigger and more urgent' if louder else 'quieter and more hushed'} than what we've "
             f"settled on so far. Which should lead the song?"
         )
     return None

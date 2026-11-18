@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/store/project"
 import { updateProject } from "@/lib/api/projects"
 import { SongSummary } from "@/components/studio/SongSummary"
+import { StartSurface } from "@/components/studio/StartSurface"
 import { createClient } from "@/lib/supabase/client"
 import {
   LogOut,
@@ -96,6 +97,18 @@ export function StudioNav({ projectId }: { projectId: string }) {
     currentProject?.title ?? "Untitled Song",
   )
   const titleInputRef = useRef<HTMLInputElement>(null)
+  // One way in, reachable from every room (spec 02, requirement 1.3). Opens by itself once for an empty song.
+  const [showStart, setShowStart] = useState(false)
+  useEffect(() => {
+    if (!activeState || activeState.project_id !== projectId) return
+    const empty = !activeState.active_lyrics_id && !activeState.active_fingerprint_id && !activeState.active_beat_version_id &&
+      !activeState.active_vocal_id
+    const key = `frank-start-shown-${projectId}`
+    if (empty && !sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, "1")
+      setShowStart(true)
+    }
+  }, [activeState, projectId])
 
   // Keep local title in sync with store
   useEffect(() => {
@@ -219,6 +232,27 @@ export function StudioNav({ projectId }: { projectId: string }) {
       <div className="flex-1" />
 
       {/* What Frank knows about the song so far */}
+      <button
+        onClick={() => setShowStart(true)}
+        className="mb-3 px-1 text-left text-xs text-primary/80 transition-colors hover:text-primary"
+      >
+        Start from something new
+      </button>
+      {showStart && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50" role="dialog" aria-modal="true" aria-label="Start your song from anything"
+             onClick={(e) => e.target === e.currentTarget && setShowStart(false)}
+             onKeyDown={(e) => e.key === "Escape" && setShowStart(false)}>
+          <div className="h-full w-full max-w-md overflow-y-auto border-l border-border bg-card p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">Start with whatever you have</h2>
+              <button onClick={() => setShowStart(false)} className="text-xs text-muted-foreground hover:text-foreground" autoFocus>
+                Close
+              </button>
+            </div>
+            <StartSurface projectId={projectId} />
+          </div>
+        </div>
+      )}
       <SongSummary projectId={projectId} />
       <Link href={`/${projectId}/yours`} className="mb-3 px-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
         What makes this song yours

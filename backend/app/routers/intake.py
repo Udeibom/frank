@@ -35,6 +35,7 @@ _EXTENSION = re.compile(r"[a-z0-9]{1,5}")
 class ConfirmMelodyResponse(BaseModel):
     version: FacetVersionResponse
     fingerprint_hints: dict
+    question: Optional[str] = None      # a tune that disagrees with what is settled asks which should lead (req 6.5)
 
 
 def safe_extension(filename: str | None) -> str:
@@ -128,10 +129,22 @@ async def confirm_melody(project_id: str, version_id: str) -> ConfirmMelodyRespo
         )
     except VersionError as exc:
         raise HTTPException(status_code=400, detail="That tune can't be saved right now.") from exc
+    hints = fingerprint_hints(sketch, sketch.source_audio)
     return ConfirmMelodyResponse(
         version=FacetVersionResponse(**confirmed.model_dump(), is_active=True),
-        fingerprint_hints=fingerprint_hints(sketch, sketch.source_audio),
+        fingerprint_hints=hints,
+        question=await _tune_question(project_id, hints),
     )
+
+
+async def _tune_question(project_id: str, hints: dict) -> Optional[str]:
+    """The tune against what the song already settled (the words' feeling, the talk): one question, never a silent pick."""
+    try:
+        latest = await feel_db.get_latest_fingerprint(project_id)
+        _, _, conflicts = merge_svc.merge_fingerprint((latest or {}).get("fingerprint"), hints)
+        return merge_svc.conflict_question(conflicts, "tune")
+    except Exception:  # noqa: BLE001
+        return None
 
 
 @router.post("/melody/{version_id}/reject")
@@ -275,3 +288,130 @@ async def _read_lyrics(project_id: str, body: ReadLyricsRequest) -> ReadLyricsRe
             "I couldn't read the feeling just now, so tell me how it should feel." + note
         )
     return ReadLyricsResponse(ok=True, message=message, reading=reading, filled=filled, asked=asked)
+
+
+# ── a description, typed or spoken (spec 02, requirement 5) ──────────────
+
+class DescriptionRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class DescriptionResponse(BaseModel):
+    ok: bool
+    message: str
+    heard: Optional[str] = None             # the words Frank read (the transcription, for a voice memo)
+    asked: Optional[str] = None
+    filled: list[str] = []
+
+
+async def _from_description(project_id: str, text: str, source: str, audio_url: Optional[str] = None) -> DescriptionResponse:
+    from app.models.song import USER_AUTHOR
+    from app.services.intake import description as desc_svc
+    from app.services.song import record as song_record
+
+    if desc_svc.too_little(text):
+        return DescriptionResponse(ok=False, message="Tell me a little more: a few words about how it should feel is enough.", heard=text)
+    try:
+        reading = await asyncio.to_thread(desc_svc.read_description, text, chat_json)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("reading a description failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="I couldn't take that in just now. Your words are safe. Want to try again?") from exc
+    original = {"source": source, "text": text.strip()[:2000], **({"audio_url": audio_url} if audio_url else {})}
+    # 1. their words are the intent statement, if the song has none yet (only the person writes the intent)
+    if not await song_record.active_facet(project_id, "intent"):
+        await store.write_facet(project_id, "intent", {"text": text.strip()[:600], "room": "start"}, author=USER_AUTHOR,
+                                operation=f"described_by_{source}", op_params=original, label="What you said the song is")
+    # 2. the feeling, with the confidence of every value (requirement 6.1)
+    await store.write_facet(project_id, "feeling", {"words": reading["feeling_words"], "summary": reading["summary"],
+                                                    "confidence": reading["confidence"], "from": source},
+                            author="frank", operation=f"read_{source}", op_params=original, label="Feeling you described")
+    # 3. confident hints fill gaps in the song's direction; a disagreement becomes one question
+    filled: list[str] = []
+    asked = reading["question"] or None
+    if reading["hints"]:
+        latest = await feel_db.get_latest_fingerprint(project_id)
+        merged, filled, conflicts = merge_svc.merge_fingerprint((latest or {}).get("fingerprint"), reading["hints"])
+        asked = merge_svc.conflict_question(conflicts, "words") or asked
+        if filled:
+            try:
+                saved = await feel_db.save_fingerprint(project_id, merged, (latest or {}).get("conversation_summary"))
+                await projects_db.update_project_active_state(project_id, {"active_fingerprint_id": saved["id"]})
+            except Exception as exc:  # noqa: BLE001
+                log.warning("could not save the direction from the description: %s", type(exc).__name__)
+                filled = []
+    message = reading["summary"] or "I've got the feeling you described."
+    if asked:
+        message = f"{message} {asked}"
+    return DescriptionResponse(ok=True, message=message, heard=text, asked=asked, filled=filled)
+
+
+@router.post("/description", response_model=DescriptionResponse)
+async def start_from_description(project_id: str, body: DescriptionRequest) -> DescriptionResponse:
+    """'It should feel like walking home alone at night': the song starts from how it should feel."""
+    return await _from_description(project_id, body.text, "description")
+
+
+@router.post("/voice-memo", response_model=DescriptionResponse)
+async def start_from_voice_memo(project_id: str, file: UploadFile = File(...)) -> DescriptionResponse:
+    """A spoken description: kept as audio, transcribed, then read like a typed one (requirement 5.1)."""
+    from app.services.audio.convert import to_wav
+    from app.services.llm.whisper import transcribe
+    from app.services.storage.files import upload_audio
+
+    raw = await _read_limited(file)
+    wav = await asyncio.to_thread(to_wav, raw, input_ext=safe_extension(file.filename))
+    audio_url = upload_audio("voice-memos", wav, extension="wav", name_prefix="described")
+    try:
+        text = (await transcribe(wav)).strip()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail="I couldn't make out the recording. Want to try again?") from exc
+    if not text:
+        return DescriptionResponse(ok=False, message="I couldn't hear any words in that. Want to try again, a little closer?")
+    return await _from_description(project_id, text, "voice_memo", audio_url)
+
+
+
+# ── one way in: a recording, whatever it is (spec 02, requirement 1.2) ───
+
+def is_speech(wav: bytes, words: int) -> bool:
+    """
+    Talking has many words and little held pitch; humming or singing holds notes. Decides which path a recording
+    takes, so nobody has to choose before they start.
+    """
+    from app.services.audio import vocal_notes
+    from app.services.jobs.voice_runner import _read_mono
+
+    mono = _read_mono(wav)
+    seconds = max(0.5, mono.shape[0] / 44100)
+    notes = vocal_notes.sung_notes(mono, 44100)
+    held = sum(n.length for n in notes if n.length >= 0.25) / seconds
+    return words >= 5 and held < 0.35
+
+
+class RecordingResponse(BaseModel):
+    kind: str                                     # "description" | "hum"
+    description: Optional[DescriptionResponse] = None
+    job_id: Optional[str] = None                  # the hum's job, when it was a tune
+
+
+@router.post("/recording", response_model=RecordingResponse)
+async def start_from_recording(project_id: str, background: BackgroundTasks, file: UploadFile = File(...)) -> RecordingResponse:
+    """Hum it, sing it or say it: Frank works out which, then takes the right path."""
+    from app.services.audio.convert import to_wav
+    from app.services.llm.whisper import transcribe
+    from app.services.storage.files import upload_audio
+
+    raw = await _read_limited(file)
+    ext = safe_extension(file.filename)
+    wav = await asyncio.to_thread(to_wav, raw, input_ext=ext)
+    try:
+        text = (await transcribe(wav)).strip()
+    except Exception:  # noqa: BLE001  no words to read: treat it as a tune
+        text = ""
+    words = len(re.findall(r"[A-Za-z']+", text))
+    if text and await asyncio.to_thread(is_speech, wav, words):
+        audio_url = upload_audio("voice-memos", wav, extension="wav", name_prefix="described")
+        return RecordingResponse(kind="description", description=await _from_description(project_id, text, "voice_memo", audio_url))
+    job = await jobs_db.create_job(project_id, job_type="hum_intake")
+    background.add_task(run_hum_intake_job, job["id"], project_id, raw, ext)
+    return RecordingResponse(kind="hum", job_id=job["id"])

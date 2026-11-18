@@ -143,13 +143,15 @@ export function HumIntake({ projectId, onConfirmed, onSay }: HumIntakeProps) {
     const current = heard
     setWorking(true)
     try {
-      const { fingerprint_hints } = await confirmTune(projectId, current.version_id)
+      const { fingerprint_hints, question } = await confirmTune(projectId, current.version_id)
       setHeard(null)
       onConfirmed({
         hints: fingerprint_hints,
         description: current.description,
         unsureAbout: current.unsure_about,
       })
+      // A tune that disagrees with what the song already settled: Frank asks which should lead (spec 02, req 6.5).
+      if (question) onSay(question)
     } catch {
       onSay("I couldn't save your tune just now. Want to say yes again?")
     } finally {

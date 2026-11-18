@@ -16,6 +16,8 @@ export type HumIntakeResult =
 
 export interface ConfirmMelodyResult {
   fingerprint_hints: Partial<MusicalFingerprint>
+  /** One question when the tune disagrees with what is settled (which should lead?). */
+  question?: string | null
 }
 
 /** Send a recorded hum, wait for Frank to work out the tune, and return what it found. */
@@ -97,4 +99,37 @@ export async function rhythmToGroove(
   }
   const done = await pollJob(job_id)
   return done.result as unknown as RhythmIntakeResult
+}
+
+export interface DescriptionResult {
+  ok: boolean
+  message: string
+  heard?: string | null
+  asked?: string | null
+  filled: string[]
+}
+
+/** Start from how it should feel, in the person's own typed words. */
+export function describeSong(projectId: string, text: string): Promise<DescriptionResult> {
+  return api.post<DescriptionResult>(`/projects/${projectId}/intake/description`, { text })
+}
+
+/** Start from a spoken description: Frank keeps the recording, writes down the words, and reads them. */
+export function describeByVoice(projectId: string, blob: Blob, ext: string): Promise<DescriptionResult> {
+  const formData = new FormData()
+  formData.append("file", blob, `described.${ext}`)
+  return uploadFile<DescriptionResult>(`/projects/${projectId}/intake/voice-memo`, formData)
+}
+
+export interface RecordingResult {
+  kind: "description" | "hum"
+  description?: DescriptionResult | null
+  job_id?: string | null
+}
+
+/** Hum it, sing it or say it: the backend works out which path a recording takes. */
+export function startFromRecording(projectId: string, blob: Blob, ext: string): Promise<RecordingResult> {
+  const formData = new FormData()
+  formData.append("file", blob, `start.${ext}`)
+  return uploadFile<RecordingResult>(`/projects/${projectId}/intake/recording`, formData)
 }
