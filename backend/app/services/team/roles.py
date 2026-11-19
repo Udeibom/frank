@@ -125,7 +125,15 @@ def strip_mention(text: str) -> str:
     out = text
     for n in NAMES:
         short = n.replace("the ", "")
-        out = re.sub(rf"\bI asked {n} (to |and they )?", "I ", out, flags=re.I)
+        out = re.sub(rf"\bI asked {n} and (we|I) ", lambda m: ("We " if m.group(1).lower() == "we" else "I "), out, flags=re.I)
+        out = re.sub(rf"\bI asked {n} to ", "I decided to ", out, flags=re.I)
+        out = re.sub(rf"\bI asked {n} (and they )?", "I ", out, flags=re.I)
         out = re.sub(rf"\b(the )?{re.escape(short)} (thinks|suggests|says|feels)\b", r"I \2", out, flags=re.I)
         out = re.sub(r"\bI (thinks|suggests|says|feels)\b", lambda m: "I " + m.group(1)[:-1], out)
-    return out
+    # Any name still left (sentence shapes the patterns don't know) becomes "the team", so a mention the rule
+    # forbids never reaches the person (found Nov 19: "I asked the beat-maker and we tried..." got through).
+    for n in sorted(NAMES, key=len, reverse=True):
+        short = n.replace("the ", "")
+        out = re.sub(rf"\b(?:the |my |our )?{re.escape(short)}\b", "the team", out, flags=re.I)
+    out = re.sub(r"\bthe the team\b", "the team", out, flags=re.I)
+    return re.sub(r"(^|[.!?]\s+)the team", lambda m: m.group(1) + "The team", out)

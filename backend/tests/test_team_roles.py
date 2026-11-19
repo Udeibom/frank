@@ -73,3 +73,44 @@ def test_every_room_prompt_carries_its_team_and_the_producer_decides_rule():
         block = roles.team_block(room, "refining", False)
         assert all(roles.ROLES[k]["name"] in block for k in team), room
         assert "the producer decides once" in block and "one voice" in block
+
+
+def test_the_mention_rule_reads_the_stored_conversation(monkeypatch):
+    """A reload has no history in the page; the rule must still see what Frank said before (spec 07, task 6)."""
+    import asyncio
+
+    from app.services.team import conversation_store as convo
+    from app.services.team import roles
+
+    name = roles.ROLES["beat_maker"]["name"]
+    stored: list[dict] = []
+
+    async def history(pid, room):
+        return stored
+
+    monkeypatch.setattr(convo, "history", history)
+    reply = f"I asked {name} and we tried simpler drums."
+    assert roles.mentions(reply)
+    assert asyncio.run(convo.enforce_reply("p", "beat", reply)) == reply, "nothing said before: a mention is allowed"
+    stored[:] = [{"role": "assistant", "content": f"The {name.lower()} suggested a fill."}, {"role": "user", "content": "ok"}]
+    stripped = asyncio.run(convo.enforce_reply("p", "beat", reply))
+    assert stripped == "We tried simpler drums.", stripped
+    for odd in (f"Our {name.replace('the ', '')} suggested a fill.", f"{name.replace('the ', '').capitalize()} has an idea."):
+        out = roles.strip_mention(odd)
+        assert not roles.mentions(out) and out[0].isupper(), out
+
+
+def test_what_the_description_reader_shows_is_plain():
+    from app.services.intake import description
+
+    out = description.clean({"summary": "A slow ballad with lots of reverb at a low BPM", "question": "Should the EQ be warmer?"})
+    from app.services.team import plain
+
+    assert not plain.find_jargon(out["summary"]) and not plain.find_jargon(out["question"])
+
+
+def test_stripped_mentions_still_read_naturally():
+    from app.services.team import roles
+
+    assert roles.strip_mention("I asked the beat-maker to try a fill.") == "I decided to try a fill."
+    assert roles.strip_mention("The mix engineer thinks your voice should come up.") == "I think your voice should come up."

@@ -58,8 +58,10 @@ Traces to founder decisions 1, 2, 4, 6 and the conversation-layer steering file.
 ### Requirement 6 - Plain language, enforced
 #### Acceptance Criteria
 1. EVERY reply SHALL be checked against the banned-word list (conversation-layer steering) before it is shown.
-2. A reply that fails SHALL be rewritten once by the model with the offending words named; IF it still fails
-   THE terms SHALL be replaced by their plain equivalents from the steering table.
+2. A reply that fails SHALL have each offending term replaced at once by its plain equivalent from the steering
+   table (no second model call). (Amended Nov 19, founder agreed: a rewrite by the model would read a little more
+   naturally but costs a second call per slip on the free tier's token budget and adds a delay.)
+3. Text a structured read shows the person (a summary, a question) SHALL pass the same check field by field.
 
 ### Requirement 7 - The conversation is remembered
 #### Acceptance Criteria

@@ -11,7 +11,7 @@ POST /projects/{id}/talk {room, message}
        -> one round: each specialist sees the other's position, may revise
        -> Producer call settles: keeps a set of actions
   -> Frank call: writes the reply from the kept positions (one voice, mention rule)
-  -> plain-language guard (code + one rewrite)
+  -> plain-language guard (code: terms replaced directly)
   -> store exchange; return {message, actions, findings_shown}
 ```
 The room pages call `/talk` instead of their own `/conversation` routes. The old routes stay as thin wrappers
@@ -54,7 +54,7 @@ names live in this one file.
 ## Plain-language guard
 `services/team/plain.py`: regex list from conversation-layer steering (BPM, tempo, key/mode as music terms,
 reverb, compression, EQ, Hz/kHz/dB, quantization, stem, DAW, VST, MIDI, LUFS) plus replacements table.
-Shared with the Plain Language Auditor agent.
+Shared with the Plain Language Auditor agent. Each term is replaced directly (no model rewrite; founder agreed Nov 19).
 
 ## Token budget (the reason for the decision above)
 Groq free tier is 6,000 tokens/min. Router + up to 3 specialists + Frank is too much per message at full
