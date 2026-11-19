@@ -145,6 +145,19 @@ async def beat_conversation(
         # they can't say what is wrong: Frank listens instead of guessing (spec 08, requirement 1.1)
         actions = [ConversationAction(type="refine", params={"concern": body.message[:300]})]
         result["message"] = "I'll listen to the song properly and come back with a few ideas you can hear before choosing."
+    # Protect the intention (spec 07, requirement 3.1): a change that fights the feeling they described is said
+    # once, with three directions; their answer (or asking again) builds it.
+    from app.services.team import intention
+
+    asked_ops = [o for a in actions if a.type == "beat_operations" for o in (a.params.get("operations") or [])]
+    say_instead, run_instead = await intention.check(project_id, body.message, asked_ops, list(body.beat_state.get("sections") or []))
+    if say_instead:
+        actions = [a for a in actions if a.type != "beat_operations"]
+        result["message"] = say_instead
+    elif run_instead:
+        actions = [a for a in actions if a.type != "beat_operations"] + [
+            ConversationAction(type="beat_operations", params={"operations": run_instead})]
+        result["message"] = "Doing that now. Have a listen when it's ready and tell me how it feels."
     result["message"] = await convo.enforce_reply(project_id, "beat", result.get("message", ""))
     await convo.record(project_id, "beat", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return BeatConversationResponse(message=result.get("message", ""), actions=actions)

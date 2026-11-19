@@ -52,6 +52,11 @@ MUTATIONS = [
     ("app/services/taste/rules.py", "    return sum((1 if prefs[t] == d else -1) for t, d in signals_for_direction(kind, actions, section_names) if t in prefs)",
      "    return 0",
      "tests/test_properties_taste.py::test_the_proposer_offers_what_the_artist_likes_first_but_still_offers_the_rest"),
+    # protect the intention (spec 07, requirement 3.1)
+    ("app/services/team/intention.py", "            if opt.get(\"kind\") == KEY and opt.get(\"pull\") == pull:", "            if False:",
+     "tests/test_intention.py::test_said_once_and_their_call_wins"),
+    ("app/services/team/intention.py", "        if pull == 0 or lean == 0 or pull == lean:", "        if True:",
+     "tests/test_intention.py::test_said_once_and_their_call_wins"),
     # creative director (spec 10)
     ("app/services/song/brief.py", "    if facet == \"references\":\n        return _references_text(content)\n", "",
      "tests/test_creative_director.py::test_a_named_artist_reaches_no_prompt_only_the_feeling_does"),
