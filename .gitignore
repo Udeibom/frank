@@ -61,3 +61,7 @@ yarn-error.log*
 .playwright-mcp/
 # Listening tests: audio never goes in the repo
 listening/
+
+tools/listener_mcp/.venv/
+backend/.reference_report.txt
+backend/.reference_report.log

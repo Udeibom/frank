@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Listen to the reference song after an engine change",
+      "trigger": "PostFileSave",
+      "description": "Renders a fixed song after any song-engine change and compares the Listener's findings with the stored baseline (kiro-craft spec 12, requirement 2.2).",
+      "matcher": "backend/app/services/generation/.*\\.py$",
+      "action": {
+        "type": "command",
+        "command": "cd backend && (nohup venv/bin/python scripts/listen_reference.py > .reference_report.log 2>&1 &) && echo \"Rendering the reference song in the background; result in backend/.reference_report.txt (a NEW likely problem makes it say so).\"",
+        "timeout": 30
+      }
+    }
+  ]
+}

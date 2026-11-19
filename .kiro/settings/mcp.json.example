@@ -1,5 +1,5 @@
 {
-  "_note": "Copy to .kiro/settings/mcp.json and fill in the <placeholders>. The real file is git-ignored because it holds a token. Servers: context7 (current library docs), supabase (database advisors and checks), playwright (drives a real browser to test the studio screens).",
+  "_note": "Copy to .kiro/settings/mcp.json and fill in the <placeholders>. The real file is git-ignored because it holds a token. Servers: context7 (current library docs), supabase (database advisors and checks), playwright (drives a real browser to test the studio screens), frank-listener (Frank's own Listener, so Kiro can hear its renders; set up with: python3 -m venv tools/listener_mcp/.venv && tools/listener_mcp/.venv/bin/pip install -r tools/listener_mcp/requirements.txt).",
   "mcpServers": {
     "context7": {
       "command": "node",
@@ -42,6 +42,18 @@
         "browser_click",
         "browser_type",
         "browser_take_screenshot"
+      ]
+    },
+    "frank-listener": {
+      "command": "<repo>/tools/listener_mcp/.venv/bin/python",
+      "args": [
+        "<repo>/tools/listener_mcp/server.py"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "measure_file",
+        "find_issues_file",
+        "compare_files"
       ]
     }
   }
