@@ -1,12 +1,19 @@
 # Build progress (read this first after an interruption)
 
-Reference point for resuming: "Continue from .kiro/specs/_build-progress.md, checkpoint 5."
+Reference point for resuming: "Continue from .kiro/specs/_build-progress.md, checkpoint 6."
 
 Deployed: frontend https://frank-bay-zeta.vercel.app · backend https://frank-api-pzjo.onrender.com (Render srv-dbtv8e0n74is73evdbdg)
 Ops (all in the repo, survive restarts): `backend/scripts/ops/render.py wait|logs|events|env`,
 `backend/scripts/ops/e2e.py` (full HTTP walkthrough on prod, now including demo story 3; `E2E_REFINE=0` skips it),
 `backend/scripts/ops/sql.py` (needs SUPABASE_ACCESS_TOKEN env), `backend/scripts/mutate_check.py` (proves the refine
 properties can fail). Plan of record: `.kiro/specs/_remaining-work.md`.
+
+## Checkpoint 6 (Nov 19): every spec built; demo stories pass on the live site
+- Specs 10 (creative director), 02 rest (description/voice memo, one way in, StartSurface), 12 (CI, Listener MCP,
+  reference hook, README/KIRO_USAGE), 13 (licence, cold start, secrets/RLS audit, Supabase URLs, demo runs).
+- Demo stories 1, 2, 3 on the live site with fresh accounts: all PASS (docs/demo-runs/).
+- Open items are listed in each tasks.md; the main ones: browser checks with a real microphone, the founder's
+  listening verdicts, team-conversation tasks 4/5/9 replaced by the one-call decision (founder to confirm).
 
 ## Checkpoint 5 (Nov 18): finish and intent (spec 11), taste memory (spec 09)
 - Spec 11: parts mixed separately (cached for the beat in use), finishing from an uncompressed render (two-pass
