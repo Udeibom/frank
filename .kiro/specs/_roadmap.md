@@ -15,12 +15,12 @@ Status key: OUTLINE (intent captured) / SPEC (requirements+design+tasks written)
 | 03 | listener | The team's ears: per-section and per-part measurements reported as plain facts | 01 | BUILDING |
 | 04 | song-engine | The team's hands for music: arrangement depth, transitions, real stems, seeded variation, melody that follows chords, every fingerprint field wired | 01, 02 | BUILDING |
 | 05 | sound-quality | Release-grade sound: spike comparing better SoundFonts + mixing chain vs hosted neural; decision recorded, then built | 04 | BUILDING |
-| 06 | sing-it | The user sings: guide melody they follow, beat alignment, tuning to the song's key per note, bleed removal, comping, harmony | 02, 04 | SPEC |
+| 06 | sing-it | The user sings: guide melody they follow, beat alignment, tuning to the song's key per note, bleed removal, comping, harmony | 02, 04 | BUILT |
 | 07 | team-conversation | Shared brief in every call, role routing, several LLM providers, bounded specialist disagreement, occasional role mentions, review-vs-creating behaviour, plain-language enforcement | 01, 03 | BUILDING |
-| 08 | refine-loop | Diagnose with evidence, offer 2-3 directions, preview each, commit; experiments when nobody knows; branches; "give me the second version back" | 03, 04, 07 | SPEC |
-| 09 | taste-memory | Per-artist taste profile with notes per specialist; repeated-evidence rule; view/edit/forget | 01, 07 | SPEC |
-| 10 | creative-director | Protects the person's own identity. NOT a "sounds like" role: no researching or imitating named artists; a named artist is turned into a feeling in the person's own words (decided Nov 13, see producer-craft.md). Identity brief | 01, 07 | SPEC |
-| 11 | finish-and-intent | Mix per part, finishing, intent check ("does this match what you described?"), one optional surprise version, export | 04, 06, 08 | SPEC |
+| 08 | refine-loop | Diagnose with evidence, offer 2-3 directions, preview each, commit; experiments when nobody knows; branches; "give me the second version back" | 03, 04, 07 | BUILT |
+| 09 | taste-memory | Per-artist taste profile with notes per specialist; repeated-evidence rule; view/edit/forget | 01, 07 | BUILT |
+| 10 | creative-director | Protects the person's own identity. NOT a "sounds like" role: no researching or imitating named artists; a named artist is turned into a feeling in the person's own words (decided Nov 13, see producer-craft.md). Identity brief | 01, 07 | BUILT |
+| 11 | finish-and-intent | Mix per part, finishing, intent check ("does this match what you described?"), one optional surprise version, export | 04, 06, 08 | BUILT |
 | 12 | kiro-craft | STARTED Nov 12 (hooks that run real checks, 3 new agents, mcp example, spec checker; see KIRO_USAGE.md). Still to do: role steering that doubles as runtime prompts, hooks that fire, per-role agents, an audio-analysis MCP so Kiro can check its own renders, PBT on the new invariants, CI, mcp.json.example, README/KIRO_USAGE honesty | all | BUILDING |
 | 13 | ship-it | Public deployment (incl. any GPU host), all three demo stories passing end to end, license, demo video, write-up, bonus posts | all | BUILDING |
 

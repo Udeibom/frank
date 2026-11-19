@@ -13,8 +13,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Spec checker (ticked tasks have evidence, roadmap agrees)
+        run: python3 scripts/check_specs.py
+      - name: Architecture checker (no audio processing in the browser, keys server-side, versions kept)
+        run: python3 scripts/check_architecture.py
+
   backend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # package names match the server image; ubuntu-latest moved to 26
     timeout-minutes: 45
     defaults:
       run:
@@ -45,7 +55,7 @@ jobs:
         run: python -m pytest -q -p no:cacheprovider tests
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # package names match the server image; ubuntu-latest moved to 26
     timeout-minutes: 20
     defaults:
       run:
