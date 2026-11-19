@@ -139,6 +139,12 @@ async def beat_conversation(
         for a in result.get("actions", [])
         if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS
     ]
+    from app.services.refine.resolve import wants_refine
+
+    if wants_refine(body.message) and not any(a.type == "refine" for a in actions):
+        # they can't say what is wrong: Frank listens instead of guessing (spec 08, requirement 1.1)
+        actions = [ConversationAction(type="refine", params={"concern": body.message[:300]})]
+        result["message"] = "I'll listen to the song properly and come back with a few ideas you can hear before choosing."
     result["message"] = await convo.enforce_reply(project_id, "beat", result.get("message", ""))
     await convo.record(project_id, "beat", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return BeatConversationResponse(message=result.get("message", ""), actions=actions)

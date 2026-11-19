@@ -132,3 +132,15 @@ def resolve(
 
 def as_plain(v: dict) -> dict[str, Any]:
     return {"id": v.get("id"), "label": v.get("label"), "render_url": v.get("render_url"), "created_at": str(v.get("created_at"))}
+
+
+UNSURE = re.compile(
+    r"(don'?t know (what|why)|can'?t (tell|put my finger on|say) (what|why)?|not sure (what|why)|something('?s| is)? (off|wrong|missing|not right)"
+    r"|feels? (off|wrong|flat)|doesn'?t (hit|work|feel right|lift)|isn'?t (working|right|hitting)|show me (some|a few) (ideas|options))",
+    re.I,
+)
+
+
+def wants_refine(text: str) -> bool:
+    """'Something feels off with the chorus but I don't know what': Frank should listen, not guess (spec 08, req 1.1)."""
+    return bool(UNSURE.search(text or ""))

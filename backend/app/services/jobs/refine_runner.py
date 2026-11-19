@@ -98,8 +98,8 @@ async def run_propose_job(job_id: str, project_id: str, concern: Optional[str]) 
 
         ident, _ = await identity.context(project_id)
         for d in directions:
-            found = identity.drift_notes(ident, direction=d.model_dump(), their_tune=basis["lead"] is not None)
-            note = await identity.mention_once(project_id, "direction:" + found[0], found[0]) if found else None
+            drift = identity.drift_notes(ident, direction=d.model_dump(), their_tune=basis["lead"] is not None)
+            note = await identity.mention_once(project_id, "direction:" + drift[0], drift[0]) if drift else None
             if note:
                 message = f"{message} One thing about \u201c{d.title}\u201d: {note}"
                 break

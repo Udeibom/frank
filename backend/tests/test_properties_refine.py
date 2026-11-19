@@ -279,3 +279,61 @@ def test_frank_speaks_as_one_person_and_names_an_experiment():
     assert "listener" not in said.lower() and "one thing" in said
     assert propose.finish_message("I couldn't pin it down.", found, True).endswith("your ears can decide.")
     assert propose.finish_message("", {"findings": [{"plain": "The chorus is quiet."}]}, False).startswith("I listened.")
+
+
+def test_not_knowing_what_is_wrong_starts_the_listening():
+    for said in ("something feels off with the chorus but I don't know what", "it just doesn't hit", "I can't put my finger on it",
+                 "show me a few ideas"):
+        assert resolve.wants_refine(said), said
+    for said in ("make the chorus bigger", "the bass is too busy in the verse", "I love it"):
+        assert not resolve.wants_refine(said), said
+
+
+def test_the_propose_job_completes_with_the_findings(monkeypatch):
+    """Regression (demo 3, Nov 19): the drift check overwrote the Listener's findings and every proposal failed."""
+    from app.services.jobs import refine_runner as rr
+    from app.services.listener.models import MeasurementReport
+    from app.services.team import identity
+
+    sections = plan()
+    done: dict = {}
+
+    async def nothing(*a, **k):
+        return None
+
+    async def measure(*a, **k):
+        return MeasurementReport()
+
+    async def basis(pid):
+        return {"beat_id": "b1", "mix_id": None, "sections": sections, "seed": SEED, "fp": FP, "lead": None, "mix_params": None, "beat": {}}
+
+    async def ctx(pid):
+        return {}, False
+
+    async def complete(job, result):
+        done.update(result)
+
+    async def fail(job, msg):
+        raise AssertionError(msg)
+
+    async def say(job, text):
+        return None
+
+    async def mention(pid, key, note):
+        return note
+
+    monkeypatch.setattr(rr.jobs_db, "mark_processing", nothing)
+    monkeypatch.setattr(rr.jobs_db, "mark_complete", complete)
+    monkeypatch.setattr(rr.jobs_db, "mark_failed", fail)
+    monkeypatch.setattr(rr, "_progress", say)
+    monkeypatch.setattr(rr.listen_project, "measure_song", measure)
+    monkeypatch.setattr(rr, "load_basis", basis)
+    monkeypatch.setattr(rr, "_prefs", lambda pid: nothing())
+    monkeypatch.setattr(rr.refine_db, "insert_proposal", lambda row: {"id": "p1", **row})
+    monkeypatch.setattr(identity, "context", ctx)
+    monkeypatch.setattr(identity, "mention_once", mention)
+    monkeypatch.setattr(identity, "drift_notes", lambda *a, **k: ["That would take your own tune out."])
+    monkeypatch.setattr(rr.propose_mod, "_ask_producer", lambda *a: {"message": "", "directions": [
+        {"title": "Leave the tune out", "plain": "x", "kind": "beat", "actions": [{"op": "remove_part", "part": "melody", "section": [2]}]}]})
+    asyncio.run(rr.run_propose_job("job", "proj", "the chorus doesn't hit"))
+    assert done["proposal_id"] == "p1" and isinstance(done["findings"], list) and 2 <= len(done["directions"]) <= 3

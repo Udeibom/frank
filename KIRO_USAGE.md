@@ -81,8 +81,6 @@ curl workflow never would have told us this.
 
 ---
 
-## (more sections to come: specs, hooks, custom agents, PBT, and the
-## integration bug story — added as we do the work)
 
 ---
 
@@ -603,3 +601,56 @@ out of that:
   as a paywalled opening or a search snippet, says plainly that no list of producers' exact questions was
   found, and flags one conflict with an earlier decision: two working songwriters call the "sounds like"
   game a trap, which bears on the Creative Director idea. That one is left to the founder.
+
+
+## Nov 17 to 19: building the rest of the specs and shipping it
+
+The founder's instruction was "build the whole spec, deploy it, and don't stop to ask me". Work went spec by spec
+(`.kiro/specs/_build-progress.md` is the checkpoint file written for exactly this: the network dropped more
+than ten times, and each time the session resumed from that file, not from memory).
+
+### What Kiro's pieces did, concretely
+
+- **Specs as the contract.** Specs 06 to 13 were written first (requirements, design, tasks), then built in order.
+  Each `tasks.md` line now carries its evidence (file, test, production check). The **Spec Keeper** agent was run
+  over ten task files at the end; it un-ticked tasks whose ticks had no evidence (for example a Beat Room timeline
+  layer list that doesn't exist) and wrote down three decisions the founder still has to make.
+- **Property tests that found real bugs, not just guarded them.** Examples from this stretch, each found by a
+  Hypothesis test and fixed in the product: "try another" on a part that isn't playing, "bigger" past the top and
+  swapping to the sound already playing all *said* they changed the song and changed nothing
+  (`ops.apply_audible` now composes the score and refuses a change you could not hear); duplicate findings
+  hid that only one direction was really on offer; a song shape where only one experiment was possible.
+- **Breaking the code on purpose.** `backend/scripts/mutate_check.py` applies one small break per property and
+  expects a test to fail. It covers the refine loop, sing-it, finish, taste and the Creative Director. One
+  mutation survived at first (harmony without chords was never tested); a test was added.
+- **Listening Lab agent** prepared blind A/B listening sets from the founder's real hums, with a separate answer
+  key. Its numbers changed a design decision: the spec said "tune toward the tune's note within two steps", and
+  real hums showed that moved notes up to 1.8 steps, rewriting the person's melody. Tuning now never moves a note
+  past its neighbour (max 0.94 steps on the same hums). The files wait for the founder's ears.
+- **Live checks against the deployed site**, all scripts in `backend/scripts/ops/`: the full walkthrough
+  (`e2e.py`), the demo stories (`demo_runs.py`, records in `docs/demo-runs/`), a two-user privacy check
+  (`rls_check.py`: "RLS OK"), the start paths (`start_check.py`).
+- **A fourth MCP server: Frank's own Listener** (`tools/listener_mcp/`). Kiro can now ask "what's wrong with this
+  render" with the exact functions the product uses. It lives in its own environment because the `mcp` package
+  needs newer libraries than the backend pins; installing it into the backend once broke FastAPI's pinned
+  Starlette, which was caught and rolled back before anything was committed.
+- **A new hook**: an engine change renders a fixed reference song in the background and compares the Listener's
+  findings with a stored baseline (`backend/scripts/listen_reference.py`).
+- **CI** (`.github/workflows/ci.yml`): its first run failed because GitHub's `ubuntu-latest` had moved to a
+  release with different audio package names; pinned to the server image's release.
+
+### What went wrong, honestly
+
+- **Edits that silently didn't apply.** Several scripted edits matched nothing (the text shown in the tool output
+  hides blank lines) and were not checked. One of them meant take responses never carried the new fields; the
+  production walkthrough caught it. After that every scripted edit asserted it matched exactly once.
+- **The first model behaviour wasn't the spec's.** Asked "make it sound like Billie Eilish", the live model
+  described the artist's sound and moved the song toward it, against the Creative Director spec. The rule in the
+  prompt was not enough; code now replaces that reply with one plain question and keeps only the feeling words.
+- **A rendering bug nobody would have heard.** Rendering the song's parts separately (for per-part mixing) gave
+  parts that didn't add up to the beat. Cause: FluidSynth applies notes on 64-sample blocks and its echo carried
+  into the next render. Every render now starts on a block boundary and drains the echo.
+- **The flaky test** noted for a week was a 200 ms Hypothesis deadline on a cold first call, not a product bug.
+- **Not tried in a real browser with a microphone**: the sing-along timing (lead-in, delay check), the start
+  surface recording and the A/B players are type-checked and built, and their server side runs on production,
+  but nobody has sung into them yet. That is the founder's first test.

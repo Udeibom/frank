@@ -189,6 +189,12 @@ async def mix_conversation(
 
     changing = [a for a in raw_actions if a.get("type") not in ("analyze_mix", "refine")][:MAX_CHANGES]
     raw_actions = changing + [a for a in raw_actions if a.get("type") in ("analyze_mix", "refine")]
+    from app.services.refine.resolve import wants_refine
+
+    if wants_refine(body.message) and not any(a.get("type") == "refine" for a in raw_actions):
+        # they can't say what is wrong: Frank listens instead of guessing (spec 08, requirement 1.1)
+        raw_actions = [{"type": "refine", "params": {"concern": body.message[:300]}}]
+        result["message"] = "I'll listen to the song properly and come back with a few ideas you can hear before choosing."
     new_params, render = apply_actions(params, raw_actions)
     actions = [ConversationAction(type=a["type"], params=a.get("params", {})) for a in raw_actions]
 
