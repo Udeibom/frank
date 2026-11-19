@@ -257,6 +257,10 @@ INTERNAL_NAMES = ("listener", "producer", "the team", "specialist")
 def finish_message(message: str, found: dict, experiment: bool) -> str:
     """Frank speaks as one person ("I listened"), never about its parts; an experiment always says what it is."""
     text = plain.guard(message or "").strip()
+    if experiment:
+        # nothing was measured, so there is no cause to state: the model may not invent one (spec 08, req 1.1-1.2;
+        # demo 3 on Nov 19 had it claim "the choruses have more layers" with no finding behind it)
+        return fallback_message(found, experiment)
     if not text or any(w in text.lower() for w in INTERNAL_NAMES):
         return fallback_message(found, experiment)
     if experiment and "one thing" not in text.lower():

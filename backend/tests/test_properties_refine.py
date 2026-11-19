@@ -277,7 +277,8 @@ def test_frank_speaks_as_one_person_and_names_an_experiment():
     found = {"findings": []}
     said = propose.finish_message("The Listener didn't find a clear cause.", found, True)
     assert "listener" not in said.lower() and "one thing" in said
-    assert propose.finish_message("I couldn't pin it down.", found, True).endswith("your ears can decide.")
+    invented = propose.finish_message("I hear the choruses have more layers than the verses.", found, True)
+    assert "layers" not in invented and "can't point to one clear thing" in invented, "no cause without a finding"
     assert propose.finish_message("", {"findings": [{"plain": "The chorus is quiet."}]}, False).startswith("I listened.")
 
 
