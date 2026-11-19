@@ -12,9 +12,13 @@ Traces to founder decisions 1, 2, 4, 6 and the conversation-layer steering file.
 ### Requirement 1 - One voice, the right specialists behind it
 **User Story:** As a user, I want to talk to Frank and have the right expert answer.
 #### Acceptance Criteria
-1. THE SYSTEM SHALL route each message to one or more specialists (Songwriter, Producer, Creative Director,
-   Arranger, Beat-maker, Session player, Vocal producer, Recording engineer, Mix engineer, Mastering
-   engineer) based on what the message is about, not only on which room it was typed in.
+1. THE SYSTEM SHALL answer each message with ONE model call whose prompt carries the role cards of the
+   specialists who work in that room (Songwriter, Producer, Creative Director, Arranger, Beat-maker, Session
+   player, Vocal producer, Recording engineer, Mix engineer, Mastering engineer, as listed per room), so the
+   model answers as the specialist the message is about. Rules that must always hold (one voice, the mention
+   rule, plain language, named artists, the phase) SHALL be enforced in code, not only in the prompt.
+   (Amended Nov 19, founder agreed: a router plus specialist calls, 5-6 calls per message, does not fit the
+   Groq free tier's ~6,000 tokens a minute.)
 2. EACH specialist SHALL have its own instructions taken from `frank-team.md` (what it owns, what it can
    hear, what it can change, when it disagrees) and SHALL only propose actions it is allowed to take.
 3. THE reply SHALL always come from Frank, in one voice.
@@ -23,12 +27,13 @@ Traces to founder decisions 1, 2, 4, 6 and the conversation-layer steering file.
 
 ### Requirement 2 - Disagreement that carries information
 #### Acceptance Criteria
-1. WHEN two specialists propose conflicting changes (for example the Mix engineer lowers the vocal and the
-   Vocal producer objects) THE SYSTEM SHALL hold one round where each states its position with the evidence
-   it rests on (a Listener measurement or the person's words), and the Producer decides.
+1. WHEN two specialists would want conflicting changes (for example the Mix engineer lowers the vocal and the
+   Vocal producer objects) THE prompt SHALL tell the model that the Producer decides, once, protecting what the
+   person said they want, with the evidence it rests on (a Listener measurement or the person's words).
+   (Amended Nov 19, founder agreed: inside the single call, not as a separate round of calls.)
 2. THE person SHALL see only Frank's summary ("I could make the music bigger, but it would cover your voice,
    so I lifted both a little").
-3. THE round SHALL be bounded: one round, no loops.
+3. THE decision SHALL be bounded: settled within the one call, no loops and no extra calls.
 
 ### Requirement 3 - Protect the intention
 #### Acceptance Criteria

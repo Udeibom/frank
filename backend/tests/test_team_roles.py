@@ -63,3 +63,13 @@ def test_the_song_moves_to_refining_once_a_first_draft_exists():
         out = asyncio.run(rec.system_with_brief("p1", "SYSTEM", "beat_maker"))
     assert switched == [{"phase": "refining"}]
     assert "PHASE: refining" in out and "YOUR TEAM" in out
+
+
+def test_every_room_prompt_carries_its_team_and_the_producer_decides_rule():
+    """Amended requirements 1.1 and 2 (founder, Nov 19): one call per message, the team and the rule in its prompt."""
+    from app.services.team import roles
+
+    for room, team in roles.ROOM_TEAM.items():
+        block = roles.team_block(room, "refining", False)
+        assert all(roles.ROLES[k]["name"] in block for k in team), room
+        assert "the producer decides once" in block and "one voice" in block
