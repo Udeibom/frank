@@ -1,7 +1,7 @@
 """
 The team behind Frank (team-conversation spec 07, requirements 1-4; kiro-craft spec 12 requirement 1).
 
-Role cards are the runtime form of `.kiro/steering/frank-team.md`. A test checks every role in that file has a card
+Role cards are the runtime form of `.kiro/skills/frank-team/SKILL.md`. A test checks every role in that file has a card
 here, so the steering file and the product cannot drift.
 
 Design decision (Nov 19, recorded in spec 07 design): the free Groq tier allows about 6,000 tokens a minute, so the

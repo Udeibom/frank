@@ -17,7 +17,7 @@ Frank's specs are only worth showing a judge if they are true. They drifted befo
 3. If there is no evidence, untick it and write one line saying what is missing. Never tick a task you have not verified yourself.
 4. Check each requirement in `requirements.md` is cited by at least one task (`_Requirements: x.y_`). List the ones that are not.
 5. Keep `.kiro/specs/_roadmap.md` true: the Status column follows the tasks (OUTLINE, SPEC, BUILDING, DONE). A spec is DONE only when every task is ticked and the founder has listened to or used the result.
-6. Keep the coverage matrix in the roadmap whole: every founder decision in `.kiro/steering/frank-team.md` still names a spec that owns it.
+6. Keep the coverage matrix in the roadmap whole: every founder decision in `.kiro/skills/frank-team/SKILL.md` still names a spec that owns it.
 
 ## Rules for your report
 

@@ -1,5 +1,6 @@
 ---
-inclusion: manual
+name: frank-team
+description: The founder's vision for Frank's production team: every role (songwriter, producer, beat maker, vocal producer, recording engineer, mix engineer, mastering engineer, creative director), what each owns, when each disagrees, and the founder's numbered decisions. Use when changing team roles, prompts, the song brief, or anything about who in Frank says what.
 ---
 
 # Frank — The Team (DRAFT, needs the founder's edits)

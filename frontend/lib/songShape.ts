@@ -117,10 +117,13 @@ export function sectionStart(sections: StripSection[], index: number): number {
 /** Which section a position (0..1 through the song) falls in. */
 export function sectionAt(sections: StripSection[], fraction: number): number {
   const total = sections.reduce((a, s) => a + s.weight, 0) || 1
+  // Compare in whole weights, not summed fractions: summing rounded fractions put the exact start of a section
+  // into the section before it (found by the fast-check property "the start of a section is found in it").
+  const at = fraction * total + 1e-9 * total
   let acc = 0
   for (let i = 0; i < sections.length; i++) {
-    acc += sections[i].weight / total
-    if (fraction < acc) return i
+    acc += sections[i].weight
+    if (at < acc) return i
   }
   return Math.max(0, sections.length - 1)
 }

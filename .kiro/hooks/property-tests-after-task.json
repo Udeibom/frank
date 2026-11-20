@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Property tests after a spec task",
+      "trigger": "PostTaskExec",
+      "description": "When a spec task is marked done, run every Hypothesis property test so a ticked task can never leave an invariant broken.",
+      "action": {
+        "type": "command",
+        "command": "cd backend && venv/bin/python -m pytest -q -p no:cacheprovider tests -k properties -x 2>&1 | tail -15",
+        "timeout": 600
+      }
+    }
+  ]
+}

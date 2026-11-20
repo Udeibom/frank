@@ -22,6 +22,10 @@ jobs:
         run: python3 scripts/check_specs.py
       - name: Architecture checker (no audio processing in the browser, keys server-side, versions kept)
         run: python3 scripts/check_architecture.py
+      - name: Plain-language checker (no music jargon in what the user reads)
+        run: python3 scripts/check_plain_language.py
+      - name: Steering checker (steering names only what is installed and read)
+        run: python3 scripts/check_steering.py
 
   backend:
     runs-on: ubuntu-24.04   # package names match the server image; ubuntu-latest moved to 26
@@ -53,6 +57,8 @@ jobs:
         run: bash scripts/fetch_soundfont.sh
       - name: Tests
         run: python -m pytest -q -p no:cacheprovider tests
+      - name: Mutation check (each listed property test fails when its code is broken)
+        run: python scripts/mutate_check.py
 
   frontend:
     runs-on: ubuntu-24.04   # package names match the server image; ubuntu-latest moved to 26
@@ -74,5 +80,7 @@ jobs:
       - run: npm ci
       - name: Type check
         run: npx tsc --noEmit
+      - name: Property tests (fast-check)
+        run: npm test
       - name: Build (includes lint)
         run: npx next build

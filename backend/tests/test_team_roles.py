@@ -10,7 +10,7 @@ from app.models.song import SongRecord
 from app.services.song import record as rec
 from app.services.team import roles
 
-STEERING = pathlib.Path(__file__).resolve().parents[2] / ".kiro" / "steering" / "frank-team.md"
+STEERING = pathlib.Path(__file__).resolve().parents[2] / ".kiro" / "skills" / "frank-team" / "SKILL.md"
 
 
 def _steering_roles() -> set[str]:

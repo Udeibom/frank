@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Plain-language review of prompt changes",
+      "trigger": "PostFileSave",
+      "description": "Prompts are where jargon leaks into Frank's speech; an agent reads the change the way the user will hear it.",
+      "matcher": "backend/app/services/(llm/prompts\\.py|team/.*\\.py|refine/propose\\.py|song/brief\\.py)$",
+      "action": {
+        "type": "agent",
+        "prompt": "A file that shapes what Frank says to the user was just saved. Invoke the Plain Language Auditor sub-agent on that file only. It must check (1) every example reply and instruction in the prompt for music jargon a non-musician would not know (tempo, BPM, key, reverb, compression, EQ, stem, MIDI, LUFS, quantise and the like) without a plain translation, and (2) that the prompt still tells the model to speak plainly. Report each finding with the line and a plain replacement. Do not edit the file."
+      }
+    }
+  ]
+}

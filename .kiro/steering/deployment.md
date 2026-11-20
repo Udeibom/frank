@@ -1,3 +1,7 @@
+---
+inclusion: fileMatch
+fileMatchPattern: ["backend/Dockerfile", "render.yaml", ".github/workflows/**", "frontend/vercel.json", "spaces/**", "backend/app/config.py"]
+---
 # Frank — Deployment
 
 ## Free Tier Architecture
@@ -12,6 +16,8 @@ Every service in Frank's production deployment uses a free tier. No credit card 
 | LLM | Groq | 6,000 tokens/min on free tier |
 | Speech-to-text | Groq (whisper-large-v3-turbo) | Free tier |
 | Music generation | Frank's own procedural engine (FluidSynth) | Free, CPU-only, self-contained |
+| Neural models (ears, hands) | Two Hugging Face Spaces, `frank-ears` and `frank-hands` (ZeroGPU hardware) | Free accounts can host 2 ZeroGPU Spaces; GPU time is a small daily quota, so every call has a CPU or plain-words fallback |
+| Dataset mining | Kaggle notebooks (offline, results committed as small JSON) | Free |
 | Audio storage | Supabase Storage | Included in free tier |
 
 ## Backend must deploy via Docker (not the plain Python env)
@@ -44,8 +50,9 @@ Environment variables set in Render dashboard:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GROQ_API_KEY`
-- `HUGGINGFACE_API_KEY`
-- `REPLICATE_API_TOKEN`
+- `GEMINI_API_KEY`
+- `HF_TOKEN`
+- `FREESOUND_API_KEY`, `JAMENDO_CLIENT_ID`, `EXA_API_KEY`, `FIRECRAWL_API_KEY` (optional)
 - `ALLOWED_ORIGINS` (Vercel frontend URL for CORS)
 
 ## CORS

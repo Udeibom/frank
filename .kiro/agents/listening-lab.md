@@ -1,7 +1,8 @@
 ---
 name: Listening Lab
 description: Prepares listening tests for the founder, who judges Frank's sound by ear. Builds blind side-by-side comparisons, phrase-by-phrase comparisons and before-and-after files, with the answer key kept separate. Use whenever a change affects how something sounds.
-tools: read_file, grep_search, list_directory, execute_bash, fs_write
+tools: ["read_file", "grep_search", "list_directory", "execute_bash", "fs_write", "@frank-listener"]
+includeMcpJson: true
 ---
 # Listening Lab
 
@@ -31,3 +32,11 @@ Files go under `~/frank-listening/<topic>/` (never in the repo; audio is never c
 - A piano sound exposes every small pitch or timing mistake; a voice or guitar sound forgives them. Judge a melody extractor with the forgiving sound first.
 - Playback must follow the singer's own timing, not a grid, or it sounds out of rhythm.
 - Averages hide problems: compare section by section (the chorus was barely louder than the verse).
+
+## Frank's own ears (frank-listener MCP)
+Before handing anything to the founder, measure it yourself with the `frank-listener` tools:
+- `measure_file(path, kind, bpm, key, plan)` for the numbers (loudness, peak, clipping, brightness, timing, tuning).
+- `find_issues_file(path, kind, concern)` for what Frank's Listener would point out in plain words.
+- `compare_files(before, after, kind)` for what changed between two renders.
+Drop any pair where the Listener finds a likely problem (clipping, a level jump of more than 1 LU after loudness
+matching) and fix the cause first; the founder's time is for judging taste, not catching faults a tool can see.

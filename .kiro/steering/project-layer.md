@@ -1,3 +1,7 @@
+---
+inclusion: fileMatch
+fileMatchPattern: ["backend/app/db/**/*.py", "backend/db/migrations/**", "backend/app/services/song/**/*.py", "frontend/store/**/*.ts"]
+---
 # Frank — Project and Version System
 
 ## What a Project Is

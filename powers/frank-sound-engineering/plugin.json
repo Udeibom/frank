@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "frank-sound-engineering",
+  "version": "1.0.0",
+  "description": "Gives Kiro ears: Frank's Listener as an MCP server (loudness, peaks, clipping, brightness, timing, tuning, section lift) plus the workflows a sound engineer uses before shipping a render, explained in plain words.",
+  "author": { "name": "Frank" },
+  "keywords": ["audio", "music", "mixing", "mastering", "loudness", "listening", "render", "sound"],
+  "repository": "https://github.com/Udeibom/frank",
+  "license": "MIT"
+}

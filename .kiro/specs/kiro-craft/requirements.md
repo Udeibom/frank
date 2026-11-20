@@ -39,3 +39,19 @@ an `mcp.json.example`, and `KIRO_USAGE.md`. This spec finishes the rest.
 1. `README.md` SHALL describe how to run and deploy Frank as it is; `KIRO_USAGE.md` SHALL describe what was
    actually used, including what failed.
 2. `mcp.json.example` SHALL list every MCP server with placeholder secrets only.
+
+### Requirement 7 - Kiro uses Frank's own ears (review Part 1.3, items 1 to 9, founder approved 19 Nov)
+#### Acceptance Criteria
+1. THE frank-listener MCP SHALL be enabled in the live config, and the Listening Lab and Frank Code Reviewer
+   agents SHALL be able to call its tools; one session where Kiro listened through it and changed code SHALL be
+   recorded.
+2. A `frank-sound-engineering` Power (POWER.md, mcp.json, steering) SHALL live in the public repo.
+3. On-demand knowledge SHALL be Skills; steering SHALL load by file match where it only concerns some files.
+4. A producer orchestrator agent SHALL run Spec Keeper, PBT Author, Listening Lab and Frank Code Reviewer in
+   order and stop on an objection.
+5. Kiro CLI SHALL run a listening regression; Kiro Crew SHALL run it on a schedule.
+6. A PostTaskExec hook SHALL run property tests; an agent hook SHALL review prompt changes for jargon; CI SHALL
+   run the plain-language check and the mutation check.
+7. The frontend SHALL have fast-check property tests.
+8. Steering SHALL match the code, and a check SHALL flag libraries named in steering that are not installed.
+9. KIRO_USAGE.md and README.md SHALL be current, with a short summary at the top of KIRO_USAGE.md.

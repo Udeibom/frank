@@ -1,3 +1,7 @@
+---
+inclusion: fileMatch
+fileMatchPattern: ["frontend/middleware.ts", "frontend/lib/supabase/**", "frontend/app/(auth)/**", "backend/app/auth.py"]
+---
 # Frank — Authentication
 
 ## Approach

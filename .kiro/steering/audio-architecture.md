@@ -1,3 +1,7 @@
+---
+inclusion: fileMatch
+fileMatchPattern: ["backend/app/services/**/*.py", "backend/app/routers/**/*.py", "frontend/lib/audio/**/*.ts", "frontend/store/audio.ts", "frontend/components/audio/**/*.tsx", "spaces/**/*.py"]
+---
 # Frank — Audio Architecture
 
 ## Core Mental Model

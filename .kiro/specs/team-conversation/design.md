@@ -18,7 +18,7 @@ The room pages call `/talk` instead of their own `/conversation` routes. The old
 for one release, then are removed.
 
 ## Specialists as data
-`backend/app/services/team/roles.py` loads `.kiro/steering/frank-team.md`-derived role cards from
+`backend/app/services/team/roles.py` loads `.kiro/skills/frank-team/SKILL.md`-derived role cards from
 `services/team/roles.json` (owns, hears, changes, disagrees_when, never, allowed_actions). The steering file
 stays the human source; a test checks every role in the steering file has a card (spec 12 "role steering that
 doubles as runtime prompts").

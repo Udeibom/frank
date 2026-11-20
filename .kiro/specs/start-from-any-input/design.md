@@ -91,7 +91,7 @@ Code, not the model, has the last word:
 - Frank asks a question only when it cannot tell dark from warm (mood below 0.6), and then exactly one.
   Anger against sorrow is not that doubt. The question is about which feeling the music should lean into,
   uses the song's own feelings, and always offers "or should it hold both" (`allow_both`, in code): a song
-  may hold all of its feelings. See `.kiro/steering/producer-craft.md` for the evidence behind this.
+  may hold all of its feelings. See `.kiro/skills/producer-craft/SKILL.md` for the evidence behind this.
 - If two attempts fail, structure comes from blank lines and repeated stanzas (`guess_sections`) and
   the feeling is left empty. A dropped connection is passed on as an error, not hidden by this fallback.
 Written as `feeling` and `structure` facet versions, keyed by a fingerprint of the lyrics text.

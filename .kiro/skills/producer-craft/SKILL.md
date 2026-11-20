@@ -1,5 +1,6 @@
 ---
-inclusion: manual
+name: producer-craft
+description: What working producers, mixers and songwriters say about making songs, and what Frank does with each lesson (chorus lift, vocal placement, the no 'sounds like' rule, arrangement moves). Use when changing the engine, the Listener's thresholds, the refine loop's experiments, or the creative director.
 ---
 
 # Producer craft: what working producers say, and what Frank does with it

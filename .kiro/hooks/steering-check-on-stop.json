@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Steering matches the code",
+      "trigger": "Stop",
+      "description": "After each agent run, flag steering that names libraries that are not installed or environment variables nothing reads.",
+      "action": {
+        "type": "command",
+        "command": "python3 scripts/check_steering.py",
+        "timeout": 30
+      }
+    }
+  ]
+}

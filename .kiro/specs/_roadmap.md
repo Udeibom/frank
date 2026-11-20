@@ -1,6 +1,6 @@
 # Frank — Spec Roadmap (the map of everything)
 
-Source of truth for the vision: `.kiro/steering/frank-team.md`. This file is the index that keeps
+Source of truth for the vision: `.kiro/skills/frank-team/SKILL.md`. This file is the index that keeps
 every spec in view. Update the Status column whenever a spec moves. A spec is only "Done" when its
 tasks are checked AND the founder has listened to or used the result.
 
@@ -23,6 +23,7 @@ Status key: OUTLINE (intent captured) / SPEC (requirements+design+tasks written)
 | 11 | finish-and-intent | Mix per part, finishing, intent check ("does this match what you described?"), one optional surprise version, export | 04, 06, 08 | BUILT |
 | 12 | kiro-craft | STARTED Nov 12 (hooks that run real checks, 3 new agents, mcp example, spec checker; see KIRO_USAGE.md). Still to do: role steering that doubles as runtime prompts, hooks that fire, per-role agents, an audio-analysis MCP so Kiro can check its own renders, PBT on the new invariants, CI, mcp.json.example, README/KIRO_USAGE honesty | all | BUILDING |
 | 13 | ship-it | Public deployment (incl. any GPU host), all three demo stories passing end to end, license, demo video, write-up, bonus posts | all | BUILDING |
+| 14 | frankenstein | The technologies from docs/research/FRANK-KIRO-AND-TECHNOLOGY-REVIEW.md stitched into one body: ears (CLAP, EffNet, Gemini listening, Audiobox, allin1, Chordino), hands (grooves, chord tables, accompaniment, CC0 samples, plugins), voice (DDSP, DiffSinger, DeepFilterNet, word timings, Kokoro), words (CMU, Datamuse, emotions), the world (references, photo, weather), memory (pgvector, Realtime) | 03, 05, 08, 09 | SPEC |
 
 Existing specs (foundation, idea-room, feel-lab, beat-room, voice-room, mix-room, export-room, auth,
 private-audio, job-reliability, voice-to-export-flow) stay as the record of what was built. New specs

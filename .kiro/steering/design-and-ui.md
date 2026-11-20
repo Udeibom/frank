@@ -1,3 +1,7 @@
+---
+inclusion: fileMatch
+fileMatchPattern: ["frontend/app/**/*.tsx", "frontend/components/**/*.tsx", "frontend/app/globals.css", "frontend/tailwind.config.ts"]
+---
 # Frank — Design and UI
 
 This file governs the whole interface. It replaces the earlier "dark theme, amber accent, studio metaphor" brief. The reasoning and evidence behind it are in `docs/design-audit/AUDIT.md`; read that before changing any rule here.

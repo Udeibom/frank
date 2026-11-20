@@ -1,7 +1,8 @@
 ---
 name: Frank Code Reviewer
 description: Reviews Frank code changes for correctness against the product vision, audio architecture rules, and UX principles. Use this before committing significant changes.
-tools: read_file, grep_search, list_directory
+tools: ["read_file", "grep_search", "list_directory", "@frank-listener"]
+includeMcpJson: true
 ---
 
 # Frank Code Reviewer
@@ -43,3 +44,8 @@ For each issue found:
 - **How to fix**: specific suggestion
 
 End with a one-line overall verdict: Ready / Needs changes / Major issues.
+
+## Listen before approving engine or mix changes
+When a change touches `backend/app/services/generation/`, `services/audio/` or `services/listener/`, ask for (or
+find) a before and after render and call `compare_files` from the `frank-listener` MCP. A new likely problem in
+`find_issues_file` on the after render is a blocking review comment, quoted with its numbers.

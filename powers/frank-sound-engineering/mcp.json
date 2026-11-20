@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "frank-listener": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["-c", "cd \"$(git rev-parse --show-toplevel)\" && exec tools/listener_mcp/.venv/bin/python tools/listener_mcp/server.py"]
+    }
+  }
+}

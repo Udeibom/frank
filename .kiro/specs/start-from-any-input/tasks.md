@@ -33,7 +33,7 @@ Depends on spec 01 (song-record) tasks 1-3.
     - _Requirements: 2.1, 2.3, 2.4_
   - [x] 4.4 Safeguards on reading the words (found by the Code Reviewer, Nov 13): everything the model writes for the person is checked to be plain (no links, digits, markup or music terms) and sent back once for repair if not; the writer's words are fenced off as data; one sloppy section is dropped without losing the answer; a long song is cut on a whole line and Frank says so; only one read per song at a time; unchanged words are not read again; a failure saving the suggested direction does not turn a good read into a failure
     - _Requirements: 2.1, 2.4, 6.2, 7.1_
-  - [x] 4.5 Questions that follow how working producers listen (research: `.kiro/steering/producer-craft.md`): never an either-or ("or should it hold both" is added by code), only when dark versus warm is truly unclear, one question, in the song's own words
+  - [x] 4.5 Questions that follow how working producers listen (research: `.kiro/skills/producer-craft/SKILL.md`): never an either-or ("or should it hold both" is added by code), only when dark versus warm is truly unclear, one question, in the song's own words
     - _Requirements: 2.4, 6.2, 6.5, 7.1_
   - [x] 4.2 Deterministic section repair (partition of lines) (`repair_sections`, plus `guess_sections` from blank lines and repeated stanzas as the fallback)
     - _Requirements: 2.2_

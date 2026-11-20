@@ -8,7 +8,7 @@ Every technology choice must work on a free tier and must not require GPU comput
 
 - **Next.js 14** (App Router) — main application shell
 - **React 18** — UI layer
-- **Tone.js** — in-browser audio scheduling, playback, real-time effects
+- **One HTML audio element** (`frontend/store/audio.ts`, the AudioEngine) — all playback. Tone.js was planned but never needed and is not installed.
 - **Web Audio API** — low-level audio recording and playback
 - **MediaRecorder API** — in-browser vocal recording
 - **Zustand** — client-side state management for project/session
@@ -80,8 +80,9 @@ Note: a neural model like MusicGen could be added later as an optional "richer t
 
 All secrets live in environment variables, never in code:
 - `GROQ_API_KEY`
-- `HUGGINGFACE_API_KEY`
-- `REPLICATE_API_TOKEN`
+- `HF_TOKEN` (calls Frank's own Hugging Face Spaces)
+- `GEMINI_API_KEY`
+- `FREESOUND_API_KEY`, `JAMENDO_CLIENT_ID`, `EXA_API_KEY`, `FIRECRAWL_API_KEY` (optional; each feature says plainly when its key is missing)
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`

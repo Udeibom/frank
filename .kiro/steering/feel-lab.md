@@ -1,3 +1,7 @@
+---
+inclusion: fileMatch
+fileMatchPattern: ["frontend/app/**/feel/**", "frontend/components/feel/**", "backend/app/routers/feel.py", "backend/app/services/generation/texture.py", "backend/app/services/intake/**/*.py"]
+---
 # Frank — Feel Lab
 
 ## Purpose
