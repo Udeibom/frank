@@ -65,3 +65,8 @@ listening/
 tools/listener_mcp/.venv/
 backend/.reference_report.txt
 backend/.reference_report.log
+
+# Built at Docker build time (frankenstein spec 14)
+backend/assets/words.sqlite
+backend/assets/sfz/
+backend/assets/plugins/

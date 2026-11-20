@@ -40,6 +40,19 @@ class Settings(BaseSettings):
 
     # Procedural music engine
     soundfont_path: str = "assets/MuseScore_General.sf3"
+    # Recorded CC0 instruments (VSCO-2 CE / VCSL as SFZ), fetched at build time; empty = FluidSynth only
+    sfz_dir: str = "assets/sfz"
+
+    # Frankenstein (spec 14): Frank's two Hugging Face Spaces and the free outside services.
+    # Every one is optional: a missing key turns its feature into a plain "I can't do that yet".
+    spaces_token: str = ""                   # HF token that may call (and deploy) Frank's own Spaces
+    ears_space: str = "Udeibom/frank-ears"
+    hands_space: str = "Udeibom/frank-hands"
+    freesound_api_key: str = ""
+    jamendo_client_id: str = ""
+    exa_api_key: str = ""
+    firecrawl_api_key: str = ""
+    datamuse_api_key: str = ""               # needed from 1 Feb 2027; keyless before then
 
     @property
     def allowed_origins_list(self) -> list[str]:

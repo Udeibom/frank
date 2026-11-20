@@ -26,13 +26,16 @@ ENV NUMBA_CACHE_DIR=/app/.numba_cache \
 # Install Python deps first (better layer caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir --no-deps basic-pitch==0.4.0
 
 # Copy the app
 COPY . .
 
 # Fetch the SoundFont at build time (not committed to the repo)
 RUN bash scripts/fetch_soundfont.sh
+# The pronouncing dictionary as an on-disk index, so lyrics analysis costs no memory (frankenstein spec 14)
+RUN PYTHONPATH=/app python scripts/build_words_db.py
 # Compile librosa's numba code now, not on the first request
 RUN PYTHONPATH=/app python scripts/warm_numba.py
 

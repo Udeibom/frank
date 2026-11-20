@@ -506,7 +506,23 @@ def quality_problem(voiced_seconds: float, mean_prob: float, notes: list[RawNote
 
 # ─── Public entry ────────────────────────────
 
-def extract_melody(audio_bytes: bytes, ext: str = "wav", source_audio: Optional[str] = None) -> MelodyExtraction:
+def default_tracker() -> str:
+    """Which ears hear a hum (frankenstein spec 14, requirement 2.6). Set by scripts/pitch_compare.py's result;
+    HUM_TRACKER=pyin|basic_pitch overrides it."""
+    import os
+
+    return os.environ.get("HUM_TRACKER", DEFAULT_TRACKER)
+
+
+# Measured 21 Nov (scripts/pitch_compare.py 6, seed 14): pyin 0.98 average note F-measure, Basic Pitch 0.81.
+# Basic Pitch won on slides (0.99 vs 0.92) but split vibrato and breathy hums into neighbouring notes (0.57, 0.51).
+# So hums stay with pyin; Basic Pitch reads chords and polyphonic parts (reference songs, intake of recordings).
+DEFAULT_TRACKER = "pyin"
+
+
+def extract_melody(audio_bytes: bytes, ext: str = "wav", source_audio: Optional[str] = None,
+                   tracker: Optional[str] = None) -> MelodyExtraction:
+    tracker = tracker or default_tracker()
     y = decode_mono(audio_bytes, ext)
     if y.size < SR:  # under a second
         return MelodyExtraction(False, "That one was over before I could catch a tune. Want to try again? Take as long as you like.")
@@ -518,6 +534,16 @@ def extract_melody(audio_bytes: bytes, ext: str = "wav", source_audio: Optional[
         )
     midi, prob, times = track_pitch(y)
     notes = segment_notes(midi, times, track_energy(y))
+    used = "pyin"
+    if tracker == "basic_pitch":
+        try:
+            from app.services.intake import basic_pitch_notes
+
+            heard = basic_pitch_notes.raw_notes(y, SR)
+            if len(heard) >= MIN_NOTES:
+                notes, used = heard, "basic_pitch"
+        except Exception:  # noqa: BLE001 - the neural ears failed: the frame-by-frame ears still heard it
+            pass
     voiced_mask = ~np.isnan(midi)
     voiced_seconds = float(voiced_mask.sum() * HOP_S)
     mean_prob = float(prob[voiced_mask].mean()) if voiced_mask.any() else 0.0
@@ -526,6 +552,7 @@ def extract_melody(audio_bytes: bytes, ext: str = "wav", source_audio: Optional[
         "voiced_seconds": round(voiced_seconds, 2),
         "mean_voiced_prob": round(mean_prob, 2),
         "raw_note_count": len(notes),
+        "tracker": used,
     }
     problem = quality_problem(voiced_seconds, mean_prob, notes)
     if problem:

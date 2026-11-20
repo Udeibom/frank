@@ -9,12 +9,15 @@ worker thread, and never overwrite the original take.
 
 from __future__ import annotations
 import asyncio
+import logging
 
 from app.services.storage.signing import fetch_audio_bytes
 from app.db import jobs as jobs_db
 from app.services.jobs.heavy import run_heavy
 from app.db import voice as voice_db
 from app.db import projects as projects_db
+from app.db import lyrics as lyrics_db
+from app.services.words import timing as word_timing
 from app.services.storage.files import upload_audio
 from app.services.audio import pitch as pitch_svc
 from app.services.audio import comp as comp_svc
@@ -170,7 +173,8 @@ async def _job(job_id: str, fail_message: str, fn, *args):
 
 # ── after every take: pitch line, facts, the engineer ────────────────────
 
-def _after_take_sync(take: dict, wav_bytes: bytes, song: song_notes.SongNotes, beat_url: str | None) -> dict:
+def _after_take_sync(take: dict, wav_bytes: bytes, song: song_notes.SongNotes, beat_url: str | None,
+                     lyrics: str | None = None) -> dict:
     mono = _read_mono(wav_bytes)
     contour = pitch_svc.detect_pitch_contour(wav_bytes)
     params = take.get("params") or {}
@@ -191,18 +195,41 @@ def _after_take_sync(take: dict, wav_bytes: bytes, song: song_notes.SongNotes, b
         "noise_floor_db": checks.get("noise_floor_db"),
         "engineer": message,
     }
-    voice_db.update_take_sync(take["id"], {"pitch_data": contour, "facts": facts})
-    return {"take_id": take["id"], "contour_points": len(contour), "engineer": message, "facts": facts}
+    update = {"pitch_data": contour, "facts": facts}
+    words = _words_for_take(wav_bytes, lyrics)
+    if words is not None:
+        update["words"] = words
+    voice_db.update_take_sync(take["id"], update)
+    return {"take_id": take["id"], "contour_points": len(contour), "engineer": message, "facts": facts,
+            "lines_placed": sum(1 for l in (words or {}).get("lines", []) if l["start"] is not None)}
+
+
+def _words_for_take(wav_bytes: bytes, lyrics: str | None) -> dict | None:
+    """Word timings and lyric-line spans (frankenstein spec 14, requirement 4.4). Never fails the take."""
+    try:
+        lines = word_timing.lyric_lines(lyrics)
+        words = word_timing.transcribe_words(word_timing.to_mp3(wav_bytes), prompt=" ".join(lines) or None)
+        return {"words": words, "lines": word_timing.line_spans(words, lines) if lines else []}
+    except Exception:  # noqa: BLE001 - Whisper down or rate-limited: the take is still fine without timings
+        logging.getLogger("frank.voice").warning("word timings failed", exc_info=True)
+        return None
 
 
 async def run_after_take_job(job_id: str, project_id: str, take: dict, wav_bytes: bytes) -> None:
     song = await song_notes.for_project(project_id)
+    lyrics = None
+    try:
+        state = await projects_db.get_project_active_state(project_id) or {}
+        if state.get("active_lyrics_id"):
+            lyrics = ((await lyrics_db.get_version(state["active_lyrics_id"])) or {}).get("content")
+    except Exception:  # noqa: BLE001
+        lyrics = None
     beat_url = None
     bvid = (take.get("params") or {}).get("beat_version_id")
     if bvid:
         bv = await beat_db.get_beat_version(bvid)
         beat_url = (bv or {}).get("render_url")
-    await _job(job_id, "Couldn't listen to that take.", _after_take_sync, take, wav_bytes, song, beat_url)
+    await _job(job_id, "Couldn't listen to that take.", _after_take_sync, take, wav_bytes, song, beat_url, lyrics)
 
 
 # ── tuning to the song ───────────────────────────────────────────────────

@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth import require_project_access
 from app.middleware.signed_urls import SignedUrlMiddleware
+from app.middleware.region import RegionMiddleware
 from app.config import get_settings
 from app.db import jobs as jobs_db
 from app.services.jobs.staleness import RESTART_MESSAGE, with_retries
@@ -69,6 +70,7 @@ app = FastAPI(
 
 # Added BEFORE CORS so CORS stays the outermost layer (later = outer).
 app.add_middleware(SignedUrlMiddleware)
+app.add_middleware(RegionMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,

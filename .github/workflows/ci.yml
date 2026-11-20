@@ -53,8 +53,11 @@ jobs:
           pip install -r requirements.txt
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
           pip install pytest hypothesis
+          pip install --no-deps basic-pitch==0.4.0
       - name: SoundFont (MIT, fetched, never committed)
         run: bash scripts/fetch_soundfont.sh
+      - name: Pronouncing dictionary index
+        run: PYTHONPATH=. python scripts/build_words_db.py
       - name: Tests
         run: python -m pytest -q -p no:cacheprovider tests
       - name: Mutation check (each listed property test fails when its code is broken)

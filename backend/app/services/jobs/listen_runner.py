@@ -8,6 +8,8 @@ from app.services.jobs.heavy import HEAVY, log_memory
 from app.db.client import get_supabase
 from app.services.listener import findings
 from app.services.listener import project as listen_project
+from app.services.listener import ears
+from app.services import provenance
 
 
 async def _progress(job_id: str, text: str) -> None:
@@ -30,7 +32,12 @@ async def run_listen_job(job_id: str, project_id: str, scope: Optional[list[str]
         async with HEAVY:
             report = await listen_project.measure_song(project_id, scope, progress=say)
         found = findings.find_issues(report, concern)
-        await jobs_db.mark_complete(job_id, {"measurements": report.model_dump(), "findings": found.model_dump()})
+        await say("Having a proper listen...")
+        heard = await ears.hear(project_id, report, found, scope, concern)
+        if heard:
+            provenance.note(project_id, "listen", None, "listened")
+        await jobs_db.mark_complete(job_id, {"measurements": report.model_dump(), "findings": found.model_dump(),
+                                             "heard": heard})
     except Exception as exc:  # noqa: BLE001
         try:
             await jobs_db.mark_failed(job_id, "Frank couldn't listen to the song just now — want to try again?")

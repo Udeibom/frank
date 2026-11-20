@@ -16,6 +16,7 @@ import httpx
 from groq import Groq
 
 from app.config import get_settings
+from app.services import region
 from app.services.team.plain import guard
 
 log = logging.getLogger(__name__)
@@ -36,6 +37,9 @@ def _gemini(messages: list[dict], temperature: float, json_mode: bool, max_token
     key = get_settings().gemini_api_key
     if not key:
         raise RuntimeError("no fallback provider configured")
+    if not region.gemini_allowed():
+        # Gemini API terms: free tier only outside the EEA, Switzerland and the UK (frankenstein spec 14, 9.1).
+        raise RuntimeError("fallback provider not available in this region")
     body: dict[str, Any] = {"model": FALLBACK_MODEL, "messages": messages, "temperature": temperature}
     if json_mode:
         body["response_format"] = {"type": "json_object"}

@@ -1,6 +1,7 @@
 import asyncio
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
+from pydantic import BaseModel, Field
 from app.models.lyrics import (
     SaveLyricsRequest,
     UpdateLyricsLabelRequest,
@@ -113,3 +114,30 @@ async def transcribe_voice_memo(
         ) from exc
 
     return VoiceMemoResponse(transcription=text, audio_url=audio_url)
+
+
+# ── how the words sound (frankenstein spec 14, requirement 5) ─────────────────────────────────────────────
+
+class AnalyseRequest(BaseModel):
+    text: str = Field(max_length=20_000)
+
+
+class RhymesRequest(BaseModel):
+    word: str = Field(min_length=1, max_length=40)
+
+
+@router.post("/analyse")
+async def analyse_lyrics(project_id: str, body: AnalyseRequest) -> dict:
+    """Syllables per line, strong syllables, rhyme families, and at most two plain observations."""
+    from app.services.words import sound
+
+    lines = await asyncio.to_thread(sound.analyse, body.text)
+    return {"lines": sound.as_json(lines), "notes": sound.plain_notes(lines)}
+
+
+@router.post("/rhymes")
+async def find_rhymes(project_id: str, body: RhymesRequest) -> dict:
+    from app.services.words import sound
+
+    word = body.word.strip().split()[-1]
+    return await asyncio.to_thread(sound.rhymes, word)
