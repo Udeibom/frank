@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr"
+import { isAuthRetryableFetchError } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 
 // Pages anyone can open without an account.
@@ -44,9 +45,19 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser()
 
   const { pathname, search } = request.nextUrl
+
+  // A dropped connection to Supabase is not the same as being signed out. Treating it as signed out sent people
+  // to /login (and from there to /songs) in the middle of a session whenever the network blinked, including on
+  // background prefetches, which Next.js then followed as a full page change (found Nov 20, studio redesign).
+  // When we simply couldn't ask, let the page through: the backend still checks the token on every API call, and
+  // a session that has really ended is caught there (lib/api/client.ts sends the person to log in).
+  if (!user && error && isAuthRetryableFetchError(error)) {
+    return response
+  }
 
   const redirectTo = (url: URL) => {
     const redirect = NextResponse.redirect(url)

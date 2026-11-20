@@ -63,6 +63,26 @@ export async function analyzeHum(
   )
 }
 
+export interface TextureRecord {
+  id: string
+  audio_url: string
+  approved: boolean
+  created_at: string
+}
+
+/** Every direction Frank has played for this song, oldest first. */
+export async function listTextures(projectId: string): Promise<TextureRecord[]> {
+  return api.get<TextureRecord[]>(`/projects/${projectId}/feel/textures`)
+}
+
+/** The shape of one direction's sound (measured by the backend; the browser never analyses audio). */
+export async function getTextureWaveform(projectId: string, textureId: string): Promise<number[]> {
+  const res = await api.get<{ texture_id: string; waveform: number[] }>(
+    `/projects/${projectId}/feel/textures/${textureId}/waveform`,
+  )
+  return res.waveform
+}
+
 export async function saveFingerprint(
   projectId: string,
   fingerprint: MusicalFingerprint,

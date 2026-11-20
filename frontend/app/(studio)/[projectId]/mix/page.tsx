@@ -7,18 +7,19 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import {
   ConversationPanel,
   type ChatTurn,
 } from "@/components/conversation/ConversationPanel"
 import { StemBalance } from "@/components/studio/StemBalance"
-import { MixVersions } from "@/components/studio/MixVersions"
+import { MixVersions, mixTrack, summarize } from "@/components/studio/MixVersions"
+import { FrankNote } from "@/components/conversation/FrankNote"
+import { PlayButton } from "@/components/audio/PlayButton"
 import { RefinePanel } from "@/components/studio/RefinePanel"
 import { VersionChoice } from "@/components/studio/VersionChoice"
 import { renameVersion } from "@/lib/api/refine"
 import { getParts, PART_NAMES, type SongParts } from "@/lib/api/finish"
-import { Button } from "@/components/ui/button"
 import {
   renderMix,
   sendMixMessage,
@@ -32,7 +33,6 @@ import { listBeatVersions } from "@/lib/api/beat"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
 import type { ConversationAction, ConversationMessage, VersionCandidate } from "@/types/api"
-import { Play, Pause, Loader2, Ear } from "lucide-react"
 
 const DEFAULT_PARAMS: Partial<MixParams> = {
   vocal_gain_db: 0,
@@ -46,6 +46,7 @@ const DEFAULT_PARAMS: Partial<MixParams> = {
 
 export default function MixRoomPage() {
   const params = useParams()
+  const router = useRouter()
   const projectId = params.projectId as string
   const { activeState, updateActiveState, revision } = useProjectStore()
 
@@ -57,11 +58,10 @@ export default function MixRoomPage() {
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [isThinking, setIsThinking] = useState(false)
   const [rendering, setRendering] = useState(false)
-  const [playing, setPlaying] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   const mixParamsRef = useRef<Partial<MixParams>>({ ...DEFAULT_PARAMS })
   const historyRef = useRef<ConversationMessage[]>([])
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   // Guards so we greet once and auto-assemble the first mix only once.
   const greetedRef = useRef(false)
   const autoAssembledRef = useRef(false)
@@ -173,7 +173,7 @@ export default function MixRoomPage() {
               id: crypto.randomUUID(),
               role: "assistant",
               content:
-                "Here's how it sounds right now. Tell me what you'd change — is the voice sitting right? Too much beat? Something feel off? I'll adjust and we'll listen again.",
+                "Here's how it sounds right now. Tell me what you'd change — is the voice sitting right? Too much music? Something feel off? I'll adjust and we'll listen again.",
             },
           ])
         } else if (haveVocal && haveBeat) {
@@ -181,16 +181,16 @@ export default function MixRoomPage() {
             {
               id: crypto.randomUUID(),
               role: "assistant",
-              content: "Let me put your voice and the beat together. One moment…",
+              content: "Let me put your voice and the music together. One moment…",
             },
           ])
         } else {
-          const missing = !haveVocal ? "a vocal" : "a beat"
+          const missing = !haveVocal ? "your voice" : "music"
           setTurns([
             {
               id: crypto.randomUUID(),
               role: "assistant",
-              content: `We need ${missing} before we can mix. Pop back to ${!haveVocal ? "the Voice Room" : "the Beat Room"} and I'll be ready when you are.`,
+              content: `We need ${missing} before we can blend the song. It's waiting in ${!haveVocal ? "the Voice room" : "the Music room"}; I'll be ready when you are.`,
             },
           ])
         }
@@ -215,32 +215,9 @@ export default function MixRoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, revision])
 
-  useEffect(() => {
-    audioRef.current?.pause()
-    setPlaying(false)
-    if (!activeVersion?.render_url) {
-      audioRef.current = null
-      return
-    }
-    const audio = new Audio(activeVersion.render_url)
-    audio.addEventListener("ended", () => setPlaying(false))
-    audioRef.current = audio
-    return () => audio.pause()
-  }, [activeVersion?.render_url])
-
-  function togglePlay() {
-    const audio = audioRef.current
-    if (!audio) return
-    if (playing) {
-      audio.pause()
-      setPlaying(false)
-    } else {
-      audio.play().then(() => setPlaying(true)).catch(() => {})
-    }
-  }
-
   async function doRender(mixParams: Partial<MixParams>, quality: "preview" | "full" = "preview") {
     setRendering(true)
+    setFailed(false)
     try {
       const { job_id } = await renderMix(projectId, mixParams, quality)
       const done = await pollJob(job_id)
@@ -248,14 +225,8 @@ export default function MixRoomPage() {
       if (madeId) await adoptMix(madeId)
       else await loadVersions()
     } catch {
-      setTurns((t) => [
-        ...t,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "Frank couldn't put the mix together just then — want to try again?",
-        },
-      ])
+      setFailed(true)
+      say("Frank couldn't put the blend together just then. Want to try again?")
     } finally {
       setRendering(false)
     }
@@ -316,127 +287,136 @@ export default function MixRoomPage() {
   }
 
   const hasMix = Boolean(activeVersion?.render_url)
+  const track = activeVersion?.render_url ? mixTrack(activeVersion) : null
+  // The blend before this one: what "compare" switches to, at the same moment.
+  const activeIndex = versions.findIndex((v) => v.id === activeVersion?.id)
+  const previous = activeIndex >= 0 ? versions.slice(activeIndex + 1).find((v) => v.render_url) ?? null : null
+
+  // ─── What Frank is saying on the stage ───
+  let note: React.ReactNode
+  let aside: React.ReactNode
+  let answers: { label: string; onClick: () => void; primary?: boolean; disabled?: boolean }[] = []
+  if (rendering) {
+    note = "Putting the blend together. This usually takes under a minute."
+    aside = "The blend you had stays as it is until the new one is ready."
+  } else if (failed) {
+    note = "Frank couldn't put the blend together just then."
+    aside = hasMix ? "The blend you had is untouched." : "Your voice and music are safe."
+    answers = [{ label: "Try again", onClick: () => void doRender(mixParamsRef.current) }]
+  } else if (!hasVocal || !hasBeat) {
+    // Blocked: say what is missing and offer the way there, instead of a play button that can't play.
+    note = !hasVocal ? "To blend the song, it needs your voice first." : "To blend the song, it needs music first."
+    answers = [
+      !hasVocal
+        ? { label: "Record your voice", onClick: () => router.push(`/${projectId}/voice`), primary: true }
+        : { label: "Build the music", onClick: () => router.push(`/${projectId}/beat`), primary: true },
+    ]
+  } else if (hasMix) {
+    note = "Listen, then say what you'd change: the voice buried, too much going on, the drop not hitting. Or change a lane below."
+    answers = [
+      { label: "Something feels off", onClick: () => startRefine(null) },
+      { label: "Make the full-quality version", onClick: () => void doRender(mixParamsRef.current, "full") },
+    ]
+  } else {
+    note = "Putting your voice and the music together for the first time."
+  }
 
   return (
-    <div className="flex h-screen">
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="border-b border-border px-8 py-3">
-          <h1 className="text-sm font-semibold text-foreground">Mix Room</h1>
-          <p className="text-xs text-muted-foreground">
-            Bring it all together
-          </p>
+    <div className="flex h-full">
+      <div className="flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
+          <h1 className="text-base font-medium text-ink">Blend</h1>
+          <span className="text-sm text-ink-2">Bring your voice and the music together</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 py-8">
-          <div className="mx-auto max-w-xl">
-            {/* Transport */}
-            <div className="mb-8 flex flex-col items-center gap-4">
-              <button
-                onClick={togglePlay}
-                disabled={!hasMix || rendering}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105 disabled:opacity-40"
-                aria-label={playing ? "Pause" : "Play"}
-              >
-                {rendering ? (
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                ) : playing ? (
-                  <Pause className="h-6 w-6" />
-                ) : (
-                  <Play className="h-7 w-7 translate-x-0.5" />
-                )}
-              </button>
-              <p className="text-sm text-muted-foreground">
-                {rendering
-                  ? "Putting the mix together…"
-                  : hasMix
-                    ? activeVersion?.label
-                    : "No mix yet"}
+        <FrankNote aside={aside} answers={answers} problem={failed} busy={rendering}>
+          {note}
+        </FrankNote>
+
+        {/* Listening is the main thing here: one large control and, when there is an earlier blend, compare */}
+        {(hasMix || rendering) && (
+          <section aria-labelledby="listen-heading" className="flex items-center gap-5 rounded-md bg-surface p-5">
+            {track ? <PlayButton track={track} size="stage" keepPosition /> : <span className="sweep h-12 w-12 rounded-full" aria-hidden="true" />}
+            <div className="min-w-0 flex-1">
+              <h2 id="listen-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+                The song right now
+              </h2>
+              <p className="truncate text-base text-ink">
+                {activeVersion?.label ?? "The first blend"}
+                {activeVersion && <span className="ml-2 text-sm text-ink-2">{summarize(activeVersion)}</span>}
               </p>
-              {hasMix && !rendering && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => doRender(mixParamsRef.current, "full")}
-                >
-                  Render full quality
-                </Button>
-              )}
-              {hasMix && !rendering && (
-                <Button variant="outline" size="sm" onClick={() => startRefine(null)}>
-                  <Ear className="h-3.5 w-3.5" />
-                  Something feels off
-                </Button>
-              )}
             </div>
-
-            {refineKey > 0 && (
-              <div className="mb-8">
-                <RefinePanel
-                  projectId={projectId}
-                  room="mix"
-                  concern={refineConcern}
-                  startKey={refineKey}
-                  onSay={say}
-                  onCommitted={async (result) => {
-                    const id = result?.mix_version_id
-                    if (typeof id === "string") await adoptMix(id)
-                    else if (result?.beat_version_id) await doRender(mixParamsRef.current)   // the music changed: hear it in the mix
-                    else await loadVersions()
-                  }}
-                  onClose={() => setRefineKey(0)}
-                />
+            {previous && track && (
+              <div role="group" aria-label="Compare with the blend before" className="flex items-center gap-3 border-l border-line pl-5">
+                <span className="text-sm text-ink-2">Compare with before</span>
+                <PlayButton track={mixTrack(previous)} size="card" keepPosition />
               </div>
             )}
+          </section>
+        )}
 
-            {candidates && (
-              <div className="mb-8">
-                <VersionChoice
-                  candidates={candidates}
-                  onPick={async (id) => {
-                    setCandidates(null)
-                    await handleSetActive(id)
-                    say("That mix is back on. Everything after it is still kept.")
-                  }}
-                  onClose={() => setCandidates(null)}
-                />
-              </div>
-            )}
+        {refineKey > 0 && (
+          <RefinePanel
+            projectId={projectId}
+            room="mix"
+            concern={refineConcern}
+            startKey={refineKey}
+            onSay={say}
+            onCommitted={async (result) => {
+              const id = result?.mix_version_id
+              if (typeof id === "string") await adoptMix(id)
+              else if (result?.beat_version_id) await doRender(mixParamsRef.current) // the music changed: hear it in the blend
+              else await loadVersions()
+            }}
+            onClose={() => setRefineKey(0)}
+          />
+        )}
 
-            {/* Stem balance */}
-            {(hasVocal || hasBeat) && (
-              <div className="mb-8">
-                <StemBalance
-                  hasVocal={hasVocal}
-                  hasBeat={hasBeat}
-                  hasHarmony={hasHarmony}
-                  harmonyEnabled={mixParamsRef.current.harmony_enabled ?? true}
-                  onToggleHarmony={handleToggleHarmony}
-                  parts={songParts?.parts}
-                  partSettings={partTick >= 0 ? mixParamsRef.current.parts : undefined}
-                  busy={rendering}
-                  onPart={changePart}
-                />
-              </div>
-            )}
+        {candidates && (
+          <VersionChoice
+            candidates={candidates}
+            material="voice"
+            onPick={async (id) => {
+              setCandidates(null)
+              await handleSetActive(id)
+              say("That blend is back on. Everything after it is still kept.")
+            }}
+            onClose={() => setCandidates(null)}
+          />
+        )}
 
-            {/* Versions */}
-            <MixVersions
-              versions={versions}
-              activeVersionId={activeVersion?.id ?? null}
-              onSetActive={handleSetActive}
-              onRename={async (id, label) => {
-                await renameVersion(projectId, "mix", id, label)
-                setVersions((vs) => vs.map((v) => (v.id === id ? { ...v, label } : v)))
-              }}
+        <div className="grid max-w-[1000px] gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          {(hasVocal || hasBeat) && (
+            <StemBalance
+              hasVocal={hasVocal}
+              hasBeat={hasBeat}
+              hasHarmony={hasHarmony}
+              harmonyEnabled={mixParamsRef.current.harmony_enabled ?? true}
+              onToggleHarmony={handleToggleHarmony}
+              parts={songParts?.parts}
+              partSettings={partTick >= 0 ? mixParamsRef.current.parts : undefined}
+              busy={rendering}
+              onPart={hasVocal && hasBeat ? changePart : undefined}
             />
-          </div>
+          )}
+          <MixVersions
+            versions={versions}
+            activeVersionId={activeVersion?.id ?? null}
+            onSetActive={handleSetActive}
+            onRename={async (id, label) => {
+              await renameVersion(projectId, "mix", id, label)
+              setVersions((vs) => vs.map((v) => (v.id === id ? { ...v, label } : v)))
+            }}
+          />
         </div>
       </div>
 
       <ConversationPanel
         projectId={projectId}
         room="mix"
-        emptyText="Getting your mix ready…"
+        material="voice"
+        emptyText="Getting your blend ready…"
         turns={turns}
         onSend={handleSend}
         isThinking={isThinking}

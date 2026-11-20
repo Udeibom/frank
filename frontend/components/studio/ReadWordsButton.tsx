@@ -23,6 +23,8 @@ interface ReadWordsButtonProps {
   getWords: () => string
   /** Anything Frank wants to say in the conversation. */
   onSay: (message: string) => void
+  /** "stage": a real control on the room's stage. "chat": the compact link above the conversation input. */
+  appearance?: "chat" | "stage"
 }
 
 const MIN_LINES = 2
@@ -45,7 +47,7 @@ function explain(err: unknown): string {
   return "I lost the connection for a moment, so I couldn't read your words. They're safe. Want to try again?"
 }
 
-export function ReadWordsButton({ projectId, getWords, onSay }: ReadWordsButtonProps) {
+export function ReadWordsButton({ projectId, getWords, onSay, appearance = "chat" }: ReadWordsButtonProps) {
   const [working, setWorking] = useState(false)
   const refresh = useProjectStore((s) => s.refresh)
 
@@ -71,12 +73,12 @@ export function ReadWordsButton({ projectId, getWords, onSay }: ReadWordsButtonP
   return (
     <div className="flex flex-col">
       <Button
-        variant="ghost"
+        variant={appearance === "stage" ? "outline" : "ghost"}
         size="sm"
         onClick={handleClick}
         disabled={working}
         aria-busy={working}
-        className="w-full justify-start text-muted-foreground"
+        className={appearance === "stage" ? "h-10 border-line bg-raised px-4 text-base text-ink hover:border-ink-3 hover:bg-raised" : "w-full justify-start text-muted-foreground"}
       >
         {working ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -85,7 +87,7 @@ export function ReadWordsButton({ projectId, getWords, onSay }: ReadWordsButtonP
         )}
         Tell me what you hear in my words
       </Button>
-      <p role="status" aria-live="polite" className="px-3 text-xs text-muted-foreground">
+      <p role="status" aria-live="polite" className={appearance === "stage" ? "sr-only" : "px-3 text-xs text-muted-foreground"}>
         {working ? "Reading your words… this usually takes a few seconds." : ""}
       </p>
     </div>

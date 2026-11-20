@@ -64,8 +64,9 @@ Each layer has an "active" pointer. The active version is what plays when the us
 The user sees all their projects on the home page. Each project shows:
 - Title
 - Last worked on
-- Which layers have content (visual indicator for each of the 6 layers)
-- A play button to hear the current mix/latest audio
+- A miniature **Song Strip**: the song's sections with a lane each for words, feeling, music and voice, lit where that material is in use (the same drawing as the strip inside the studio)
+- A play button to hear the current mix/latest audio, playing through the shared AudioEngine
+- The phase in plain words ("Adding things" or "Polishing")
 
 ## Naming
 

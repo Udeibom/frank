@@ -20,7 +20,7 @@ Approve ─▶ POST /feel/fingerprint ─▶ feel_fingerprints , project_active_
 ## Components and Interfaces
 
 ### Frontend
-- `components/audio/TexturePlayer.tsx` — waveform + play/pause, auto-play once then loop-once-and-stop.
+- `components/studio/DirectionCard.tsx` + `store/audio.ts` (replaced `TexturePlayer.tsx` on Nov 19) — each texture is a card on the stage's listening bench with its sound shape, play/pause, keep / set aside; it auto-plays on arrival, plays through, goes round once more and stops, through the one shared AudioEngine.
 - Conversation panel wired to `/feel/conversation`; handles `generate_texture` (show "Finding a sound...", poll, then render the texture card) and `approve_direction` (confirmation + fingerprint commit).
 - "Hum it" button reusing the recorder hook from the Idea Room.
 - Project store holds the evolving fingerprint; it is loaded on entry if one exists.

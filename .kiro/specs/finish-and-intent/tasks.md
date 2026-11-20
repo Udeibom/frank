@@ -36,7 +36,7 @@ they are re-made exactly from the plan and seed when needed.
 - [x] 6. Download separate parts (zip) and final-listen waveform
   - _Requirements: 5.1, 5.2_
   - Evidence: `services/finish/parts_zip.py` (plain names, voice as MP3 to stay under the 50 MB upload limit),
-    `components/audio/Waveform.tsx` drawn from points the export job measured; prod zip 28 MB, 300 points.
+    `components/audio/SoundShape.tsx` (replaced Waveform.tsx in the Nov 19 redesign) drawn from points the export job measured; prod zip 28 MB, 300 points.
 - [x] 7. Property tests and a real-audio before/after listening set
   - Evidence: `tests/test_properties_finish.py` (9 tests). The before/after listening set is made for the founder
     by the Export Room itself ("As you mixed it" / "Finished" at the same position); no separate files.

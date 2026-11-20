@@ -8,6 +8,10 @@ The name is short for Frankenstein — stitched together from many powerful tech
 
 **Tagline: "Use Frank."**
 
+## The Studio, in plain words
+
+The six rooms are called **Words, Feeling, Music, Voice, Blend, Finish**. They are different working views of one song, not six applications. A persistent Song Strip shows the song, its four materials (words, feeling, music, voice) and where it is; Frank is a margin of plain notes and visible, reversible changes beside whichever room the user is in. See `design-and-ui.md`.
+
 ## The Core Principle
 
 Nothing in Frank is a one-off handoff. Every element the system produces is a starting point for a conversation, not a finished answer. The user can always go back, try again, compare, adjust, reject, and rebuild. This is what real music production feels like. Frank just removes the prerequisite of knowing music to do it.
@@ -42,7 +46,7 @@ Both paths are non-linear. The user can move between layers at any time. The son
 ## What Frank Is Not
 
 - Not a music generator (no "generate song" button that produces a finished track)
-- Not a DAW (no visible faders, no timeline unless the user understands it, no technical terms)
+- Not a DAW (no visible faders, no bars-and-beats grid, no technical terms). The Song Strip is not a DAW timeline: it shows named sections and minutes:seconds, so the user always sees their song's shape
 - Not a karaoke machine
 - Not a tool that does one thing and calls it done
 - Not something that sounds AI-generated

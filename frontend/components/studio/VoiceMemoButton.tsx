@@ -16,6 +16,8 @@ interface VoiceMemoButtonProps {
   projectId: string
   onTranscription: (text: string) => void
   onError?: (message: string) => void
+  /** "stage": a real control on the room's stage. "chat": the compact link above the conversation input. */
+  appearance?: "chat" | "stage"
 }
 
 function formatTime(seconds: number): string {
@@ -28,7 +30,9 @@ export function VoiceMemoButton({
   projectId,
   onTranscription,
   onError,
+  appearance = "chat",
 }: VoiceMemoButtonProps) {
+  const look = appearance === "stage" ? "h-10 border-line bg-raised px-4 text-base text-ink hover:border-ink-3 hover:bg-raised" : "w-full justify-start"
   const recorder = useRecorder()
   const [transcribing, setTranscribing] = useState(false)
   // Tracks that the user pressed stop and wants the memo transcribed
@@ -71,7 +75,7 @@ export function VoiceMemoButton({
 
   if (transcribing) {
     return (
-      <Button variant="ghost" size="sm" disabled className="w-full justify-start">
+      <Button variant={appearance === "stage" ? "outline" : "ghost"} size="sm" disabled className={look} role="status">
         <Loader2 className="h-4 w-4 animate-spin" />
         Listening back…
       </Button>
@@ -81,10 +85,10 @@ export function VoiceMemoButton({
   if (recorder.status === "recording") {
     return (
       <Button
-        variant="ghost"
+        variant={appearance === "stage" ? "outline" : "ghost"}
         size="sm"
         onClick={handleStop}
-        className="w-full justify-start text-destructive hover:text-destructive"
+        className={`${look} text-problem hover:text-problem`}
       >
         <Square className="h-4 w-4 fill-current" />
         Stop ({formatTime(recorder.durationSeconds)})
@@ -94,10 +98,10 @@ export function VoiceMemoButton({
 
   return (
     <Button
-      variant="ghost"
+      variant={appearance === "stage" ? "outline" : "ghost"}
       size="sm"
       onClick={handleStart}
-      className="w-full justify-start text-muted-foreground"
+      className={appearance === "stage" ? look : "w-full justify-start text-muted-foreground"}
     >
       <Mic className="h-4 w-4" />
       Hum or speak an idea

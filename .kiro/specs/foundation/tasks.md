@@ -27,7 +27,7 @@
 - [x] 5. Build the studio shell
   - [x] 5.1 `app/(studio)/layout.tsx` with the persistent sidebar slot
     - _Requirements: 2.5_
-  - [x] 5.2 `components/studio/StudioNav.tsx` — editable title, six layers, status indicators, back link
+  - [x] 5.2 Studio navigation: editable title, six rooms, status, back link. _Replaced Nov 19 by the studio redesign: `StudioNav.tsx` was deleted and its jobs split between `components/shell/Rail.tsx` (six rooms, active room marked by a bar and `aria-current`, no locks) and `components/shell/SongStrip.tsx` (inline-editable title, status as four lanes with text states for screen readers, "FRANK" link back to /songs). Evidence: tested in a browser Nov 19 (`docs/design-audit/FEELING-ROOM.md`, journeys 1–10; `tsc --noEmit` and `next build` pass). Requirement 11 amended to match._
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
   - [x] 5.3 `app/(studio)/songs/page.tsx` — dashboard with empty state and project list (the dashboard lives at /songs)
     - _Requirements: 2.7, 10.3_

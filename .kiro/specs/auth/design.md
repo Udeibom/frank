@@ -32,7 +32,7 @@ Browser ── supabase-js (anon key) ──▶ Supabase Auth  (signUp / signIn 
 
 ## Components
 
-Frontend: `lib/supabase/client.ts`, `lib/supabase/middleware.ts`, `middleware.ts`, `app/(auth)/login`, `app/(auth)/signup`, a shared `AuthForm`, `lib/api/client.ts` (adds the bearer token), `store/session.ts` (real user), `StudioNav` (log out), `app/(studio)/songs/page.tsx`.
+Frontend: `lib/supabase/client.ts`, `lib/supabase/middleware.ts`, `middleware.ts`, `app/(auth)/login`, `app/(auth)/signup`, a shared `AuthForm`, `lib/api/client.ts` (adds the bearer token), `store/session.ts` (real user), `components/shell/YouMenu.tsx` (log out; was `StudioNav` before the Nov 19 redesign), `app/(studio)/songs/page.tsx`.
 
 Backend: `app/auth.py` (`get_current_user_id`, `require_project_access`), `config.py` (`auth_required`), `main.py` (mounting), `routers/jobs.py` (job ownership).
 

@@ -7,9 +7,9 @@
     - _Requirements: 1.3, 1.4_
 
 - [x] 2. Section timeline component — _Evidence: children 2.1-2.2 ticked_
-  - [x] 2.1 `components/studio/BeatTimeline.tsx` — colored blocks, scrub, playing highlight — _Evidence: BeatTimeline.tsx (SECTION_TINT blocks, `onSeek`, `playingIndex` from progress). Screen type-checks (tsc --noEmit passes Nov 18); not seen in a browser by me_
+  - [x] 2.1 Sections across, playing section marked, jump to a section — _Evidence (Nov 19 redesign, replaces BeatTimeline.tsx): `components/studio/Arrangement.tsx` shows the sections as columns sized by their length (minimum 80px so every name fits), marks the playing section and draws the playhead inside it; each section name opens "Play from here" (engine `atFraction`). Seen in a browser Nov 19 (`docs/design-audit/after/22b-music-arrangement.png`). "Play from here" not yet clicked in a browser: see `docs/design-audit/ROOMS.md`_
     - _Requirements: 3.1, 3.2_
-  - [x] 2.2 Section label editing (label-only persist) — _Evidence: BeatTimeline.tsx label editing; `PATCH /beat/sections/{section_index}` (routers/beat.py `update_section`) changes the label in the stored plan only, no re-render. Screen type-checks (tsc --noEmit passes Nov 18); not seen in a browser by me; no test_
+  - [x] 2.2 Section label editing (label-only persist) — _Evidence: Arrangement.tsx section menu "Rename" calls `PATCH /beat/sections/{section_index}` (routers/beat.py `update_section`), which changes the label in the stored plan only, no re-render. Rename not yet done in a browser: see `docs/design-audit/ROOMS.md`; no test_
     - _Requirements: 3.3, 10.3_
 
 - [ ] 3. Stem layer view — _open: 3.1_
@@ -49,7 +49,7 @@
 - [x] 8. Backend: beat persistence — _Evidence: children 8.1-8.2 ticked_
   - [x] 8.1 beat_versions + beat_stems records; active_beat_version_id update — _Evidence: db/beat.py (create_beat_version, create_stem_sync, PART_SECTION); beat_runner sets `active_beat_version_id` after each build and edit_
     - _Requirements: 2.4, 7.1, 11.2_
-  - [x] 8.2 Sidebar status indicator updates — _Evidence: components/studio/StudioNav.tsx `LayerStatusIcon`; the store's `refresh` and `revision` re-read it after changes (voice-to-export-flow 1.1). Screen type-checks (tsc --noEmit passes Nov 18); not seen in a browser by me_
+  - [x] 8.2 Sidebar status indicator updates — _Evidence (updated Nov 19, studio redesign): the sidebar's `LayerStatusIcon` is gone; the music status now shows as the Song Strip's music lane (`components/shell/SongStrip.tsx`, built from the song record's `beat` by `lib/songShape.ts`). It reloads whenever the store's `revision` bumps, and a new beat version bumps it. Type-checks and builds; the music lane with a real beat has not been seen in a browser since the redesign (the Feeling room journeys didn't build one)_
     - _Requirements: 11.3_
 
 - [ ] 9. Deferred follow-ups (tracked, not demo-critical)

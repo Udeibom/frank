@@ -17,6 +17,7 @@ import { useRecorder } from "@/hooks/useRecorder"
 import { ApiError } from "@/lib/api/client"
 import { confirmTune, humToTune, rejectTune, type HumIntakeResult } from "@/lib/api/intake"
 import { Button } from "@/components/ui/button"
+import { useAudio, usePlayback, type Track } from "@/store/audio"
 import type { MusicalFingerprint } from "@/types/project"
 
 /** A minute is far more than a tune needs; recording stops by itself here. */
@@ -33,6 +34,8 @@ interface HumIntakeProps {
   }) => void
   /** Anything Frank wants to say in the conversation (kind reasons, next steps). */
   onSay: (message: string) => void
+  /** "stage": a real control on the room's stage. "chat": the compact link above the conversation input. */
+  appearance?: "chat" | "stage"
 }
 
 type Heard = Extract<HumIntakeResult, { ok: true }>
@@ -53,13 +56,14 @@ function explainFailure(err: unknown): string {
   return "Something went wrong while I was listening. Want to try again?"
 }
 
-export function HumIntake({ projectId, onConfirmed, onSay }: HumIntakeProps) {
+export function HumIntake({ projectId, onConfirmed, onSay, appearance = "chat" }: HumIntakeProps) {
   const recorder = useRecorder()
   const pendingUpload = useRef(false)
   const [working, setWorking] = useState(false)
   const [heard, setHeard] = useState<Heard | null>(null)
-  const [playing, setPlaying] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // Frank's version of the tune plays through the shared engine (one sound at a time).
+  const tuneTrack: Track | null = heard ? { id: `hum:${heard.version_id}`, url: heard.preview_url, label: "Your tune, as I heard it", material: "feel" } : null
+  const { playing } = usePlayback(tuneTrack?.id)
 
   // Keyboard users must not lose their place when the button they pressed disappears.
   const startRef = useRef<HTMLButtonElement | null>(null)
@@ -103,39 +107,30 @@ export function HumIntake({ projectId, onConfirmed, onSay }: HumIntakeProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder.audioBlob])
 
-  // Play Frank's version of the tune.
+  // Play Frank's version of the tune as soon as it arrives.
   useEffect(() => {
-    if (!heard) return
-    const audio = new Audio(heard.preview_url)
-    audioRef.current = audio
-    audio.onended = () => setPlaying(false)
-    audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
-    return () => {
-      audio.pause()
-      audioRef.current = null
-    }
+    if (tuneTrack) void useAudio.getState().play(tuneTrack)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heard])
 
   // Move focus to whatever is now in front of the person.
   useEffect(() => {
     if (recorder.status === "recording") stopRef.current?.focus()
   }, [recorder.status])
+  // (Only after something changed: never on first load, or the page would pull focus away from where the
+  // person is about to type.)
+  const before = useRef({ heard: false, working: false })
   useEffect(() => {
+    const changed = before.current.heard !== Boolean(heard) || before.current.working !== working
+    before.current = { heard: Boolean(heard), working }
+    if (!changed) return
     if (heard) checkRef.current?.focus()
     else if (!working && recorder.status === "idle") startRef.current?.focus({ preventScroll: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heard, working])
 
   function togglePlay() {
-    const audio = audioRef.current
-    if (!audio) return
-    if (playing) {
-      audio.pause()
-      setPlaying(false)
-    } else {
-      audio.currentTime = 0
-      audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
-    }
+    if (tuneTrack) void useAudio.getState().toggle(tuneTrack, { at: playing ? undefined : 0 })
   }
 
   async function handleYes() {
@@ -232,10 +227,14 @@ export function HumIntake({ projectId, onConfirmed, onSay }: HumIntakeProps) {
     <div className="flex flex-col gap-1">
       <Button
         ref={startRef}
-        variant="ghost"
+        variant={appearance === "stage" ? "outline" : "ghost"}
         size="sm"
         onClick={() => recorder.start()}
-        className="w-full justify-start text-muted-foreground"
+        className={
+          appearance === "stage"
+            ? "h-10 border-line bg-raised px-4 text-base text-ink hover:border-ink-3 hover:bg-raised"
+            : "w-full justify-start text-muted-foreground"
+        }
       >
         <Music className="h-4 w-4" aria-hidden="true" />
         Hum your tune

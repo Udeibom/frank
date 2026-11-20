@@ -21,6 +21,7 @@ from app.db import projects as projects_db
 from app.services.storage.files import upload_audio
 from app.services.generation import fingerprint as fp_utils
 from app.services.generation.texture import generate_texture_wav
+from app.services.audio import shape
 
 
 async def run_texture_job(
@@ -38,8 +39,10 @@ async def run_texture_job(
         # Cache hit — reuse the existing texture, no re-render.
         cached = await feel_db.find_cached_texture(project_id, cache_key)
         if cached:
+            points = await asyncio.to_thread(shape.shape_of_texture, cached["id"], cached["audio_url"])
             await jobs_db.mark_complete(
-                job_id, {"audio_url": cached["audio_url"], "texture_id": cached["id"], "cached": True}
+                job_id,
+                {"audio_url": cached["audio_url"], "texture_id": cached["id"], "cached": True, "waveform": points},
             )
             return
 
@@ -55,9 +58,12 @@ async def run_texture_job(
             project_id, audio_url, cache_key, fingerprint_id
         )
 
+        points = await asyncio.to_thread(shape.shape_of_wav, wav)
+        if points:
+            shape.remember(texture["id"], points)
         await jobs_db.mark_complete(
             job_id,
-            {"audio_url": audio_url, "texture_id": texture["id"], "cached": False},
+            {"audio_url": audio_url, "texture_id": texture["id"], "cached": False, "waveform": points},
         )
     except Exception as exc:  # noqa: BLE001 — we translate to a friendly message
         # Guard the failure write itself: if marking failed also throws, we must

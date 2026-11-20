@@ -2,39 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Frank's visual system. Authority: .kiro/steering/design-and-ui.md.
+ * Colours are RGB channels so Tailwind opacity modifiers work and the exact values (and their
+ * checked contrast ratios) are preserved. Do not add new colours here without a reason in that file.
+ */
 @layer base {
   :root {
-    /* Frank dark studio palette */
-    --background: 0 0% 5%;
-    --foreground: 40 10% 92%;
+    /* Warm graphite surfaces */
+    --ground: 20 17 14;      /* #14110E */
+    --surface: 28 24 20;     /* #1C1814 */
+    --raised: 38 33 28;      /* #26211C */
+    --line: 51 45 38;        /* #332D26 */
 
-    --card: 0 0% 8%;
-    --card-foreground: 40 10% 92%;
+    /* Text. ink-3 is the quietest allowed text (5.4:1 on surface). */
+    --ink: 239 232 220;      /* #EFE8DC */
+    --ink-2: 181 171 156;    /* #B5AB9C */
+    --ink-3: 150 141 127;    /* #968D7F */
 
-    --popover: 0 0% 8%;
-    --popover-foreground: 40 10% 92%;
+    /* The four materials of a song */
+    --words: 216 203 176;    /* #D8CBB0 */
+    --feel: 142 134 201;     /* #8E86C9 */
+    --music: 79 163 154;     /* #4FA39A */
+    --voice: 226 125 95;     /* #E27D5F */
 
-    /* Amber/warm gold accent */
-    --primary: 38 92% 50%;
-    --primary-foreground: 0 0% 5%;
+    /* Frank: the playhead, the one primary action, "Frank is waiting for you". Nothing else. */
+    --frank: 240 168 48;     /* #F0A830 */
 
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 40 10% 92%;
+    /* Status (always with an icon and a sentence) */
+    --ok: 123 181 138;       /* #7BB58A */
+    --caution: 224 182 78;   /* #E0B64E */
+    --problem: 226 106 95;   /* #E26A5F */
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 40 5% 55%;
-
-    --accent: 38 80% 45%;
-    --accent-foreground: 0 0% 5%;
-
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 40 10% 92%;
-
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 38 92% 50%;
-
-    --radius: 0.5rem;
+    /* shadcn names, mapped onto the tokens above so existing components inherit the system */
+    --background: var(--ground);
+    --foreground: var(--ink);
+    --card: var(--surface);
+    --card-foreground: var(--ink);
+    --popover: var(--surface);
+    --popover-foreground: var(--ink);
+    --primary: var(--frank);
+    --primary-foreground: var(--ground);
+    --secondary: var(--raised);
+    --secondary-foreground: var(--ink);
+    --muted: var(--raised);
+    --muted-foreground: var(--ink-2);
+    --accent: var(--frank);
+    --accent-foreground: var(--ground);
+    --destructive: var(--problem);
+    --destructive-foreground: var(--ink);
+    --border: var(--line);
+    --input: var(--line);
+    --ring: var(--frank);
+    --radius: 0.375rem;   /* 6px */
   }
 }
 
@@ -42,38 +62,63 @@
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-
-  /* Scrollbar — dark and minimal */
+  /* One focus ring everywhere: 2px, Frank's colour, offset so it never hides the control. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--frank));
+    outline-offset: 2px;
+  }
+  /* Scrollbar: quiet */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: hsl(var(--background));
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
-    border-radius: 3px;
+    background: rgb(var(--line));
+    border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground));
+    background: rgb(var(--ink-3));
   }
 }
 
 @layer utilities {
-  /* Studio glow — amber light effect for active elements */
-  .glow-amber {
-    box-shadow: 0 0 20px -5px hsl(38 92% 50% / 0.3);
+  /* A progress sweep for things being made: informs, does not decorate. Static under reduced motion. */
+  /* Colour follows the material being made: set --sweep on a parent (defaults to the feeling). */
+  .sweep {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(var(--sweep, var(--feel)) / 0.35) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: sweep 1.6s linear infinite;
   }
-
-  /* Waveform container */
+  @media (prefers-reduced-motion: reduce) {
+    .sweep {
+      animation: none;
+      background-image: none;
+      background-color: rgb(var(--sweep, var(--feel)) / 0.2);
+    }
+  }
   .waveform-container {
     @apply relative w-full overflow-hidden rounded-md bg-muted;
     height: 64px;
+  }
+}
+
+@keyframes sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
   }
 }

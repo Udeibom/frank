@@ -61,7 +61,7 @@
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
 - [x] 9. Active state and sidebar — _Evidence: child 9.1 ticked_
-  - [x] 9.1 Update active_vocal_id / active_comp_id; sidebar status — _Evidence: routers/voice.py:129 (upload sets `active_vocal_id`, clears `active_comp_id`) and `POST /voice/active`; StudioNav.tsx status icons; 'take after comp wins' checked on the live database (voice-to-export-flow 2.4)_
+  - [x] 9.1 Update active_vocal_id / active_comp_id; sidebar status — _Evidence: routers/voice.py:129 (upload sets `active_vocal_id`, clears `active_comp_id`) and `POST /voice/active`; status now shown by the Song Strip's voice lane (`components/shell/SongStrip.tsx`, replaced the StudioNav status icons Nov 19; not yet seen in a browser with a real take); 'take after comp wins' checked on the live database (voice-to-export-flow 2.4)_
     - _Requirements: 10.1, 10.2, 10.3_
 
 - [ ] 10. Deferred follow-ups (tracked)

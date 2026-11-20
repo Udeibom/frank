@@ -1,0 +1,196 @@
+<!doctype html>
+<!--
+  STATIC DIRECTION MOCK. Not application code. Shows the proposed shell (song strip, room rail, Frank panel)
+  and the Feeling (Feel Lab) stage in the state the real app was in during the audit journey:
+  words written, beat v1 built, a feeling heard but not yet kept, no voice yet.
+  All colour values are provisional until checked on a real screen.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Frank – Feeling room (direction mock)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ground:#14110E; --surface:#1C1814; --raised:#26211C; --line:#332D26;
+    --ink:#EFE8DC; --ink2:#B5AB9C; --ink3:#968D7F;
+    --words:#D8CBB0; --feel:#8E86C9; --beat:#4FA39A; --voice:#E27D5F; --frank:#F0A830;
+    --sans:'Inter',system-ui,sans-serif; --serif:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--ground);color:var(--ink);font:15px/22px var(--sans);width:1440px;height:900px;overflow:hidden;display:grid;
+       grid-template-rows:96px 1fr;grid-template-columns:76px 1fr 340px}
+  /* ---------- Song strip ---------- */
+  .strip{grid-column:1/4;background:var(--surface);border-bottom:1px solid var(--line);display:grid;grid-template-columns:76px 300px 1fr 200px;align-items:stretch}
+  .mark{display:flex;align-items:center;justify-content:center;font:600 12px var(--sans);letter-spacing:.14em;color:var(--ink3);border-right:1px solid var(--line)}
+  .who{padding:14px 20px;display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0}
+  .who h1{font:500 24px/28px var(--serif);color:var(--ink);white-space:nowrap}
+  .who p{font-size:13px;line-height:18px;color:var(--ink2)}
+  .timeline{padding:12px 20px 10px;display:flex;flex-direction:column;gap:6px}
+  .secs{display:flex;gap:2px;height:16px}
+  .secs span{font-size:12px;line-height:16px;color:var(--ink3);padding-left:2px;overflow:hidden;white-space:nowrap}
+  .lanes{display:flex;flex-direction:column;gap:3px;position:relative}
+  .lane{display:flex;gap:2px;height:8px}
+  .lane i{display:block;border-radius:2px;background:transparent;border:1px dashed #4a4238}
+  .lane i.on{border:0}
+  .lane.words i.on{background:var(--words)} .lane.feel i.on{background:var(--feel)}
+  .lane.beat i.on{background:var(--beat)}   .lane.voice i.on{background:var(--voice)}
+  .lane.feel i.maybe{border:0;background:repeating-linear-gradient(90deg,var(--feel) 0 3px,transparent 3px 6px);opacity:.8}
+  .labels{position:absolute;right:calc(100% + 8px);top:-1px}
+  .playhead{position:absolute;left:21.5%;top:-22px;bottom:-4px;width:2px;background:var(--frank)}
+  .transport{display:flex;align-items:center;gap:14px;padding:0 20px;border-left:1px solid var(--line)}
+  .play{width:48px;height:48px;border-radius:50%;background:var(--frank);display:grid;place-items:center;flex:none}
+  .play svg{fill:var(--ground)}
+  .time{font:500 13px var(--sans);font-variant-numeric:tabular-nums;color:var(--ink2);line-height:18px}
+  .time b{display:block;color:var(--ink);font-weight:500}
+  /* ---------- Rail ---------- */
+  .rail{background:var(--ground);border-right:1px solid var(--line);padding:12px 0;display:flex;flex-direction:column;gap:2px;align-items:stretch}
+  .rail a{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;color:var(--ink2);font-size:12px;line-height:16px;position:relative}
+  .rail a svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6}
+  .rail a.on{color:var(--ink);background:var(--surface)}
+  .rail a.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;background:var(--feel);border-radius:0 2px 2px 0}
+  .rail a .dot{position:absolute;top:8px;right:20px;width:7px;height:7px;border-radius:50%;background:var(--frank)}
+  .rail .gap{flex:1}
+  /* ---------- Stage ---------- */
+  .stage{padding:28px 40px;overflow:hidden;display:flex;flex-direction:column;gap:24px}
+  .note{display:flex;gap:20px;align-items:center;justify-content:space-between;background:var(--surface);border-left:3px solid var(--frank);padding:16px 20px;border-radius:0 6px 6px 0}
+  .note p{font-size:15px;line-height:22px;max-width:560px}
+  .note small{display:block;color:var(--ink2);font-size:13px;line-height:18px;margin-top:2px}
+  .btn{font:500 14px/20px var(--sans);padding:9px 16px;border-radius:6px;border:1px solid var(--line);background:var(--raised);color:var(--ink);white-space:nowrap}
+  .btn.primary{background:var(--frank);border-color:var(--frank);color:var(--ground)}
+  .row{display:flex;gap:10px}
+  h2{font:600 13px/18px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+  .bench{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .card{background:var(--surface);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:12px;border:1px solid transparent}
+  .card.live{border-color:var(--feel)}
+  .card h3{font:500 20px/26px var(--serif);color:var(--ink)}
+  .card p{font-size:13px;line-height:18px;color:var(--ink2)}
+  .wf{height:64px;width:100%;display:block}
+  .cardbar{display:flex;align-items:center;gap:12px}
+  .cplay{width:36px;height:36px;border-radius:50%;border:1.5px solid var(--ink2);display:grid;place-items:center;flex:none}
+  .card.live .cplay{background:var(--frank);border-color:var(--frank)}
+  .cplay svg{fill:var(--ink)} .card.live .cplay svg{fill:var(--ground)}
+  .cardbar .t{margin-left:auto;font-size:13px;color:var(--ink3);font-variant-numeric:tabular-nums}
+  .acts{display:flex;gap:8px}
+  .acts .btn{flex:1;text-align:center;padding:7px 8px;font-size:13px}
+  .show{display:flex;gap:12px;align-items:center;color:var(--ink2);font-size:14px}
+  .show .btn{display:flex;gap:8px;align-items:center}
+  .show svg{width:16px;height:16px;stroke:var(--feel);fill:none;stroke-width:1.8}
+  /* ---------- Frank panel ---------- */
+  .frank{background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  .know{padding:16px 20px;border-bottom:1px solid var(--line)}
+  .know h2{margin-bottom:6px}
+  .know p{font-size:13px;line-height:19px;color:var(--ink2)}
+  .know p b{color:var(--ink);font-weight:500}
+  .log{flex:1;overflow:hidden;padding:20px;display:flex;flex-direction:column;gap:18px}
+  .m{font-size:15px;line-height:23px}
+  .m.you{font:400 17px/25px var(--serif);color:var(--words);border-left:2px solid var(--words);padding-left:12px}
+  .change{display:flex;align-items:center;gap:10px;font-size:13px;line-height:18px;color:var(--ink2);background:var(--raised);padding:8px 12px;border-radius:6px}
+  .change i{width:8px;height:8px;border-radius:2px;background:var(--feel);flex:none}
+  .change a{margin-left:auto;color:var(--ink);font-weight:500;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+  .ask{padding:14px 20px 18px;border-top:1px solid var(--line)}
+  .ask div{background:var(--raised);border-radius:6px;padding:11px 14px;color:var(--ink3);font-size:14px}
+</style>
+</head>
+<body>
+
+<!-- ============ SONG STRIP: the song, always visible, with the one transport ============ -->
+<header class="strip" aria-label="Your song">
+  <div class="mark">FRANK</div>
+  <div class="who">
+    <h1>Untitled song</h1>
+    <p>Beat v1 · your words · no voice yet</p>
+  </div>
+  <div class="timeline">
+    <div class="secs" id="secs"></div>
+    <div class="lanes" id="lanes"><div class="playhead"></div></div>
+  </div>
+  <div class="transport">
+    <div class="play" aria-label="Play"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M5 2.5v13l11-6.5z"/></svg></div>
+    <div class="time"><b>0:21</b>of 2:40</div>
+  </div>
+</header>
+
+<!-- ============ ROOM RAIL: where you can work; no status marks, the strip does that ============ -->
+<nav class="rail" aria-label="Rooms">
+  <a><svg viewBox="0 0 20 20"><path d="M4 16l1-4L14 3l3 3-9 9z"/></svg>Words</a>
+  <a class="on" aria-current="page"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6"/><path d="M10 6v8M6 10h8"/></svg>Feeling<span class="dot"></span></a>
+  <a><svg viewBox="0 0 20 20"><path d="M3 14V8m4 6V4m4 10V7m4 7V9"/></svg>Music</a>
+  <a><svg viewBox="0 0 20 20"><rect x="7.5" y="3" width="5" height="9" rx="2.5"/><path d="M4.5 10a5.5 5.5 0 0 0 11 0M10 15.5V18"/></svg>Voice</a>
+  <a><svg viewBox="0 0 20 20"><path d="M4 6h12M4 10h12M4 14h12"/><circle cx="7" cy="6" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="8" cy="14" r="1.6"/></svg>Blend</a>
+  <a><svg viewBox="0 0 20 20"><path d="M10 3v10m-4-4l4 4 4-4M4 17h12"/></svg>Finish</a>
+  <div class="gap"></div>
+  <a><svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3.5 3-5 6-5s6 1.5 6 5"/></svg>You</a>
+</nav>
+
+<!-- ============ STAGE: Feeling = a listening bench ============ -->
+<main class="stage">
+  <div class="note">
+    <p>Here are three ways your walk home could sound. Play each one, then tell me which feels closest.
+      <small>You said: “slow and warm, a little lonely.”</small></p>
+    <div class="row"><button class="btn">More like the second</button><button class="btn">None of these</button></div>
+  </div>
+
+  <section>
+    <h2 style="margin-bottom:12px">Three directions</h2>
+    <div class="bench" id="bench"></div>
+  </section>
+
+  <section class="show">
+    <span>Or show me:</span>
+    <button class="btn"><svg viewBox="0 0 16 16"><rect x="6" y="1.5" width="4" height="8" rx="2"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V15"/></svg>Hum a tune</button>
+    <button class="btn"><svg viewBox="0 0 16 16"><circle cx="5" cy="9" r="2.2"/><circle cx="11" cy="6" r="2.2"/><path d="M5 11.2V14M11 8.2V13"/></svg>Tap a rhythm</button>
+  </section>
+</main>
+
+<!-- ============ FRANK PANEL: a margin, not a chat ============ -->
+<aside class="frank" aria-label="Frank">
+  <div class="know">
+    <h2>What Frank knows</h2>
+    <p><b>Slow, warm, a little lonely.</b> Words: 2 parts. Beat v1 is on. Nothing kept for the feeling yet.</p>
+  </div>
+  <div class="log">
+    <div class="m you">Walking home alone after a party, slow and warm, a little lonely</div>
+    <div class="m">I hear a quiet walk under soft streetlights. I made three small sounds with that feeling in them.</div>
+    <div class="change"><i></i>3 directions ready <a>Hear them</a></div>
+    <div class="m you">The second one, but with less going on</div>
+    <div class="m">Thinned out the second one. How does it sit now?</div>
+    <div class="change"><i></i>Direction B, simpler <a>Undo</a></div>
+  </div>
+  <div class="ask"><div>Tell Frank what you’re feeling…</div></div>
+</aside>
+
+<script>
+  // Sections come from the real beat (Intro, Verse, Chorus, Verse, Chorus, Bridge, Chorus, Outro; bars 4/8/8/8/8/4/8/4 approx.)
+  const S=[['Intro',4],['Verse',8],['Chorus',8],['Verse',8],['Chorus',8],['Bridge',4],['Chorus',8],['Outro',4]];
+  const total=S.reduce((a,s)=>a+s[1],0);
+  const secs=document.getElementById('secs'), lanes=document.getElementById('lanes');
+  const w=(n)=>`calc((100% - ${(S.length-1)*2}px) * ${n/total})`;
+  S.forEach(([n,b])=>{const e=document.createElement('span');e.textContent=n;e.style.width=w(b);secs.appendChild(e)});
+  const spec={ words:[0,1,1,0,0,0,0,0], feel:[2,2,2,2,2,2,2,2], beat:[1,1,1,1,1,1,1,1], voice:[0,0,0,0,0,0,0,0] };
+  ['words','feel','beat','voice'].forEach(k=>{
+    const l=document.createElement('div');l.className='lane '+k;
+    spec[k].forEach((v,i)=>{const e=document.createElement('i');e.style.width=w(S[i][1]);if(v===1)e.className='on';if(v===2)e.className='maybe';l.appendChild(e)});
+    lanes.insertBefore(l,lanes.querySelector('.playhead'));
+  });
+  // Waveforms: seeded so the mock is repeatable
+  function wf(seed,density){let s=seed;const r=()=>(s=(s*16807)%2147483647)/2147483647;let o='';const n=70;
+    for(let i=0;i<n;i++){const env=.35+.65*Math.sin(Math.PI*(i/n))**.6;const h=Math.max(3,(r()*.6+.25)*60*env*density);
+      o+=`<rect x="${i*8.5}" y="${32-h/2}" width="4" height="${h}" rx="1" fill="${i/n<(seed===7?.46:0)?'#F0A830':'#8E86C9'}" opacity="${i/n<(seed===7?.46:0)?1:.75}"/>`}
+    return `<svg class="wf" viewBox="0 0 600 64" preserveAspectRatio="none">${o}</svg>`}
+  const C=[
+    {t:'Streetlight hum',d:'Soft piano, a little air around it. Slowest of the three.',seed:3,den:.9,len:'0:10',live:false},
+    {t:'Last bus home',d:'Warm and low, a gentle pulse underneath.',seed:7,den:1,len:'0:10',live:true},
+    {t:'Empty street',d:'Almost nothing. Just a few notes and room to think.',seed:11,den:.6,len:'0:09',live:false}];
+  const bench=document.getElementById('bench');
+  C.forEach(c=>{bench.insertAdjacentHTML('beforeend',`
+    <div class="card ${c.live?'live':''}">
+      <div><h3>${c.t}</h3><p>${c.d}</p></div>
+      ${wf(c.seed,c.den)}
+      <div class="cardbar"><div class="cplay"><svg width="12" height="12" viewBox="0 0 12 12">${c.live?'<rect x="2" y="1.5" width="3" height="9"/><rect x="7" y="1.5" width="3" height="9"/>':'<path d="M3 1.5v9l7.5-4.5z"/>'}</svg></div><span class="t">${c.live?'0:05 / ':''}${c.len}</span></div>
+      <div class="acts"><button class="btn ${c.live?'primary':''}">This is it</button><button class="btn">Not this</button></div>
+    </div>`)});
+</script>
+</body>
+</html>

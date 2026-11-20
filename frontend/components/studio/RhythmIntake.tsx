@@ -10,6 +10,7 @@ import { useRecorder } from "@/hooks/useRecorder"
 import { ApiError } from "@/lib/api/client"
 import { rhythmToGroove, type RhythmIntakeResult } from "@/lib/api/intake"
 import { Button } from "@/components/ui/button"
+import { useAudio, usePlayback, type Track } from "@/store/audio"
 import type { MusicalFingerprint } from "@/types/project"
 
 const MAX_SECONDS = 30
@@ -19,6 +20,8 @@ interface RhythmIntakeProps {
   /** The person said "yes, that's my rhythm". Carries the speed and the pattern. */
   onConfirmed: (hints: Partial<MusicalFingerprint>) => void
   onSay: (message: string) => void
+  /** "stage": a real control on the room's stage. "chat": the compact link above the conversation input. */
+  appearance?: "chat" | "stage"
 }
 
 type Heard = Extract<RhythmIntakeResult, { ok: true }>
@@ -30,13 +33,14 @@ function explainFailure(err: unknown): string {
     : "Something went wrong while I was listening. Want to try again?"
 }
 
-export function RhythmIntake({ projectId, onConfirmed, onSay }: RhythmIntakeProps) {
+export function RhythmIntake({ projectId, onConfirmed, onSay, appearance = "chat" }: RhythmIntakeProps) {
   const recorder = useRecorder()
   const pendingUpload = useRef(false)
   const [working, setWorking] = useState(false)
   const [heard, setHeard] = useState<Heard | null>(null)
-  const [playing, setPlaying] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // The rhythm Frank heard plays on a loop through the shared engine (one sound at a time).
+  const grooveTrack: Track | null = heard ? { id: `rhythm:${heard.preview_url}`, url: heard.preview_url, label: "Your rhythm, as I heard it", material: "music", loop: true } : null
+  const { playing } = usePlayback(grooveTrack?.id)
 
   function finishRecording() {
     pendingUpload.current = true
@@ -70,31 +74,18 @@ export function RhythmIntake({ projectId, onConfirmed, onSay }: RhythmIntakeProp
   }, [recorder.audioBlob])
 
   useEffect(() => {
-    if (!heard) return
-    const audio = new Audio(heard.preview_url)
-    audioRef.current = audio
-    audio.loop = true
-    audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
-    return () => {
-      audio.pause()
-      audioRef.current = null
-    }
+    if (grooveTrack) void useAudio.getState().play(grooveTrack)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heard])
 
   function togglePlay() {
-    const audio = audioRef.current
-    if (!audio) return
-    if (playing) {
-      audio.pause()
-      setPlaying(false)
-    } else {
-      audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
-    }
+    if (grooveTrack) void useAudio.getState().toggle(grooveTrack)
   }
 
   function handleYes() {
     if (!heard) return
     const { groove } = heard
+    useAudio.getState().pause()
     setHeard(null)
     onConfirmed({
       tempo_bpm: groove.tempo_confidence >= 0.6 ? groove.tempo_bpm : undefined,
@@ -103,6 +94,7 @@ export function RhythmIntake({ projectId, onConfirmed, onSay }: RhythmIntakeProp
   }
 
   function handleNotQuite() {
+    useAudio.getState().pause()
     setHeard(null)
     onSay("No problem. Tap it again whenever you're ready, nice and steady, a bar or two is plenty.")
   }
@@ -146,7 +138,16 @@ export function RhythmIntake({ projectId, onConfirmed, onSay }: RhythmIntakeProp
   }
   return (
     <div className="flex flex-col gap-1">
-      <Button variant="ghost" size="sm" onClick={() => recorder.start()} className="w-full justify-start text-muted-foreground">
+      <Button
+        variant={appearance === "stage" ? "outline" : "ghost"}
+        size="sm"
+        onClick={() => recorder.start()}
+        className={
+          appearance === "stage"
+            ? "h-10 border-line bg-raised px-4 text-base text-ink hover:border-ink-3 hover:bg-raised"
+            : "w-full justify-start text-muted-foreground"
+        }
+      >
         <Drum className="h-4 w-4" aria-hidden="true" />
         Tap out a rhythm
       </Button>

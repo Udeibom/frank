@@ -12,20 +12,21 @@ Frank/
 │   │   │   ├── page.tsx         # Project dashboard / home
 │   │   │   └── [projectId]/     # Per-project studio
 │   │   │       ├── page.tsx     # Project overview
-│   │   │       ├── idea/        # Layer 1: Idea Room
-│   │   │       ├── feel/        # Layer 2: Feel Lab
-│   │   │       ├── beat/        # Layer 3: Beat Room
-│   │   │       ├── voice/       # Layer 4: Voice Room
-│   │   │       ├── mix/         # Layer 5: Mix Room
-│   │   │       └── export/      # Layer 6: Export Room
+│   │   │       ├── idea/        # Room 1: shown to the user as "Words"
+│   │   │       ├── feel/        # Room 2: shown as "Feeling"
+│   │   │       ├── beat/        # Room 3: shown as "Music"
+│   │   │       ├── voice/       # Room 4: shown as "Voice"
+│   │   │       ├── mix/         # Room 5: shown as "Blend"
+│   │   │       └── export/      # Room 6: shown as "Finish"
 │   │   ├── api/                 # Next.js API routes (thin proxies only)
 │   │   ├── layout.tsx           # Root layout
 │   │   └── page.tsx             # Landing page
 │   ├── components/              # Shared UI components
 │   │   ├── ui/                  # shadcn/ui base components
-│   │   ├── studio/              # Studio-specific components
-│   │   ├── audio/               # Audio player, waveform, recorder
-│   │   └── conversation/        # Chat/conversation UI
+│   │   ├── shell/               # SongStrip, Rail, FrankPanel: the same in every room
+│   │   ├── studio/              # Room-specific components
+│   │   ├── audio/               # PlayButton, Waveform, Lane, recorder (all play through the AudioEngine)
+│   │   └── conversation/        # Frank panel pieces: FrankNote, ChangeLine, message list
 │   ├── lib/                     # Utilities and helpers
 │   │   ├── audio/               # Audio utility functions
 │   │   ├── api/                 # API client functions
@@ -33,7 +34,7 @@ Frank/
 │   ├── store/                   # Zustand stores
 │   │   ├── project.ts           # Project state
 │   │   ├── session.ts           # Current session state
-│   │   └── audio.ts             # Audio playback state
+│   │   └── audio.ts             # The AudioEngine: the one place anything plays from
 │   ├── types/                   # TypeScript type definitions
 │   │   ├── project.ts           # Project, layer, version types
 │   │   ├── audio.ts             # Audio file, take, stem types
@@ -89,9 +90,11 @@ Frank/
 - **Database tables**: `snake_case`
 - **Supabase storage buckets**: `kebab-case` (`voice-takes`, `beat-stems`, `exports`)
 
-## The Six Layers Are Pages, Not Modals
+## The Six Rooms Are Pages, Not Modals
 
-Each layer (Idea, Feel, Beat, Voice, Mix, Export) is its own route inside a project. The user navigates between them. All layers are always accessible — the user is never locked into a linear flow. The studio layout persists across all layer pages.
+Each room is its own route inside a project. The user sees the plain names **Words, Feeling, Music, Voice, Blend, Finish**; the route slugs stay `idea`, `feel`, `beat`, `voice`, `mix`, `export` so links and saved state do not break. Code, API and database names also keep the original terms (`beat`, `mix`, `export`); only what the user reads changes. All rooms are always accessible, with no locks and no linear flow.
+
+The shell (Song Strip, Rail, Frank panel) lives in the project layout and **never unmounts** while navigating between rooms or while the project loads. Each room fills the stage and may lay it out however its work needs (see `design-and-ui.md`). Nothing in a room creates its own `Audio`; everything plays through the single AudioEngine in `store/audio.ts`.
 
 ## Audio Files Never Live in the Repo
 

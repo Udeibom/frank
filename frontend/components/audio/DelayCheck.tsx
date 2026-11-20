@@ -12,6 +12,7 @@ import { useRecorder } from "@/hooks/useRecorder"
 import { SessionPlayer } from "@/lib/audio/sessionPlayer"
 import { sendDelayCheck } from "@/lib/api/voice"
 import { Loader2, Timer, X } from "lucide-react"
+import { useAudio } from "@/store/audio"
 
 const CLICKS = 4
 const EVERY = 0.75
@@ -31,6 +32,8 @@ export function DelayCheck({ projectId, onDone, onClose }: DelayCheckProps) {
   const clicksRef = useRef<number[] | null>(null)
 
   async function run() {
+    // The clicks must be the only sound, or the measurement is wrong.
+    useAudio.getState().pause()
     setNote(null)
     setPhase("listening")
     playerRef.current ??= new SessionPlayer()
@@ -58,24 +61,24 @@ export function DelayCheck({ projectId, onDone, onClose }: DelayCheckProps) {
   }, [recorder.audioBlob, recorder.fileExtension, recorder, projectId, onDone])
 
   return (
-    <section aria-label="Line up my recordings" className="mx-auto mb-6 max-w-md rounded-xl border border-primary/30 bg-card p-4">
+    <section aria-label="Line up my recordings" className="rounded-md border border-line bg-surface p-4">
       <div className="mb-2 flex items-center justify-between">
-        <p className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Timer className="h-4 w-4 text-primary" /> Line up my recordings (once)
+        <p className="flex items-center gap-2 text-base font-medium text-ink">
+          <Timer className="h-4 w-4 text-ink-2" aria-hidden="true" /> Line up my recordings (once)
         </p>
-        <button onClick={onClose} aria-label="Not now" className="text-muted-foreground hover:text-foreground">
+        <button onClick={onClose} aria-label="Not now" className="rounded-sm p-1 text-ink-3 hover:text-ink">
           <X className="h-4 w-4" />
         </button>
       </div>
-      <p className="mb-3 text-xs text-muted-foreground">
+      <p className="mb-3 text-sm text-ink-2">
         Every computer adds a tiny delay to recordings. I&apos;ll play four clicks: clap along, right on each one. Then
         every take you sing lands exactly on the beat.
       </p>
-      <Button size="sm" onClick={run} disabled={phase !== "idle"}>
+      <Button size="sm" variant="outline" onClick={run} disabled={phase !== "idle"}>
         {phase !== "idle" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
         {phase === "listening" ? "Clap on each click…" : phase === "sending" ? "Measuring…" : "Start the check"}
       </Button>
-      {note && <p className="mt-2 text-xs text-amber-200/80" role="status">{note}</p>}
+      {note && <p className="mt-2 text-sm text-caution" role="status">{note}</p>}
     </section>
   )
 }

@@ -10,6 +10,8 @@ from app.models.feel import (
     FingerprintResponse,
     HumAnalysisResponse,
     JobResponse,
+    TextureResponse,
+    TextureWaveformResponse,
 )
 from app.models.conversation import ConversationAction
 from app.services.llm.groq_client import chat_structured
@@ -81,6 +83,30 @@ async def generate_texture(
         run_texture_job, job["id"], project_id, body.fingerprint, body.fingerprint_id
     )
     return JobResponse(job_id=job["id"])
+
+
+@router.get("/textures", response_model=list[TextureResponse])
+async def list_textures(project_id: str) -> list[TextureResponse]:
+    """Every direction Frank has played for this song, oldest first, so the Feeling room can show them again."""
+    rows = await feel_db.list_textures(project_id)
+    return [
+        TextureResponse(
+            id=r["id"], audio_url=r["audio_url"], approved=bool(r.get("approved")), created_at=str(r["created_at"])
+        )
+        for r in rows
+    ]
+
+
+@router.get("/textures/{texture_id}/waveform", response_model=TextureWaveformResponse)
+async def texture_waveform(project_id: str, texture_id: str) -> TextureWaveformResponse:
+    """The shape of one texture's sound (the browser never analyses audio, so it asks)."""
+    from app.services.audio import shape
+
+    row = await feel_db.get_texture(project_id, texture_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="That sound isn't part of this song.")
+    points = await asyncio.to_thread(shape.shape_of_texture, texture_id, row["audio_url"])
+    return TextureWaveformResponse(texture_id=texture_id, waveform=points)
 
 
 @router.post("/hum", response_model=HumAnalysisResponse)

@@ -15,6 +15,7 @@ import { SessionPlayer } from "@/lib/audio/sessionPlayer"
 import type { TakePlacement } from "@/lib/api/voice"
 import { Mic, Square, Loader2, Headphones, Repeat, Music2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAudio } from "@/store/audio"
 
 export interface SongSection {
   index: number
@@ -115,6 +116,8 @@ export function VocalRecorder({
 
   async function practise() {
     if (!beatUrl) return
+    // Nothing else may play while the person is singing along (it would end up in the mic).
+    useAudio.getState().pause()
     if (practising) {
       player().stop()
       setPractising(false)
@@ -130,6 +133,7 @@ export function VocalRecorder({
   }
 
   async function startRecording() {
+    useAudio.getState().pause()
     player().stop()
     setPractising(false)
     await recorder.start()
@@ -164,7 +168,7 @@ export function VocalRecorder({
   return (
     <div className="flex flex-col items-center gap-5">
       {beatUrl && withBeat && !headphones && (
-        <div className="flex items-center gap-2 rounded-full bg-amber-500/10 px-4 py-1.5 text-xs text-amber-200/80" role="note">
+        <div className="flex items-center gap-2 rounded-md bg-raised px-3 py-2 text-sm text-ink-2" role="status">
           <Headphones className="h-3.5 w-3.5" />
           Use headphones so the beat doesn&apos;t get into your mic. If it does, I can take it out afterwards.
         </div>
@@ -172,11 +176,11 @@ export function VocalRecorder({
 
       {showOptions && sections.length > 0 && withBeat && (
         <div className="flex flex-wrap items-center justify-center gap-2" role="group" aria-label="Where to start singing">
-          <span className="text-xs text-muted-foreground">Start from</span>
+          <span className="text-sm text-ink-2">Start from</span>
           <select
             value={startAt}
             onChange={(e) => setStartAt(Number(e.target.value))}
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+            className="rounded-md border border-line bg-raised px-2 py-1.5 text-sm text-ink"
             aria-label="Start from"
           >
             <option value={-1}>the very start</option>
@@ -186,7 +190,7 @@ export function VocalRecorder({
               </option>
             ))}
           </select>
-          <Button variant="outline" size="sm" onClick={practise} aria-pressed={practising}>
+          <Button variant="outline" size="sm" className={practising ? "border-voice bg-raised text-ink hover:bg-raised" : "border-line text-ink-2 hover:text-ink"} onClick={practise} aria-pressed={practising}>
             <Repeat className="h-3.5 w-3.5" />
             {practising ? "Stop practising" : section ? `Practise ${section.label.toLowerCase()} on repeat` : "Practise"}
           </Button>
@@ -198,7 +202,8 @@ export function VocalRecorder({
         disabled={uploading}
         className={cn(
           "flex h-24 w-24 items-center justify-center rounded-full transition-all",
-          isRecording ? "bg-red-500 text-white scale-105 animate-pulse-amber" : "bg-primary text-primary-foreground hover:scale-105",
+          // Recording is the one thing that is "live": it gets the voice colour and a square to stop. No pulsing.
+          isRecording ? "bg-voice text-ground" : "bg-frank text-ground hover:bg-frank/90",
           uploading && "opacity-60",
         )}
         aria-label={isRecording ? "Stop recording" : "Start recording"}
@@ -208,36 +213,42 @@ export function VocalRecorder({
 
       {isRecording ? (
         <div className="flex flex-col items-center gap-2">
-          <span className="text-sm font-medium text-foreground tabular-nums">{formatTime(recorder.durationSeconds)}</span>
+          <span className="text-base font-medium tabular-nums text-ink" role="timer">Recording · {formatTime(recorder.durationSeconds)}</span>
           <div className="flex h-2 w-40 items-center gap-[2px]" aria-hidden>
             {Array.from({ length: 20 }).map((_, i) => (
-              <div key={i} className={cn("h-full flex-1 rounded-full transition-colors", i / 20 < recorder.inputLevel ? "bg-primary" : "bg-muted")} />
+              <div key={i} className={cn("h-full flex-1 rounded-[1px] transition-colors", i / 20 < recorder.inputLevel ? "bg-voice" : "bg-raised")} />
             ))}
           </div>
           {withBeat && beatUrl && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-ink-2">
               {clicks ? "Four clicks, then the music." : "One bar of the music, then you're on."}
             </p>
           )}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">{uploading ? "Saving your take…" : "Tap to record"}</p>
+        <p className="max-w-xs text-center text-base text-ink-2" role="status">
+          {uploading
+            ? "Saving your take…"
+            : recorder.status === "requesting"
+              ? "Waiting for your microphone. If your browser asks, choose Allow."
+              : "Press to record"}
+        </p>
       )}
 
       {showOptions && (
         <div className="flex flex-wrap justify-center gap-2">
-          <Button variant={withBeat ? "default" : "outline"} size="sm" onClick={() => setWithBeat(true)}>
+          <Button variant="outline" size="sm" aria-pressed={withBeat} className={withBeat ? "border-voice bg-raised text-ink hover:bg-raised" : "border-line text-ink-2 hover:text-ink"} onClick={() => setWithBeat(true)}>
             Sing with the beat
           </Button>
-          <Button variant={!withBeat ? "default" : "outline"} size="sm" onClick={() => setWithBeat(false)}>
+          <Button variant="outline" size="sm" aria-pressed={!withBeat} className={!withBeat ? "border-voice bg-raised text-ink hover:bg-raised" : "border-line text-ink-2 hover:text-ink"} onClick={() => setWithBeat(false)}>
             Just my voice
           </Button>
         </div>
       )}
 
       {showOptions && withBeat && (
-        <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
-          <Button variant={guideOn ? "default" : "outline"} size="sm" onClick={toggleGuide} disabled={loadingGuide} aria-pressed={guideOn}>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-ink-2">
+          <Button variant="outline" size="sm" className={guideOn ? "border-voice bg-raised text-ink hover:bg-raised" : "border-line text-ink-2 hover:text-ink"} onClick={toggleGuide} disabled={loadingGuide} aria-pressed={guideOn}>
             {loadingGuide ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Music2 className="h-3.5 w-3.5" />}
             Sing along with the tune
           </Button>
@@ -260,14 +271,14 @@ export function VocalRecorder({
             </label>
           )}
           <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={headphones} onChange={(e) => setHeadphones(e.target.checked)} className="accent-amber-500" />
+            <input type="checkbox" checked={headphones} onChange={(e) => setHeadphones(e.target.checked)} className="h-4 w-4 accent-[rgb(var(--voice))]" />
             I&apos;m wearing headphones
           </label>
         </div>
       )}
-      {guideNote && showOptions && <p className="max-w-sm text-center text-xs text-muted-foreground">{guideNote}</p>}
+      {guideNote && showOptions && <p className="max-w-sm text-center text-sm text-ink-2">{guideNote}</p>}
 
-      {recorder.error && <p className="text-xs text-red-400">{recorder.error}</p>}
+      {recorder.error && <p className="text-sm text-problem" role="alert">{recorder.error}</p>}
     </div>
   )
 }

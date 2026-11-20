@@ -33,7 +33,7 @@ Key boundaries:
 - `app/(studio)/page.tsx` — dashboard: lists projects, empty state, "New Project".
 - `app/(studio)/[projectId]/layout.tsx` — loads the project and populates the project store.
 - `app/(studio)/[projectId]/{idea,feel,beat,voice,mix,export}/page.tsx` — six placeholder rooms.
-- `components/studio/StudioNav.tsx` — sidebar: editable title, six layers with status indicators, back link.
+- `components/shell/Rail.tsx` and `components/shell/SongStrip.tsx` — the studio shell (replaced the original `StudioNav.tsx` sidebar on Nov 19): the Rail lists the six rooms; the Strip holds the editable title, the song's status as four lanes, the transport, and the back link.
 - `store/{project,session,audio}.ts` — Zustand stores.
 - `types/{project,audio,api}.ts` — shared types.
 - `lib/api/projects.ts` — typed client functions.

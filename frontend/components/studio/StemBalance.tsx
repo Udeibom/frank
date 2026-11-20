@@ -1,12 +1,12 @@
 "use client"
 
 /**
- * StemBalance — what's in the mix: your voice, every part of the music (spec 11), and (if it exists) a harmony.
- * No sliders or numbers ("no technical controls"): each part can be made a bit softer or louder, or turned off,
- * and the harmony turned on or off.
+ * StemBalance: the Blend room's lanes. Each thing in the song (your voice, each part of the music, a second
+ * voice) is one lane with plain controls: a bit softer, a bit louder, on/off. No sliders or numbers. Each change
+ * makes a new blend. The on/off switch shows the state ("On" means you can hear it), never the action.
  */
 
-import { Mic2, Drum, Users, Minus, Plus } from "lucide-react"
+import { Minus, Plus } from "lucide-react"
 import { PART_NAMES } from "@/lib/api/finish"
 import { cn } from "@/lib/utils"
 
@@ -16,114 +16,122 @@ interface StemBalanceProps {
   hasHarmony: boolean
   harmonyEnabled: boolean
   onToggleHarmony: (on: boolean) => void
-  /** The parts the music plays; when given, the beat is shown part by part. */
+  /** The parts the music plays; when given, the music is shown part by part. */
   parts?: string[]
   partSettings?: Record<string, { level_db?: number; muted?: boolean }>
   busy?: boolean
   onPart?: (part: string, change: { level_delta_db?: number; muted?: boolean }) => void
 }
 
-export function StemBalance({
-  hasVocal,
-  hasBeat,
-  hasHarmony,
-  harmonyEnabled,
-  onToggleHarmony,
-  parts,
-  partSettings,
-  busy,
-  onPart,
-}: StemBalanceProps) {
-  const byPart = Boolean(hasBeat && parts && parts.length > 0 && onPart)
+function levelWords(db: number): string {
+  if (db >= 6) return "much louder"
+  if (db > 0) return "a bit louder"
+  if (db <= -6) return "much softer"
+  if (db < 0) return "a bit softer"
+  return "as made"
+}
+
+function Switch({ on, label, disabled, onChange }: { on: boolean; label: string; disabled?: boolean; onChange: (on: boolean) => void }) {
   return (
-    <div className="flex flex-col gap-2">
-      <p className="px-1 text-xs font-medium text-muted-foreground">What&apos;s in your song</p>
-      {hasVocal && <StemRow icon={<Mic2 className="h-4 w-4" />} label="Your voice" active />}
-      {hasBeat && !byPart && <StemRow icon={<Drum className="h-4 w-4" />} label="The beat" active />}
-      {byPart &&
-        parts!.map((part) => {
-          const st = partSettings?.[part] ?? {}
-          const name = PART_NAMES[part] ?? part
-          const lvl = st.level_db ?? 0
-          return (
-            <div key={part} className={cn("flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2", st.muted && "opacity-50")}>
-              <span className="text-primary">
-                <Drum className="h-4 w-4" />
-              </span>
-              <span className="flex-1 text-sm text-foreground">
-                {name}
-                {!st.muted && lvl !== 0 && <span className="ml-2 text-[11px] text-muted-foreground">{lvl > 0 ? "louder" : "softer"}</span>}
-                {st.muted && <span className="ml-2 text-[11px] text-muted-foreground">off</span>}
-              </span>
-              <button
-                disabled={busy || st.muted}
-                onClick={() => onPart!(part, { level_delta_db: -3 })}
-                aria-label={`${name} a bit softer`}
-                className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40"
-              >
-                <Minus className="h-3.5 w-3.5" />
-              </button>
-              <button
-                disabled={busy || st.muted}
-                onClick={() => onPart!(part, { level_delta_db: 3 })}
-                aria-label={`${name} a bit louder`}
-                className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-              <button
-                disabled={busy}
-                onClick={() => onPart!(part, { muted: !st.muted })}
-                role="switch"
-                aria-checked={!st.muted}
-                aria-label={st.muted ? `Turn ${name} back on` : `Turn ${name} off`}
-                className="rounded px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                {st.muted ? "on" : "off"}
-              </button>
-            </div>
-          )
-        })}
-      {hasHarmony && (
-        <StemRow
-          icon={<Users className="h-4 w-4" />}
-          label="Harmony"
-          active={harmonyEnabled}
-          toggle={{ on: harmonyEnabled, onChange: onToggleHarmony }}
-        />
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+      className={cn(
+        "w-14 shrink-0 rounded-md border px-2 py-1 text-sm font-medium transition-colors disabled:opacity-60",
+        on ? "border-voice/60 bg-raised text-ink" : "border-dashed border-ink-3 text-ink-3",
       )}
-    </div>
+    >
+      {on ? "On" : "Off"}
+    </button>
   )
 }
 
-function StemRow({
-  icon,
-  label,
-  active,
-  toggle,
+function Lane({
+  name,
+  state,
+  on,
+  busy,
+  material,
+  onSofter,
+  onLouder,
+  onSwitch,
 }: {
-  icon: React.ReactNode
-  label: string
-  active: boolean
-  toggle?: { on: boolean; onChange: (on: boolean) => void }
+  name: string
+  state: string
+  on: boolean
+  busy?: boolean
+  material: "voice" | "music"
+  onSofter?: () => void
+  onLouder?: () => void
+  onSwitch?: (on: boolean) => void
 }) {
   return (
-    <div className={cn("flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5", !active && "opacity-50")}>
-      <span className="text-primary">{icon}</span>
-      <span className="flex-1 text-sm text-foreground">{label}</span>
-      {toggle ? (
+    <li className={cn("flex items-center gap-3 rounded-md bg-surface px-3 py-2.5", !on && "bg-transparent outline outline-1 outline-dashed outline-ink-3/50")}>
+      <span aria-hidden="true" className={cn("h-8 w-1 shrink-0 rounded-[2px]", material === "voice" ? "bg-voice" : "bg-music", !on && "opacity-30")} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-base text-ink">{name}</span>
+        <span className="block text-sm text-ink-2">{on ? state : "Turned off"}</span>
+      </span>
+      {onSofter && (
         <button
-          onClick={() => toggle.onChange(!toggle.on)}
-          className={cn("relative h-5 w-9 rounded-full transition-colors", toggle.on ? "bg-primary" : "bg-muted")}
-          aria-label={toggle.on ? "Turn harmony off" : "Turn harmony on"}
-          role="switch"
-          aria-checked={toggle.on}
+          disabled={busy || !on}
+          onClick={onSofter}
+          aria-label={`${name} a bit softer`}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink hover:border-ink-3 disabled:text-ink-3"
         >
-          <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform", toggle.on ? "translate-x-4" : "translate-x-0.5")} />
+          <Minus className="h-4 w-4" aria-hidden="true" />
         </button>
-      ) : (
-        <span className="h-2 w-2 rounded-full bg-primary" />
       )}
-    </div>
+      {onLouder && (
+        <button
+          disabled={busy || !on}
+          onClick={onLouder}
+          aria-label={`${name} a bit louder`}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink hover:border-ink-3 disabled:text-ink-3"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
+      {onSwitch && <Switch on={on} label={name} disabled={busy} onChange={onSwitch} />}
+    </li>
+  )
+}
+
+export function StemBalance({ hasVocal, hasBeat, hasHarmony, harmonyEnabled, onToggleHarmony, parts, partSettings, busy, onPart }: StemBalanceProps) {
+  const byPart = Boolean(hasBeat && parts && parts.length > 0 && onPart)
+  return (
+    <section aria-labelledby="lanes-heading" className="flex flex-col gap-2">
+      <h2 id="lanes-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+        What's in your song
+      </h2>
+      <ul className="flex flex-col gap-1.5">
+        {hasVocal && <Lane name="Your voice" state="In front" on material="voice" />}
+        {hasHarmony && (
+          <Lane name="Second voice" state="With your voice" on={harmonyEnabled} busy={busy} material="voice" onSwitch={onToggleHarmony} />
+        )}
+        {hasBeat && !byPart && <Lane name="The music" state="All its parts together" on material="music" />}
+        {byPart &&
+          parts!.map((part) => {
+            const st = partSettings?.[part] ?? {}
+            const name = PART_NAMES[part] ?? part
+            return (
+              <Lane
+                key={part}
+                name={name}
+                state={levelWords(st.level_db ?? 0)}
+                on={!st.muted}
+                busy={busy}
+                material="music"
+                onSofter={() => onPart!(part, { level_delta_db: -3 })}
+                onLouder={() => onPart!(part, { level_delta_db: 3 })}
+                onSwitch={(on) => onPart!(part, { muted: !on })}
+              />
+            )
+          })}
+      </ul>
+    </section>
   )
 }

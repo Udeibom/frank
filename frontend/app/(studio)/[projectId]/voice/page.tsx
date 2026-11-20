@@ -8,13 +8,14 @@
  */
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { ConversationPanel, type ChatTurn } from "@/components/conversation/ConversationPanel"
 import { VocalRecorder, type SongSection } from "@/components/audio/VocalRecorder"
 import { DelayCheck } from "@/components/audio/DelayCheck"
 import { TakeCard, type TakeAction } from "@/components/studio/TakeCard"
 import { CompView } from "@/components/studio/CompView"
-import { Button } from "@/components/ui/button"
+import { FrankNote } from "@/components/conversation/FrankNote"
+import { PlayButton } from "@/components/audio/PlayButton"
 import {
   uploadTake,
   listTakes,
@@ -38,8 +39,10 @@ import { listBeatVersions, type BeatVersion } from "@/lib/api/beat"
 import { confirmTune, rejectTune } from "@/lib/api/intake"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
+import { useSongStore } from "@/store/song"
+import { useAudio } from "@/store/audio"
 import type { ConversationMessage, ConversationAction } from "@/types/api"
-import { Play, Pause, Wand2, Timer } from "lucide-react"
+import { Timer } from "lucide-react"
 
 type Job = { job_id: string }
 
@@ -74,8 +77,11 @@ function sectionsOf(beat: BeatVersion | null): { sections: SongSection[]; spb: n
 
 export default function VoiceRoomPage() {
   const params = useParams()
+  const router = useRouter()
   const projectId = params.projectId as string
   const { activeState, updateActiveState, revision } = useProjectStore()
+  const record = useSongStore((s) => s.record)
+  const engine = useAudio()
 
   const [takes, setTakes] = useState<VocalTake[]>([])
   const [beat, setBeat] = useState<BeatVersion | null>(null)
@@ -89,8 +95,6 @@ export default function VoiceRoomPage() {
   const [picked, setPicked] = useState<string[]>([])
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [isThinking, setIsThinking] = useState(false)
-  const [playingUrl, setPlayingUrl] = useState<string | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   const historyRef = useRef<ConversationMessage[]>([])
 
   const say = useCallback((content: string) => {
@@ -156,21 +160,6 @@ export default function VoiceRoomPage() {
     for (const k of Object.keys(children)) children[k].sort((a, b) => a.created_at.localeCompare(b.created_at))
     return { roots, children, harmonies: takes.filter((t) => t.is_harmony) }
   }, [takes])
-
-  function playUrl(url: string) {
-    if (playingUrl === url) {
-      audioRef.current?.pause()
-      setPlayingUrl(null)
-      return
-    }
-    audioRef.current?.pause()
-    const audio = new Audio(url)
-    audio.onended = () => setPlayingUrl(null)
-    audio.play().then(() => {
-      audioRef.current = audio
-      setPlayingUrl(url)
-    }).catch(() => setPlayingUrl(null))
-  }
 
   async function wantGuide() {
     if (!beat) return
@@ -318,36 +307,112 @@ export default function VoiceRoomPage() {
   }
 
   const activeTakeId = activeState?.active_comp_id ? null : activeState?.active_vocal_id ?? null
+  const words = record?.lyrics?.trim() ?? ""
+  const inSong = takes.find((t) => t.id === (activeState?.active_vocal_id ?? ""))
+  const canBlend = picked.length >= 2 || roots.length >= 2
+
+  // ─── What Frank is saying on the stage ───
+  let note: React.ReactNode
+  let answers: { label: string; onClick: () => void; primary?: boolean; disabled?: boolean }[] = []
+  if (heard) {
+    note = heard.description || "Here's the tune I heard in what you sang. Is that your tune?"
+    answers = [
+      {
+        label: "Hear it",
+        onClick: () => void engine.toggle({ id: `tune:${heard.version_id}`, url: heard.preview_url, label: "The tune I heard", material: "voice" }),
+      },
+      {
+        label: "Yes, that's my tune",
+        primary: true,
+        onClick: async () => {
+          await confirmTune(projectId, heard.version_id)
+          setHeard(null)
+          say("That's the song's tune now. Next time the music is built or changed, it will follow it.")
+        },
+      },
+      {
+        label: "Not quite",
+        onClick: async () => {
+          await rejectTune(projectId, heard.version_id)
+          setHeard(null)
+          say("No problem, I've set it aside. Sing it again whenever you like.")
+        },
+      },
+    ]
+  } else if (busy) {
+    note = "Working on your voice. Your original take is always kept."
+  } else if (!beat) {
+    note = "There's no music yet. You can record just your voice now, or build the music first and sing along with it."
+    answers = [{ label: "Build the music", onClick: () => router.push(`/${projectId}/beat`) }]
+  } else if (roots.length === 0) {
+    note = "Pick where to start and press Record. I'll count you in. Sing it as many times as you like: I keep every take."
+  } else {
+    note = `${inSong?.label ?? "A take"} is in the song. Record again any time; every take is kept.`
+    if (canBlend) {
+      answers = [
+        {
+          label: picked.length >= 2 ? `Best of ${picked.length} takes` : "Best of all my takes",
+          onClick: () => void blend(picked.length >= 2 ? picked : roots.map((t) => t.id)),
+        },
+      ]
+    }
+  }
 
   return (
-    <div className="flex h-screen">
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border px-8 py-3">
-          <div>
-            <h1 className="text-sm font-semibold text-foreground">Voice Room</h1>
-            <p className="text-xs text-muted-foreground">Record your voice</p>
+    <div className="flex h-full">
+      <div className="flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-voice" />
+            <h1 className="text-base font-medium text-ink">Voice</h1>
+            <span className="text-sm text-ink-2">Record your voice</span>
           </div>
           {delayKnown && !showDelayCheck && (
-            <button onClick={() => setShowDelayCheck(true)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-              <Timer className="h-3.5 w-3.5" /> Redo the timing check
+            <button onClick={() => setShowDelayCheck(true)} className="flex items-center gap-1.5 text-sm text-ink-2 hover:text-ink">
+              <Timer className="h-4 w-4" aria-hidden="true" /> Check the timing again
             </button>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 py-8">
-          {showDelayCheck && beat && (
-            <DelayCheck
-              projectId={projectId}
-              onDone={(m) => {
-                say(m)
-                setDelayKnown(true)
-                setShowDelayCheck(false)
-              }}
-              onClose={() => setShowDelayCheck(false)}
-            />
-          )}
+        <FrankNote answers={answers} material="voice" busy={busy}>
+          {note}
+        </FrankNote>
 
-          <div className="mb-10">
+        {showDelayCheck && beat && (
+          <DelayCheck
+            projectId={projectId}
+            onDone={(m) => {
+              say(m)
+              setDelayKnown(true)
+              setShowDelayCheck(false)
+            }}
+            onClose={() => setShowDelayCheck(false)}
+          />
+        )}
+
+        {/* The booth: your words in front of you, the recorder beside them */}
+        <div className="flex min-w-0 gap-10">
+          <section aria-labelledby="your-words" className="min-w-0 max-w-[520px] flex-1">
+            <h2 id="your-words" className="mb-3 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+              Your words
+            </h2>
+            {words ? (
+              <div className="max-h-[440px] overflow-y-auto rounded-md bg-surface p-5">
+                <p className="whitespace-pre-wrap font-written text-xl leading-[1.6] text-ink">{words}</p>
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed border-ink-3/60 p-5">
+                <p className="text-base text-ink-2">
+                  No words yet. Sing whatever you have, or write them first in{" "}
+                  <button onClick={() => router.push(`/${projectId}/idea`)} className="text-ink underline underline-offset-4 hover:text-frank">
+                    Words
+                  </button>
+                  .
+                </p>
+              </div>
+            )}
+          </section>
+          <section aria-label="Record" className="flex w-[360px] shrink-0 flex-col items-center rounded-md bg-surface p-6">
             <VocalRecorder
               beatUrl={beat?.render_url ?? null}
               beatVersionId={beat?.id ?? null}
@@ -359,96 +424,67 @@ export default function VoiceRoomPage() {
               uploading={uploading}
               onRecorded={handleRecorded}
             />
-          </div>
+          </section>
+        </div>
 
-          {heard && (
-            <section aria-label="The tune I heard" className="mx-auto mb-6 max-w-2xl rounded-xl border border-primary/30 bg-card p-4">
-              <p className="mb-2 text-sm text-foreground">{heard.description || "Here's the tune I heard in what you sang."}</p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => playUrl(heard.preview_url)}>
-                  {playingUrl === heard.preview_url ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />} Hear it
-                </Button>
-                <Button size="sm" onClick={async () => {
-                  await confirmTune(projectId, heard.version_id)
-                  setHeard(null)
-                  say("That's the song's tune now. Next time the beat is built or changed, it will follow it.")
-                }}>
-                  Yes, that&apos;s my tune
-                </Button>
-                <Button size="sm" variant="outline" onClick={async () => {
-                  await rejectTune(projectId, heard.version_id)
-                  setHeard(null)
-                  say("No problem, I've set it aside. Sing it again whenever you like.")
-                }}>
-                  Not quite
-                </Button>
-              </div>
-            </section>
+        {/* Takes */}
+        <section aria-labelledby="takes-heading" className="flex max-w-[920px] flex-col gap-3">
+          <h2 id="takes-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+            {roots.length ? `Your takes (${roots.length})` : "Your takes"}
+          </h2>
+          {comp && (
+            <CompView
+              comp={comp}
+              takes={takes}
+              busy={busy}
+              inUse={activeState?.active_comp_id === comp.id}
+              onUse={useComp}
+              onSwap={swap}
+            />
           )}
-
-          {(roots.length > 0 || comp) && (
-            <div className="mx-auto max-w-2xl">
-              {comp && (
-                <CompView comp={comp} takes={takes} busy={busy} playingUrl={playingUrl} inUse={activeState?.active_comp_id === comp.id}
-                          onPlay={playUrl} onUse={useComp} onSwap={swap} />
-              )}
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-medium text-muted-foreground">Your takes ({roots.length})</h2>
-                {picked.length >= 2 ? (
-                  <Button size="sm" disabled={busy} onClick={() => blend(picked)}>
-                    <Wand2 className="h-3.5 w-3.5" /> Best of {picked.length} takes
-                  </Button>
-                ) : roots.length >= 2 ? (
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => blend(roots.map((t) => t.id))}>
-                    <Wand2 className="h-3.5 w-3.5" /> Best of all my takes
-                  </Button>
-                ) : null}
-              </div>
-              <div className="flex flex-col gap-3">
-                {roots.map((take) => (
-                  <TakeCard
-                    key={take.id}
-                    take={take}
-                    versions={children[take.id] ?? []}
-                    activeId={activeTakeId}
-                    playingUrl={playingUrl}
-                    busy={busy}
-                    picked={picked.includes(take.id)}
-                    canUseAsMelody={!hasOwnTune}
-                    onPlay={playUrl}
-                    onUse={chooseActive}
-                    onPick={(id) => setPicked((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]))}
-                    onAction={act}
-                  />
-                ))}
-              </div>
-              {harmonies.length > 0 && (
-                <div className="mt-6">
-                  <h2 className="mb-2 text-sm font-medium text-muted-foreground">Harmonies (the Mix Room turns them on or off)</h2>
-                  {harmonies.map((h) => (
-                    <div key={h.id} className="mb-2 flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
-                      <button onClick={() => playUrl(h.audio_url)} aria-label={playingUrl === h.audio_url ? "Pause harmony" : "Play harmony"}
-                              className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary hover:bg-primary/25">
-                        {playingUrl === h.audio_url ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 translate-x-px" />}
-                      </button>
-                      <span className="text-sm text-foreground">{h.label}</span>
-                    </div>
-                  ))}
+          {roots.length === 0 ? (
+            <div aria-hidden="true" className="flex h-24 items-center rounded-md border border-dashed border-ink-3/60 px-5">
+              <span className="text-base text-ink-3">Each take you record appears here, with how steady it was.</span>
+            </div>
+          ) : (
+            roots.map((take) => (
+              <TakeCard
+                key={take.id}
+                take={take}
+                versions={children[take.id] ?? []}
+                activeId={activeTakeId}
+                busy={busy}
+                picked={picked.includes(take.id)}
+                canUseAsMelody={!hasOwnTune}
+                onUse={chooseActive}
+                onPick={(id) => setPicked((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]))}
+                onAction={act}
+              />
+            ))
+          )}
+          {harmonies.length > 0 && (
+            <div className="mt-3 flex flex-col gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">Second voices (Blend turns them on or off)</h2>
+              {harmonies.map((h) => (
+                <div key={h.id} className="flex items-center gap-3 rounded-md bg-surface px-3 py-2">
+                  <PlayButton track={{ id: `take:${h.id}`, url: h.audio_url, label: h.label ?? "Second voice", material: "voice" }} size="row" />
+                  <span className="text-base text-ink">{h.label}</span>
                 </div>
-              )}
+              ))}
             </div>
           )}
-        </div>
+        </section>
       </div>
 
       <ConversationPanel
         projectId={projectId}
         room="voice"
+        material="voice"
         emptyText="Getting your takes ready…"
         turns={turns}
         onSend={handleSend}
         isThinking={isThinking}
-        placeholder="Ask Frank for help with your voice…"
+        placeholder="Ask about your voice…"
       />
     </div>
   )

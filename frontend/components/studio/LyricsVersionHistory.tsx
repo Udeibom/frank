@@ -1,59 +1,44 @@
 "use client"
 
 /**
- * LyricsVersionHistory — flip through drafts like pages in a notebook.
- * Every saved version is here. Nothing is ever lost. The user can preview,
- * restore, and label any version.
+ * LyricsVersionHistory: every draft of the words, in the margin of the page, newest first. Nothing is ever lost.
+ * The person can look at any draft, bring it back, or give it a name ("before I changed the chorus").
  */
 
 import { useState } from "react"
 import type { LyricsVersion } from "@/types/project"
 import { updateLyricsLabel } from "@/lib/api/lyrics"
-import { History, RotateCcw, X, Tag } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { lyricHeadings } from "@/lib/songShape"
+import { Check, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface LyricsVersionHistoryProps {
   versions: LyricsVersion[]
   activeVersionId: string | null
   onRestore: (version: LyricsVersion) => void
-  onClose: () => void
   onLabelUpdated: (versionId: string, label: string) => void
 }
 
+/** The first line of words, skipping section headings ("Verse"), so each draft is recognisable. */
 function firstLine(content: string): string {
-  const line = content.split("\n").find((l) => l.trim())
-  return line?.trim() || "Empty draft"
+  const line = content.split("\n").find((l) => l.trim() && lyricHeadings(l).length === 0)
+  return line?.trim() || "An empty page"
 }
 
-function formatTime(iso: string): string {
+function when(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
+  return d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
-export function LyricsVersionHistory({
-  versions,
-  activeVersionId,
-  onRestore,
-  onClose,
-  onLabelUpdated,
-}: LyricsVersionHistoryProps) {
-  const [previewId, setPreviewId] = useState<string | null>(null)
-  const [editingLabelId, setEditingLabelId] = useState<string | null>(null)
-  const [labelDraft, setLabelDraft] = useState("")
-
-  const previewVersion = versions.find((v) => v.id === previewId)
+export function LyricsVersionHistory({ versions, activeVersionId, onRestore, onLabelUpdated }: LyricsVersionHistoryProps) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState("")
 
   async function saveLabel(version: LyricsVersion) {
-    setEditingLabelId(null)
-    const label = labelDraft.trim()
+    setEditingId(null)
+    const label = draft.trim()
     if (!label || label === version.label) return
-    // Optimistically show the new label, revert if the save fails
     onLabelUpdated(version.id, label)
     try {
       await updateLyricsLabel(version.project_id, version.id, label)
@@ -63,117 +48,74 @@ export function LyricsVersionHistory({
   }
 
   return (
-    <div className="flex h-full w-72 flex-col border-l border-border bg-card">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Your drafts</span>
-        </div>
-        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close drafts">
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Preview overlay */}
-      {previewVersion && (
-        <div className="border-b border-border bg-background/50 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              {formatTime(previewVersion.created_at)}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setPreviewId(null)}
-              className="h-6 text-xs"
-            >
-              Close preview
-            </Button>
-          </div>
-          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-muted-foreground leading-relaxed font-sans">
-            {previewVersion.content}
-          </pre>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onRestore(previewVersion)}
-            className="mt-3 w-full"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Bring this back
-          </Button>
-        </div>
-      )}
-
-      {/* Version list */}
-      <div className="flex-1 overflow-y-auto">
-        {versions.length === 0 ? (
-          <p className="px-4 py-6 text-center text-xs text-muted-foreground/50">
-            Your drafts will appear here as you write.
-          </p>
-        ) : (
-          <div className="flex flex-col">
-            {versions.map((version) => (
-              <div
-                key={version.id}
-                className={cn(
-                  "group border-b border-border/50 px-4 py-3 transition-colors hover:bg-secondary/50",
-                  version.id === activeVersionId && "bg-primary/5",
-                )}
-              >
+    <section aria-labelledby="drafts-heading" className="flex flex-col gap-2">
+      <h2 id="drafts-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+        Drafts
+      </h2>
+      {versions.length === 0 ? (
+        <p className="text-sm text-ink-2">Each time you pause, what you wrote is kept here as a draft.</p>
+      ) : (
+        <ol className="flex flex-col">
+          {versions.map((v) => {
+            const current = v.id === activeVersionId
+            const open = openId === v.id
+            return (
+              <li key={v.id} className="border-b border-line py-2.5 last:border-b-0">
                 <button
-                  onClick={() => setPreviewId(version.id)}
-                  className="w-full text-left"
+                  onClick={() => setOpenId(open ? null : v.id)}
+                  aria-expanded={open}
+                  className="w-full rounded-sm text-left"
                 >
-                  <p className="truncate text-sm text-foreground">
-                    {firstLine(version.content)}
-                  </p>
+                  <span className="line-clamp-1 font-written text-[17px] leading-[25px] text-words">{firstLine(v.content)}</span>
+                  <span className="text-sm text-ink-3">{v.label ? v.label : when(v.created_at)}</span>
                 </button>
-
-                <div className="mt-1 flex items-center justify-between">
-                  {editingLabelId === version.id ? (
+                <div className="mt-1 flex items-center gap-3">
+                  {current ? (
+                    <span className="flex items-center gap-1 text-sm text-words">
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" /> On the page
+                    </span>
+                  ) : (
+                    <button onClick={() => onRestore(v)} className="text-sm text-ink underline underline-offset-4 hover:text-frank">
+                      Bring this back
+                    </button>
+                  )}
+                  {editingId === v.id ? (
                     <input
                       autoFocus
-                      value={labelDraft}
-                      onChange={(e) => setLabelDraft(e.target.value)}
-                      onBlur={() => saveLabel(version)}
+                      value={draft}
+                      maxLength={80}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => saveLabel(v)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") saveLabel(version)
-                        if (e.key === "Escape") setEditingLabelId(null)
+                        if (e.key === "Enter") void saveLabel(v)
+                        if (e.key === "Escape") setEditingId(null)
                       }}
-                      placeholder="Label this draft"
-                      className="w-full bg-transparent text-xs text-primary outline-none"
+                      aria-label="Name this draft"
+                      placeholder="Name this draft"
+                      className="min-w-0 flex-1 rounded-sm bg-raised px-2 py-0.5 text-sm text-ink placeholder:text-ink-3"
                     />
                   ) : (
                     <button
                       onClick={() => {
-                        setEditingLabelId(version.id)
-                        setLabelDraft(version.label ?? "")
+                        setDraft(v.label ?? "")
+                        setEditingId(v.id)
                       }}
-                      className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-primary"
+                      className="flex items-center gap-1 text-sm text-ink-2 hover:text-ink"
                     >
-                      {version.label ? (
-                        <>
-                          <Tag className="h-3 w-3" />
-                          {version.label}
-                        </>
-                      ) : (
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                          {formatTime(version.created_at)}
-                        </span>
-                      )}
+                      <Pencil className="h-3 w-3" aria-hidden="true" /> Name it
                     </button>
                   )}
-                  {version.id === activeVersionId && (
-                    <span className="text-xs text-primary">current</span>
-                  )}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+                {open && (
+                  <pre className={cn("mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-sm bg-raised p-3 font-written text-[17px] leading-[25px] text-words")}>
+                    {v.content}
+                  </pre>
+                )}
+              </li>
+            )
+          })}
+        </ol>
+      )}
+    </section>
   )
 }

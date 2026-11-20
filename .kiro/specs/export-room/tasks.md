@@ -39,7 +39,7 @@
     - _Requirements: 4.1, 5.4_
 
 - [ ] 7. Deferred follow-ups (tracked) — _open: 7.1_
-  - [ ] 7.1 Waveform on the final-listen screen — _PARTLY DONE: components/audio/Waveform.tsx with `waveform()` in export_runner.py (test_the_waveform_is_a_short_shape_between_zero_and_one) is shown, but only after "Finish it" (`{finished && <Waveform .../>}`); the first listen at the top of the screen still has only the play button. Not seen in a browser by me_
+  - [ ] 7.1 Waveform on the final-listen screen — _PARTLY DONE: `components/audio/SoundShape.tsx` (replaced Waveform.tsx Nov 19) with `waveform()` in export_runner.py (test_the_waveform_is_a_short_shape_between_zero_and_one) is shown, but still only after "Finish it": the backend measures the shape during the finishing job, so before that the Finish room says the shape appears once it is finished. Showing it on the first listen needs the shape measured for the active blend (backend). Not yet seen in a browser after the redesign_
     - _Requirements: 1.2_
   - [x] 7.2 Two-pass loudnorm; true-320k from un-encoded source — _Evidence: mastering.py `measure_loudness` then `encode_finished` (second pass with the measured values, one corrective retry) fed by `render_array`, the uncompressed mix, in export_runner; test_finishing_reaches_streaming_loudness_without_clipping passes; production loudness -14.7 (build-progress Nov 18)_
     - _Requirements: 6.1_

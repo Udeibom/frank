@@ -33,6 +33,14 @@ class FingerprintResponse(BaseModel):
     created_at: str
 
 
+class TextureResponse(BaseModel):
+    id: str
+    audio_url: str
+    approved: bool = False
+    created_at: str
+class TextureWaveformResponse(BaseModel):
+    texture_id: str
+    waveform: list[float]
 class HumAnalysisResponse(BaseModel):
     analysis: dict[str, Any]
     audio_url: str

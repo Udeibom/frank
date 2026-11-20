@@ -14,7 +14,14 @@ The LLM never produces audio. It produces JSON that the audio pipeline acts on.
 
 ## Conversation Presence
 
-The conversation interface is always present — a panel alongside whatever layer the user is working in. It does not interrupt or demand attention. The user uses it when they want to talk. They can also interact directly with the UI (play, compare, select) without the conversation.
+The conversation interface is always present, as **the Frank panel**: a margin alongside whatever room the user is working in (340px, collapsible to a 56px tab, overlaying the stage at 1100px and below). It is not a chat window: no bubbles, no avatar. It does not interrupt or demand attention. The user uses it when they want to talk. They can also interact directly with the stage (play, compare, select) without the conversation.
+
+Three rules follow from that:
+- **Frank always shows what he knows.** A one-line "What Frank knows" summary is pinned at the top of the panel.
+- **Everything Frank does is visible and reversible.** Each action produces a change line ("Direction B, simpler  Undo") with Hear it and Undo. Frank speaks once per action, after the thing exists. He never says it is done before it is.
+- **A question that needs an answer is also on the stage**, as a Frank note with the answers as buttons, next to the thing it is about. The stage never tells the user to look at the panel.
+
+In text shown to the user the rooms are called Words, Feeling, Music, Voice, Blend and Finish. The older section headings below (Idea Room, Feel Lab, ...) are the same rooms.
 
 ## Prompt Architecture
 

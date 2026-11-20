@@ -6,10 +6,11 @@
  * share), heard before and after, the download, separate parts, and one optional surprise idea.
  */
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Waveform } from "@/components/audio/Waveform"
+import { FrankNote } from "@/components/conversation/FrankNote"
+import { PlayButton } from "@/components/audio/PlayButton"
+import { SoundShape } from "@/components/audio/SoundShape"
 import { createExport, listExports, getDownloadInfo, type ExportRecord } from "@/lib/api/export"
 import { listMixVersions, type MixVersion } from "@/lib/api/mix"
 import { setActiveBeatVersion } from "@/lib/api/beat"
@@ -25,7 +26,8 @@ import {
 } from "@/lib/api/finish"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
-import { Play, Pause, Download, Sparkles, Loader2, Check, Package, Lightbulb } from "lucide-react"
+import { formatTime, useAudio, usePlayback, type Track } from "@/store/audio"
+import { Download } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Which = "finished" | "as_mixed"
@@ -42,7 +44,8 @@ export default function ExportRoomPage() {
   const params = useParams()
   const router = useRouter()
   const projectId = params.projectId as string
-  const { activeState, updateActiveState } = useProjectStore()
+  const { activeState, updateActiveState, currentProject } = useProjectStore()
+  const engine = useAudio()
 
   const [activeMix, setActiveMix] = useState<MixVersion | null>(null)
   const [exports, setExports] = useState<ExportRecord[]>([])
@@ -55,11 +58,8 @@ export default function ExportRoomPage() {
   const [working, setWorking] = useState<string | null>(null)
   const [downloaded, setDownloaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [playing, setPlaying] = useState(false)
-  const [progress, setProgress] = useState(0)
   const [surpriseState, setSurpriseState] = useState<"hidden" | "offer" | "making" | "ready" | "done">("hidden")
   const [surprise, setSurprise] = useState<SurpriseResult | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     Promise.all([listMixVersions(projectId), listExports(projectId), getIntent(projectId).catch(() => null)])
@@ -75,45 +75,25 @@ export default function ExportRoomPage() {
 
   const currentUrl = finished ? (which === "finished" ? finished.url : finished.beforeUrl ?? finished.url) : activeMix?.render_url ?? null
 
-  // One player; switching between "as mixed" and "finished" keeps the moment, so the difference is easy to hear.
+  // One track at a time through the shared engine; switching between "as blended" and "finished" keeps the
+  // moment, so the difference is easy to hear.
+  const track: Track | null = currentUrl
+    ? {
+        id: `finish:${currentUrl}`,
+        url: currentUrl,
+        label: finished ? (which === "finished" ? "The finished song" : "The song as you blended it") : "The song",
+        material: "voice",
+        onSong: true,
+      }
+    : null
+  const playback = usePlayback(track?.id)
   useEffect(() => {
-    const at = audioRef.current?.currentTime ?? 0
-    const wasPlaying = playing
-    audioRef.current?.pause()
-    if (!currentUrl) {
-      audioRef.current = null
-      return
+    const s = useAudio.getState()
+    if (track && s.playing && s.track?.id.startsWith("finish:") && s.track.id !== track.id) {
+      void s.play(track, { keepPosition: true })
     }
-    const audio = new Audio(currentUrl)
-    audio.addEventListener("timeupdate", () => audio.duration && setProgress(audio.currentTime / audio.duration))
-    audio.addEventListener("ended", () => setPlaying(false))
-    audio.addEventListener("loadedmetadata", () => {
-      audio.currentTime = Math.min(at, audio.duration || at)
-      if (wasPlaying) audio.play().catch(() => setPlaying(false))
-    })
-    audioRef.current = audio
-    return () => audio.pause()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUrl])
-
-  function togglePlay() {
-    const audio = audioRef.current
-    if (!audio) return
-    if (playing) {
-      audio.pause()
-      setPlaying(false)
-    } else {
-      audio.play().then(() => setPlaying(true)).catch(() => {})
-    }
-  }
-
-  function seek(f: number) {
-    const audio = audioRef.current
-    if (audio?.duration) {
-      audio.currentTime = f * audio.duration
-      setProgress(f)
-    }
-  }
+  }, [track?.id])
 
   const needsIntentCheck = Boolean(activeMix) && exports.length === 0 && intent !== null && intent.answered !== "yes"
 
@@ -210,162 +190,218 @@ export default function ExportRoomPage() {
 
   if (loadError) {
     return (
-      <div className="flex h-screen items-center justify-center px-8 text-center">
-        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">Frank had trouble loading your song just now. Try refreshing in a moment.</p>
+      <div className="flex h-full items-center justify-center px-8">
+        <FrankNote problem answers={[{ label: "Try again", onClick: () => window.location.reload() }]}>
+          Frank had trouble loading your song just now. Nothing is lost.
+        </FrankNote>
       </div>
     )
   }
 
   if (!activeMix) {
+    // Blocked: say what is missing and offer the way there.
     return (
-      <div className="flex h-screen items-center justify-center px-8 text-center">
-        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-          Once you&apos;ve got a mix you like, come back here to take your song with you. Head to the Mix Room to put it together.
-        </p>
+      <div className="flex h-full flex-col gap-7 px-10 py-8">
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
+          <h1 className="text-base font-medium text-ink">Finish</h1>
+        </div>
+        <FrankNote answers={[{ label: "Go to Blend", onClick: () => router.push(`/${projectId}/mix`), primary: true }]}>
+          Once your voice and the music are blended, come back here to take your song with you.
+        </FrankNote>
+        <div aria-hidden="true" className="flex h-[120px] items-center rounded-md border border-dashed border-ink-3/60 px-6">
+          <span className="text-base text-ink-3">Your finished song will be here, ready to hear and download.</span>
+        </div>
       </div>
     )
   }
 
+  const title = currentProject?.title || "Your song"
+  const step = needsIntentCheck ? "ask" : !finished ? "finish" : "download"
+
   return (
-    <div className="flex h-screen flex-col items-center overflow-y-auto px-8 py-12">
-      <div className="flex w-full max-w-lg flex-col items-center gap-7 text-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Here&apos;s your song</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Take a final listen before you take it with you.</p>
+    <div className="flex h-full flex-col overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
+      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-8">
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
+          <h1 className="text-base font-medium text-ink">Finish</h1>
+          <span className="text-sm text-ink-2">A last listen, then it's yours</span>
         </div>
 
-        <button
-          onClick={togglePlay}
-          className="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105"
-          aria-label={playing ? "Pause" : "Play"}
-        >
-          {playing ? <Pause className="h-8 w-8" /> : <Play className="h-9 w-9 translate-x-0.5" />}
-        </button>
-
-        {finished && <Waveform points={finished.waveform} progress={progress} onSeek={seek} />}
-
-        {needsIntentCheck ? (
-          <section aria-label="Does it match?" className="w-full rounded-xl border border-primary/30 bg-card p-5 text-left">
-            <p className="mb-4 text-sm text-foreground">{intent!.question}</p>
-            {!notYet ? (
-              <div className="flex gap-2">
-                <Button onClick={sayYes}>
-                  <Check className="h-4 w-4" /> Yes, that&apos;s it
-                </Button>
-                <Button variant="outline" onClick={() => setNotYet(true)}>
-                  Not yet
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <label className="text-xs text-muted-foreground" htmlFor="what-missing">
-                  What&apos;s missing, in your own words? (You can leave it blank.)
-                </label>
-                <input
-                  id="what-missing"
-                  value={said}
-                  onChange={(e) => setSaid(e.target.value)}
-                  className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  placeholder="It should feel lonelier…"
-                  autoFocus
-                />
-                <Button onClick={sayNotYet} className="self-start">
-                  Find a few ideas
-                </Button>
-              </div>
-            )}
-          </section>
-        ) : !finished ? (
-          <Button size="lg" onClick={finish} disabled={Boolean(working)} className="gap-2 px-8">
-            {working ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-            Finish it, ready to share
-          </Button>
-        ) : (
-          <>
-            <div className="flex gap-2" role="group" aria-label="Compare before and after">
-              <Button variant={which === "as_mixed" ? "default" : "outline"} size="sm" onClick={() => setWhich("as_mixed")} disabled={!finished.beforeUrl}>
-                As you mixed it
-              </Button>
-              <Button variant={which === "finished" ? "default" : "outline"} size="sm" onClick={() => setWhich("finished")}>
-                Finished
-              </Button>
+        {/* The song: its name, its shape, one play control */}
+        <section aria-labelledby="song-name" className="flex flex-col gap-5 rounded-md bg-surface p-8">
+          <div className="flex items-center gap-5">
+            <PlayButton track={track!} size="stage" keepPosition />
+            <div className="min-w-0">
+              <h2 id="song-name" className="truncate font-written text-[34px] leading-[40px] text-ink">
+                {title}
+              </h2>
+              <p className="text-base text-ink-2">
+                {finished ? (which === "finished" ? "Finished, ready to share" : "As you blended it") : activeMix.label ?? "The blend in your song"}
+                {playback.duration > 0 && <span className="ml-2 tabular-nums">{formatTime(playback.duration)}</span>}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {finished.onTarget === false
-                ? "I got it close to the loudness songs usually have, but not all the way. It's still safe to share."
-                : "The finished one plays as loud as songs on streaming apps, with no harsh peaks. Pick the one you prefer."}
-            </p>
-            <Button size="lg" onClick={download} className="gap-2 px-8">
-              <Download className="h-5 w-5" /> Download {which === "finished" ? "the finished song" : "it as you mixed it"}
-            </Button>
-          </>
+          </div>
+          {finished ? (
+            <SoundShape
+              points={finished.waveform}
+              progress={playback.progress}
+              material="voice"
+              live={playback.isCurrent}
+              label={title}
+              onSeek={(f) => (playback.isCurrent ? engine.seekFraction(f) : void engine.play(track!, { atFraction: f }))}
+              className="h-24"
+            />
+          ) : (
+            <p className="text-sm text-ink-2">The shape of the song appears here once it's finished.</p>
+          )}
+          {finished && finished.beforeUrl && (
+            <div className="flex flex-wrap items-center gap-3" role="group" aria-label="Compare before and after">
+              <span className="text-sm text-ink-2">Hear it</span>
+              {(["finished", "as_mixed"] as Which[]).map((w) => (
+                <button
+                  key={w}
+                  aria-pressed={which === w}
+                  onClick={() => setWhich(w)}
+                  className={cn(
+                    "rounded-md border px-3 py-1.5 text-base",
+                    which === w ? "border-voice bg-raised text-ink" : "border-line text-ink-2 hover:text-ink",
+                  )}
+                >
+                  {w === "finished" ? "Finished" : "As you blended it"}
+                </button>
+              ))}
+              <span className="text-sm text-ink-2">
+                {finished.onTarget === false
+                  ? "It's close to the loudness songs usually have, not all the way. Still safe to share."
+                  : "The finished one plays as loud as songs on streaming apps, with no harsh peaks."}
+              </span>
+            </div>
+          )}
+        </section>
+        {/* One step at a time: does it match → finish it → download */}
+        {step === "ask" && (
+          <FrankNote
+            answers={notYet ? [] : [
+              { label: "Yes, that's it", onClick: () => void sayYes(), primary: true },
+              { label: "Not yet", onClick: () => setNotYet(true) },
+            ]}
+          >
+            {intent!.question}
+          </FrankNote>
         )}
-
-        {finished && (
-          <Button variant="outline" size="sm" onClick={downloadParts} disabled={Boolean(working)} className="gap-2">
-            <Package className="h-4 w-4" /> Download separate parts
-          </Button>
+        {step === "ask" && notYet && (
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void sayNotYet()
+            }}
+          >
+            <label className="text-sm font-medium text-ink-2" htmlFor="what-missing">
+              What's missing, in your own words? (You can leave it blank.)
+            </label>
+            <div className="flex items-end gap-3">
+              <input
+                id="what-missing"
+                value={said}
+                onChange={(e) => setSaid(e.target.value)}
+                className="max-w-xl flex-1 rounded-md bg-raised px-3 py-2.5 font-written text-[17px] text-words placeholder:font-sans placeholder:text-base placeholder:text-ink-3"
+                placeholder="It should feel lonelier…"
+                autoFocus
+              />
+              <button type="submit" className="h-10 rounded-md border border-line bg-raised px-5 text-base text-ink hover:border-ink-3">
+                Find a few ideas
+              </button>
+            </div>
+          </form>
         )}
-
-        {working && (
-          <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> {working}
-          </p>
+        {step === "finish" && (
+          <FrankNote
+            busy={Boolean(working)}
+            aside={working ? undefined : "Frank makes it as loud and even as songs on streaming apps. You'll hear before and after."}
+            answers={working ? [] : [{ label: "Finish it, ready to share", onClick: () => void finish(), primary: true }]}
+          >
+            {working ?? "Happy with how it sounds? Let's finish it."}
+          </FrankNote>
         )}
-        {error && <p className="text-xs text-red-400">{error}</p>}
-        {downloaded && !error && <p className="text-sm text-primary/80">It&apos;s yours. Good luck with it.</p>}
+        {step === "download" && (
+          <FrankNote
+            busy={Boolean(working)}
+            answers={[
+              {
+                label: which === "finished" ? "Download the finished song" : "Download it as you blended it",
+                onClick: () => void download(),
+                primary: true,
+              },
+              { label: "Download separate parts", onClick: () => void downloadParts(), disabled: Boolean(working) },
+            ]}
+            aside={downloaded && !error ? "It's yours. Good luck with it." : "An MP3 you can share anywhere. Separate parts are each sound on its own, for a friend who mixes."}
+          >
+            {working ?? (downloaded ? "Downloaded." : "Your song is ready.")}
+          </FrankNote>
+        )}
+        {error && (
+          <FrankNote problem>
+            {error}
+          </FrankNote>
+        )}
 
         {surpriseState === "offer" && (
-          <section aria-label="One idea" className="w-full rounded-xl border border-border bg-card p-4 text-left">
-            <p className="mb-3 flex items-center gap-2 text-sm text-foreground">
-              <Lightbulb className="h-4 w-4 text-primary" /> Before we finish, I tried one idea. Want to hear it? Your version stays exactly as it is.
-            </p>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={showSurprise}>Show me</Button>
-              <Button size="sm" variant="outline" onClick={skipSurprise}>No thanks</Button>
-            </div>
-          </section>
+          <FrankNote
+            answers={[
+              { label: "Show me", onClick: () => void showSurprise() },
+              { label: "No thanks", onClick: () => void skipSurprise() },
+            ]}
+          >
+            Before you go, I tried one idea. Want to hear it? Your version stays exactly as it is.
+          </FrankNote>
         )}
         {surpriseState === "making" && (
-          <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Making my idea. This takes a few minutes; your song is already safe.
-          </p>
+          <FrankNote busy>
+            Making my idea. This takes a few minutes; your song is already safe.
+          </FrankNote>
         )}
         {surpriseState === "ready" && surprise && (
-          <section aria-label="Frank's idea" className="w-full rounded-xl border border-primary/30 bg-card p-4 text-left">
-            <p className="mb-1 text-sm font-medium text-foreground">{surprise.title}</p>
-            <p className="mb-3 text-xs text-muted-foreground">{surprise.plain}</p>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => new Audio(surprise.render_url).play().catch(() => {})}>
-                <Play className="h-3.5 w-3.5" /> Hear it
-              </Button>
-              <Button size="sm" onClick={chooseSurprise}>Use this one instead</Button>
-              <Button size="sm" variant="outline" onClick={() => setSurpriseState("done")}>Keep mine</Button>
+          <section aria-label="Frank's idea" className="flex items-center gap-4 rounded-md border border-line bg-surface p-4">
+            <PlayButton track={{ id: `surprise:${surprise.beat_version_id}`, url: surprise.render_url, label: surprise.title, material: "music", onSong: true }} size="card" keepPosition />
+            <div className="min-w-0 flex-1">
+              <p className="font-written text-xl text-ink">{surprise.title}</p>
+              <p className="text-sm text-ink-2">{surprise.plain}</p>
             </div>
+            <button onClick={() => void chooseSurprise()} className="rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3">
+              Use this one instead
+            </button>
+            <button onClick={() => setSurpriseState("done")} className="text-sm text-ink-2 hover:text-ink">
+              Keep mine
+            </button>
           </section>
         )}
 
         {exports.length > 0 && (
-          <div className="mt-4 w-full border-t border-border pt-4">
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Past downloads</p>
-            <div className="flex flex-col gap-1.5">
+          <section aria-labelledby="past-heading" className="flex flex-col gap-2">
+            <h2 id="past-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+              Past downloads
+            </h2>
+            <ul className="flex flex-col">
               {exports.map((e) => (
-                <button
-                  key={e.id}
-                  onClick={async () => {
-                    const info = await getDownloadInfo(projectId, e.id)
-                    clickDownload(info.url, info.filename)
-                  }}
-                  className={cn("flex items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary")}
-                >
-                  <span className="text-muted-foreground">
-                    {new Date(e.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                  </span>
-                  <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
+                <li key={e.id} className="border-b border-line last:border-b-0">
+                  <button
+                    onClick={async () => {
+                      const info = await getDownloadInfo(projectId, e.id)
+                      clickDownload(info.url, info.filename)
+                    }}
+                    className="flex w-full items-center justify-between py-2.5 text-left text-base text-ink hover:text-frank"
+                  >
+                    {new Date(e.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    <span className="flex items-center gap-1.5 text-sm text-ink-2">
+                      <Download className="h-4 w-4" aria-hidden="true" /> Download again
+                    </span>
+                  </button>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
         )}
       </div>
     </div>

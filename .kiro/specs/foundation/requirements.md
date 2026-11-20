@@ -131,9 +131,11 @@ No audio processing is built in this spec. No LLM calls are made. This is the bo
 
 #### Acceptance Criteria
 
-1. THE SYSTEM SHALL render `components/studio/StudioNav.tsx` showing the project title, all six layers (Idea, Feel, Beat, Voice, Mix, Export), and a back link to the dashboard.
+> **Amended Nov 19 (studio redesign, founder approved; see `docs/design-audit/AUDIT.md` and `.kiro/steering/design-and-ui.md`).** The single sidebar `StudioNav.tsx` was replaced by two shell parts: the **Rail** (`components/shell/Rail.tsx`: the six rooms, by plain names) and the **Song Strip** (`components/shell/SongStrip.tsx`: song title, status, transport). Status moved from per-room circles to the strip's lanes, because the audit found the circles and the "Where your song is" list disagreeing (finding D-3). Criteria 1 and 3 are reworded to match; the rest are unchanged.
+
+1. THE SYSTEM SHALL render the Rail showing all six rooms (Words, Feeling, Music, Voice, Blend, Finish; routes `idea`, `feel`, `beat`, `voice`, `mix`, `export`), and the Song Strip showing the project title and a link back to the dashboard.
 2. WHEN the user clicks the project title THEN the system SHALL allow inline editing, and WHEN the field blurs THEN the system SHALL save the new title.
-3. THE SYSTEM SHALL show a per-layer status indicator (empty / in-progress / has-content) driven by the project's active state.
+3. THE SYSTEM SHALL show the song's status in the Song Strip: one lane per material (words, feeling, music, voice), each in use / tried / nothing yet, driven by the shared song record.
 4. WHERE color conveys status THE SYSTEM SHALL also convey it by a non-color indicator, per the accessibility steering.
 5. THE SYSTEM SHALL highlight the currently active layer.
 6. THE SYSTEM SHALL NOT impose any lock or prerequisite between layers.

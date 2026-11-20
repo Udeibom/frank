@@ -86,3 +86,30 @@ async def mark_texture_approved(texture_id: str) -> None:
     supabase.table("texture_samples").update({"approved": True}).eq(
         "id", texture_id
     ).execute()
+
+
+async def list_textures(project_id: str) -> list[dict]:
+    """Every texture made for the song, oldest first. Nothing is ever dropped from this list."""
+    supabase = get_supabase()
+    result = (
+        supabase.table("texture_samples")
+        .select("id, audio_url, approved, created_at")
+        .eq("project_id", project_id)
+        .order("created_at")
+        .execute()
+    )
+    return result.data or []
+
+
+async def get_texture(project_id: str, texture_id: str) -> Optional[dict]:
+    """One texture, only if it belongs to this song."""
+    supabase = get_supabase()
+    result = (
+        supabase.table("texture_samples")
+        .select("id, audio_url, approved, created_at")
+        .eq("project_id", project_id)
+        .eq("id", texture_id)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None

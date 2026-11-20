@@ -9,9 +9,9 @@
     - _Requirements: 3.5, 5.1_
 
 - [x] 2. Texture playback component
-  - [x] 2.1 `components/audio/TexturePlayer.tsx` — waveform + play/pause, auto-play, loop once then stop
+  - [x] 2.1 Texture playback — waveform + play/pause, auto-play, loop once then stop. _Moved Nov 19 (studio redesign): `TexturePlayer.tsx` was deleted. Each texture is now a card on the stage (`components/studio/DirectionCard.tsx`) with its sound shape measured by the backend (`GET /feel/textures/{id}/waveform`), and it plays through the shared AudioEngine (`store/audio.ts`, track option `playsTwice`: play through, go round once more, stop). It auto-plays on arrival (`frontend/app/(studio)/[projectId]/feel/page.tsx`, `runTextureGeneration`). The play button doubles as the mute/stop control. Evidence: auto-play and pause seen in a browser Nov 19 (`docs/design-audit/FEELING-ROOM.md` journeys 1, 3, 9); "plays twice then stops" checked in a browser after the change (see that file)_
     - _Requirements: 2.1, 2.2_
-  - [x] 2.2 Replayable texture cards in the conversation history
+  - [x] 2.2 Replayable texture cards — _Moved Nov 19: they are on the stage's listening bench rather than in the conversation, every direction made for the song is listed from `GET /feel/textures` (nothing is dropped), and each can be replayed. Evidence: reload journey 2 in `docs/design-audit/FEELING-ROOM.md`_
     - _Requirements: 2.4_
 
 - [x] 3. Hum recording
@@ -57,7 +57,7 @@
 - [x] 8. Backend: fingerprint persistence
   - [x] 8.1 `POST /feel/fingerprint` saves to `feel_fingerprints` and sets active_fingerprint_id
     - _Requirements: 3.6, 5.5_
-  - [x] 8.2 Sidebar status indicator updates to "has content"
+  - [x] 8.2 Sidebar status indicator updates to "has content" — _Updated Nov 19: shown by the Song Strip's feeling lane (solid once kept). Seen in a browser: keeping Direction 2 turned the lane solid and the strip said "the feeling is kept" (`docs/design-audit/FEELING-ROOM.md` journey 5)_
     - _Requirements: 3.6_
 
 - [x] 9. Async job system

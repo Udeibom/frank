@@ -22,6 +22,7 @@ import {
 } from "@/lib/api/intake"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
+import { useAudio } from "@/store/audio"
 import type { MusicalFingerprint } from "@/types/project"
 import { Mic, Square, Loader2, Play, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -45,7 +46,6 @@ export function StartSurface({ projectId, onSay }: StartSurfaceProps) {
   const [said, setSaid] = useState<string[]>([])
   const [heard, setHeard] = useState<Heard | null>(null)
   const pendingRef = useRef(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const say = (m: string) => (onSay ? onSay(m) : setSaid((xs) => [...xs.slice(-3), m]))
 
@@ -180,9 +180,7 @@ export function StartSurface({ projectId, onSay }: StartSurfaceProps) {
           <p className="mb-2 text-sm text-foreground">Is this your tune?</p>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => {
-              audioRef.current?.pause()
-              audioRef.current = new Audio(heard.preview_url)
-              audioRef.current.play().catch(() => {})
+              void useAudio.getState().play({ id: `start-hum:${heard.preview_url}`, url: heard.preview_url, label: "Your tune, as I heard it", material: "feel" }, { at: 0 })
             }}>
               <Play className="h-3.5 w-3.5" /> Hear it
             </Button>

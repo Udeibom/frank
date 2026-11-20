@@ -1,14 +1,17 @@
 "use client"
 
 /**
- * BeatVersions — a collapsible list of every beat the user has made. Nothing is
- * ever lost; they can play any past version and bring it back as the current one.
+ * BeatVersions: every version of the music, newest first, each with what changed to make it (so the person
+ * can see how the song got here, the way Endlesss keeps each riff as a step from the last). Nothing is ever
+ * lost: any version can be heard and put back in the song. Plays through the shared AudioEngine.
  */
 
 import { useState } from "react"
-import type { BeatVersion } from "@/lib/api/beat"
-import { Play, Pause, Check, Layers, Pencil } from "lucide-react"
+import { Check, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { PlayButton } from "@/components/audio/PlayButton"
+import type { BeatVersion } from "@/lib/api/beat"
+import type { Track } from "@/store/audio"
 
 interface BeatVersionsProps {
   versions: BeatVersion[]
@@ -18,12 +21,18 @@ interface BeatVersionsProps {
   onRename?: (versionId: string, label: string) => Promise<void> | void
 }
 
-export function BeatVersions({
-  versions,
-  activeVersionId,
-  onSetActive,
-  onRename,
-}: BeatVersionsProps) {
+export function beatTrack(v: BeatVersion): Track {
+  return { id: `beat:${v.id}`, url: v.render_url ?? "", label: v.label ?? "The music", material: "music", onSong: true }
+}
+
+/** What made this version, in the words the backend already wrote. */
+function whatChanged(v: BeatVersion, isFirst: boolean): string {
+  const changes = v.params.changes ?? []
+  if (changes.length) return changes.join(" ")
+  return isFirst ? "Built from the feeling" : "A new take"
+}
+
+export function BeatVersions({ versions, activeVersionId, onSetActive, onRename }: BeatVersionsProps) {
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState("")
 
@@ -32,108 +41,77 @@ export function BeatVersions({
     setEditing(null)
     if (label && onRename) await onRename(id, label)
   }
-  const [playingId, setPlayingId] = useState<string | null>(null)
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
-
-  function togglePlay(version: BeatVersion) {
-    if (!version.render_url) return
-    if (playingId === version.id) {
-      audio?.pause()
-      setPlayingId(null)
-      return
-    }
-    audio?.pause()
-    const next = new Audio(version.render_url)
-    next.onended = () => setPlayingId(null)
-    next.play().then(() => {
-      setAudio(next)
-      setPlayingId(version.id)
-    }).catch(() => setPlayingId(null))
-  }
 
   if (versions.length === 0) return null
+  const oldest = versions[versions.length - 1]?.id
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
-        <Layers className="h-3.5 w-3.5" />
-        Your beats ({versions.length})
-      </div>
-      {versions.map((version) => (
-        <div
-          key={version.id}
-          className={cn(
-            "flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors",
-            version.id === activeVersionId
-              ? "border-primary/40 bg-primary/5"
-              : "border-border bg-card hover:bg-secondary",
-          )}
-        >
-          <button
-            onClick={() => togglePlay(version)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary hover:bg-primary/25"
-            aria-label={playingId === version.id ? "Pause" : "Play"}
-            disabled={!version.render_url}
-          >
-            {playingId === version.id ? (
-              <Pause className="h-3.5 w-3.5" />
-            ) : (
-              <Play className="h-3.5 w-3.5 translate-x-px" />
-            )}
-          </button>
-
-          <div className="min-w-0 flex-1">
-            {editing === version.id ? (
-              <input
-                value={draft}
-                autoFocus
-                maxLength={80}
-                aria-label="Name this version"
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={() => saveName(version.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveName(version.id)
-                  if (e.key === "Escape") setEditing(null)
-                }}
-                className="w-full rounded border border-border bg-background px-2 py-0.5 text-sm"
-              />
-            ) : (
-              <p className="flex items-center gap-1.5 truncate text-sm text-foreground">
-                {version.label}
-                {onRename && (
-                  <button
-                    onClick={() => {
-                      setDraft(version.label ?? "")
-                      setEditing(version.id)
-                    }}
-                    aria-label={`Rename ${version.label ?? "this version"}`}
-                    className="text-muted-foreground/60 hover:text-primary"
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </button>
-                )}
-              </p>
-            )}
-            <p className="text-[11px] text-muted-foreground/60">
-              {version.params.sections?.length ?? 0} sections
-            </p>
-          </div>
-
-          {version.id === activeVersionId ? (
-            <span className="flex items-center gap-1 text-xs text-primary">
-              <Check className="h-3.5 w-3.5" />
-              Current
-            </span>
-          ) : (
-            <button
-              onClick={() => onSetActive(version.id)}
-              className="text-xs text-muted-foreground hover:text-primary"
+    <section aria-labelledby="versions-heading" className="flex flex-col gap-2">
+      <h2 id="versions-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+        How the music got here
+      </h2>
+      <ol className="flex flex-col">
+        {versions.map((v, i) => {
+          const inUse = v.id === activeVersionId
+          return (
+            <li
+              key={v.id}
+              className={cn(
+                "relative flex gap-3 py-2.5 pl-1",
+                i < versions.length - 1 && "border-b border-line",
+              )}
             >
-              Use this
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
+              {v.render_url ? <PlayButton track={beatTrack(v)} size="row" className="mt-0.5" where="in the version history" /> : <span className="h-7 w-7" />}
+              <div className="min-w-0 flex-1">
+                {editing === v.id ? (
+                  <input
+                    value={draft}
+                    autoFocus
+                    maxLength={80}
+                    aria-label="Name this version"
+                    onChange={(e) => setDraft(e.target.value)}
+                    onBlur={() => saveName(v.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void saveName(v.id)
+                      if (e.key === "Escape") setEditing(null)
+                    }}
+                    className="w-full rounded-sm bg-raised px-2 py-0.5 text-base text-ink"
+                  />
+                ) : (
+                  <p className="flex items-center gap-1.5 text-base text-ink">
+                    <span className="truncate">{v.label}</span>
+                    {onRename && (
+                      <button
+                        onClick={() => {
+                          setDraft(v.label ?? "")
+                          setEditing(v.id)
+                        }}
+                        aria-label={`Rename ${v.label ?? "this version"}`}
+                        className="rounded-sm p-0.5 text-ink-3 hover:text-ink"
+                      >
+                        <Pencil className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                    )}
+                  </p>
+                )}
+                <p className="line-clamp-2 text-sm text-ink-2">{whatChanged(v, v.id === oldest)}</p>
+              </div>
+              {inUse ? (
+                <span className="flex shrink-0 items-center gap-1 self-start pt-1 text-sm text-music">
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" /> In the song
+                </span>
+              ) : (
+                <button
+                  onClick={() => onSetActive(v.id)}
+                  className="shrink-0 self-start rounded-md border border-line px-2.5 py-1 text-sm text-ink hover:border-ink-3"
+                >
+                  Use this
+                </button>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+    </section>
   )
 }
