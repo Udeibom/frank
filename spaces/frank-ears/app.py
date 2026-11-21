@@ -22,6 +22,8 @@ Endpoints (api_name):
 from __future__ import annotations
 
 import json
+from pathlib import Path
+import subprocess
 import os
 import sys
 import tempfile
@@ -271,10 +273,10 @@ def pitch(f) -> str:
 def _emo():
     from transformers import pipeline
 
-    return pipeline("text-classification", model="SamLowe/roberta-base-go_emotions", top_k=None)
+    # CPU on purpose: a few lines of text, and the free GPU minutes are shared by every Frank user.
+    return pipeline("text-classification", model="SamLowe/roberta-base-go_emotions", top_k=None, device=-1)
 
 
-@GPU(duration=15)
 def emotions(lines_json: str) -> str:
     lines = [str(l)[:400] for l in json.loads(lines_json)][:200]
     res = _emo()(lines) if lines else []
@@ -319,31 +321,17 @@ def match_master(target, reference):
 
 # ── DeepFilterNet (MIT / Apache-2.0) ────────────────────────────────────────────────────────────────────
 
-@lru_cache(maxsize=1)
-def _df():
-    # deepfilternet imports a torchaudio module that newer torchaudio removed; it only needs the type name.
-    if "torchaudio.backend.common" not in sys.modules:
-        mod = types.ModuleType("torchaudio.backend.common")
-        mod.AudioMetaData = object
-        sys.modules["torchaudio.backend"] = types.ModuleType("torchaudio.backend")
-        sys.modules["torchaudio.backend.common"] = mod
-    from df.enhance import init_df
-
-    return init_df()
-
-
-@GPU(duration=30)
 def denoise(f):
-    import soundfile as sf
-    import torch
-    from df.enhance import enhance
-
-    model, state, _ = _df()
-    y = _load(_path(f), state.sr(), 600)
-    out = enhance(model, state, torch.from_numpy(y)[None, :])
-    path = tempfile.mktemp(suffix=".wav", prefix="quiet-")
-    sf.write(path, out.squeeze(0).numpy(), state.sr())
-    return path
+    """Room noise out of a take. CPU on purpose (DeepFilterNet runs in real time on a CPU, and the free GPU minutes
+    are shared by every Frank user). In its own process with no GPU visible: inside ZeroGPU's main process the
+    library reaches for CUDA and is stopped."""
+    out = tempfile.mktemp(suffix=".wav", prefix="quiet-")
+    env = {**os.environ, "CUDA_VISIBLE_DEVICES": ""}
+    r = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "denoise_worker.py"), _path(f), out],
+                       capture_output=True, text=True, timeout=400, env=env)
+    if r.returncode != 0 or not os.path.exists(out):
+        raise RuntimeError(f"quieting stopped (code {r.returncode}): {(r.stderr or r.stdout)[-500:]}")
+    return out
 
 
 def health() -> str:
