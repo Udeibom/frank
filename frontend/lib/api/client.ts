@@ -2,7 +2,12 @@
 // API keys never live in frontend code — all sensitive calls are made server-side
 import { createClient } from "@/lib/supabase/client"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+// All backend calls go through the Vercel proxy at /api/frank/.
+// Direct calls to the Render backend are dropped by Cloudflare's WAF for any
+// request whose combined size exceeds 512 bytes — which every authenticated
+// request does (Supabase JWTs are ~930 bytes). The proxy forwards from a
+// server-side Vercel IP that the WAF does not rate-limit.
+const PROXY_BASE = "/api/frank"
 
 export class ApiError extends Error {
   constructor(
@@ -39,11 +44,7 @@ async function authHeader(): Promise<Record<string, string>> {
   const [{ data }, country] = await Promise.all([createClient().auth.getSession(), region()])
   const token = data.session?.access_token
   return {
-    // Render's Cloudflare WAF blocks Authorization headers over ~511 bytes.
-    // Supabase JWTs are ~930 bytes, so we send the token in a custom header
-    // that the WAF doesn't inspect. The backend reads from X-Frank-Auth first,
-    // falling back to Authorization for compatibility with direct API calls.
-    ...(token ? { "X-Frank-Auth": token } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(country ? { "X-Frank-Region": country } : {}),
   }
 }
@@ -75,12 +76,13 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const url = `${API_URL}${path}`
+  const url = `${PROXY_BASE}${path}`
 
-  // 90-second timeout — long enough to survive a Render cold start (30–60s)
-  // without leaving the user hanging indefinitely.
+  // 55-second timeout — the Vercel proxy has a 60s limit; leave 5s margin.
+  // Long-running jobs (beat generation etc.) return a job_id immediately and
+  // are polled separately, so this timeout only applies to auth + DB ops.
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 90_000)
+  const timeoutId = setTimeout(() => controller.abort(), 55_000)
 
   let res: Response
   try {
@@ -108,7 +110,7 @@ export async function uploadFile<T>(
   path: string,
   formData: FormData,
 ): Promise<T> {
-  const url = `${API_URL}${path}`
+  const url = `${PROXY_BASE}${path}`
 
   const res = await fetch(url, {
     method: "POST",

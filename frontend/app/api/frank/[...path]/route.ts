@@ -1,0 +1,92 @@
+/**
+ * /api/frank/[...path] — server-side proxy to the Render backend.
+ *
+ * Render's Cloudflare WAF drops any request whose combined headers + body
+ * exceed 512 bytes. Supabase JWTs are ~930 bytes, so every authenticated
+ * browser request was silently dropped. Routing through this Vercel API route
+ * keeps the JWT server-side: the browser sends the token to Vercel over HTTPS,
+ * Vercel forwards it to Render from a trusted server IP that the WAF allows.
+ */
+import { NextRequest, NextResponse } from "next/server"
+
+const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+
+export const dynamic = "force-dynamic"
+
+async function proxy(req: NextRequest, path: string): Promise<NextResponse> {
+  const url = `${BACKEND}/${path}${req.nextUrl.search}`
+
+  // Forward all headers the client sent, except the Host header.
+  const headers = new Headers()
+  req.headers.forEach((value, key) => {
+    if (key.toLowerCase() !== "host") {
+      headers.set(key, value)
+    }
+  })
+
+  let body: BodyInit | undefined
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    body = await req.arrayBuffer()
+  }
+
+  try {
+    const upstream = await fetch(url, {
+      method: req.method,
+      headers,
+      body,
+      // Edge functions have a 10s wall-clock limit; use a service worker
+      // pattern for long jobs (they poll separately). Auth + simple DB ops
+      // complete in < 5s when the backend is warm.
+      signal: AbortSignal.timeout(55_000),
+    })
+
+    const responseHeaders = new Headers()
+    upstream.headers.forEach((value, key) => {
+      // Strip hop-by-hop headers Vercel shouldn't forward.
+      if (!["connection", "transfer-encoding", "keep-alive"].includes(key.toLowerCase())) {
+        responseHeaders.set(key, value)
+      }
+    })
+
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers: responseHeaders,
+    })
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.name === "TimeoutError"
+    return NextResponse.json(
+      { detail: isTimeout ? "Frank is taking a moment — try again." : "Frank couldn't reach the studio just now." },
+      { status: 503 },
+    )
+  }
+}
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return proxy(req, path.join("/"))
+}
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return proxy(req, path.join("/"))
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return proxy(req, path.join("/"))
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return proxy(req, path.join("/"))
+}
+
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return proxy(req, path.join("/"))
+}
+
+export async function OPTIONS(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return proxy(req, path.join("/"))
+}
