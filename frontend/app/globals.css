@@ -9,16 +9,16 @@
  */
 @layer base {
   :root {
-    /* Warm graphite surfaces */
-    --ground: 20 17 14;      /* #14110E */
-    --surface: 28 24 20;     /* #1C1814 */
-    --raised: 38 33 28;      /* #26211C */
-    --line: 51 45 38;        /* #332D26 */
+    /* Dark neutral surfaces — cool enough that the amber accent pops */
+    --ground: 10 9 9;        /* #0A0909 — near-black, neutral, no brown cast */
+    --surface: 18 17 16;     /* #121110 — first elevation, barely visible lift */
+    --raised: 27 25 23;      /* #1B1917 — second elevation, card surfaces */
+    --line: 42 39 35;        /* #2A2723 — border/divider, still warm-tinted */
 
-    /* Text. ink-3 is the quietest allowed text (5.4:1 on surface). */
-    --ink: 239 232 220;      /* #EFE8DC */
-    --ink-2: 181 171 156;    /* #B5AB9C */
-    --ink-3: 150 141 127;    /* #968D7F */
+    /* Text — lighter and less yellow so it reads crisply on the deeper dark */
+    --ink: 245 240 234;      /* #F5F0EA — near-white with the faintest warmth */
+    --ink-2: 188 179 166;    /* #BCB3A6 — secondary, good contrast */
+    --ink-3: 155 147 136;    /* #9B9388 — quietest allowed text */
 
     /* The four materials of a song */
     --words: 216 203 176;    /* #D8CBB0 */
@@ -112,6 +112,43 @@
     @apply relative w-full overflow-hidden rounded-md bg-muted;
     height: 64px;
   }
+
+  /* ── Landing page entrance animations ─────────────────────────────────────
+     Elements fade up from 16px below on load. Four delay classes for staggering.
+     All motion is suppressed under prefers-reduced-motion. */
+  .landing-fade {
+    animation: fadeUp 0.65s ease-out both;
+  }
+  .landing-fade-1 { animation-delay: 0ms; }
+  .landing-fade-2 { animation-delay: 150ms; }
+  .landing-fade-3 { animation-delay: 300ms; }
+  .landing-fade-4 { animation-delay: 480ms; }
+  .landing-fade-5 { animation-delay: 640ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-fade {
+      animation: none;
+      opacity: 1;
+    }
+  }
+
+  /* Idle amber glow on the primary CTA + lift on hover */
+  .cta-glow {
+    box-shadow: 0 0 0 0 rgb(var(--frank) / 0);
+    animation: glowPulse 3s ease-in-out infinite;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .cta-glow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 24px 6px rgb(var(--frank) / 0.35);
+    animation: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cta-glow {
+      animation: none;
+    }
+  }
 }
 
 @keyframes sweep {
@@ -137,3 +174,23 @@
 .frank-lyrics p[data-rhyme="3"]::before { background: rgb(var(--voice)); }
 .frank-lyrics p[data-rhyme="4"]::before { background: rgb(var(--ok)); }
 .frank-lyrics p[data-rhyme="5"]::before { background: rgb(var(--caution)); }
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px 2px rgb(var(--frank) / 0.15);
+  }
+  50% {
+    box-shadow: 0 0 22px 6px rgb(var(--frank) / 0.30);
+  }
+}

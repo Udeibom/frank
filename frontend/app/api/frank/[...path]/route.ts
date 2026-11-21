@@ -16,10 +16,11 @@ export const dynamic = "force-dynamic"
 async function proxy(req: NextRequest, path: string): Promise<NextResponse> {
   const url = `${BACKEND}/${path}${req.nextUrl.search}`
 
-  // Forward all headers the client sent, except the Host header.
+  // Forward all headers the client sent, except the Host header and
+  // Accept-Encoding — we don't decompress/re-compress, so ask for plain text.
   const headers = new Headers()
   req.headers.forEach((value, key) => {
-    if (key.toLowerCase() !== "host") {
+    if (key.toLowerCase() !== "host" && key.toLowerCase() !== "accept-encoding") {
       headers.set(key, value)
     }
   })
@@ -42,13 +43,18 @@ async function proxy(req: NextRequest, path: string): Promise<NextResponse> {
 
     const responseHeaders = new Headers()
     upstream.headers.forEach((value, key) => {
-      // Strip hop-by-hop headers Vercel shouldn't forward.
-      if (!["connection", "transfer-encoding", "keep-alive"].includes(key.toLowerCase())) {
+      // Strip hop-by-hop and encoding headers — we buffer the full body,
+      // so the browser must not try to decompress or use the wrong length.
+      const skip = ["connection", "transfer-encoding", "keep-alive",
+                    "content-encoding", "content-length"]
+      if (!skip.includes(key.toLowerCase())) {
         responseHeaders.set(key, value)
       }
     })
 
-    return new NextResponse(upstream.body, {
+    // Buffer the full body so Next.js computes the correct Content-Length.
+    const responseBody = await upstream.arrayBuffer()
+    return new NextResponse(responseBody, {
       status: upstream.status,
       headers: responseHeaders,
     })
