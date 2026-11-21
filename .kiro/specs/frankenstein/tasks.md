@@ -75,13 +75,13 @@ rooms. Each task is ticked only with evidence (file, test, live check). Live che
 - [x] 32. Space scaffold and deploy — _Evidence: `spaces/frank-hands/` (app.py, requirements, packages, README), same deploy script; live: hands `health` OK in check_all.log. The working copy has uncommitted edits to app.py and requirements.txt (the DDSP and Stable Audio fix)_
 - [x] 33. Anticipatory Music Transformer accompaniment as notes — _Evidence: `/accompany` in the Space; live: returned notes in check_all.log (Nov 21 03:02) and `beat_runner.run_accompany_job` calls it. Not seen end to end: the 21 Nov beat/accompany step failed plainly because no hum was confirmed, which is the intended behaviour_
   - _Requirements: 3.4_
-- [ ] 34. DDSP: hum or take becomes an instrument — _NOT DONE: DDSP timbre fails: voice/instrument failed plainly in the 21 Nov Kaggle log and `/timbre` failed in check_all.log (ddsp and tensorflow install conflict). Fix in progress in the uncommitted `spaces/frank-hands` changes_
+- [x] 34. DDSP: hum or take becomes an instrument — _Evidence: `/timbre` on frank-hands (`ddsp_worker.py`, own TensorFlow 2.11 env installed at start-up), called by `organs.timbre`; live 21 Nov: a 3-second hum A3-B3-C#4 came back as violin A4-B4-C#5 in 26 s (same notes, violin octave, measured with pyin)_
   - _Requirements: 4.1_
 - [x] 35. DiffSinger guide vocal singing the lyrics — _Evidence: `/sing` DiffSinger in the Space (`spaces/frank-hands/diffsinger_worker.py`), `services/audio/sung_guide.py`; live: voice/guide/sung returned a sung guide in 166 s in the 21 Nov Kaggle log. Heard by the founder: not recorded_
   - _Requirements: 4.2_
 - [x] 36. Kokoro: Frank reads its notes aloud — _Evidence: `/speak` Kokoro in the Space, `routers/conversation.py:86`; live: conversation/speak returned an audio address in the 21 Nov Kaggle log_
   - _Requirements: 4.5_
-- [ ] 37. Stable Audio 3 Small atmosphere — _NOT DONE: Stable Audio atmosphere fails on the Space: `/ambience` failed in check_all.log and hands_run.log (stable_audio_tools / ZeroGPU error); fix in progress in uncommitted `spaces/frank-hands`. Freesound is the working atmosphere source meanwhile_
+- [x] 37. Stable Audio 3 Small atmosphere — _Evidence: `/ambience` on frank-hands (licence accepted on the HF account 21 Nov; pytorch-lightning added, `seconds_start` conditioning); live 21 Nov via `scripts/check_spaces.py hands`: OK, 201 KB of audio in 43 s_
   - _Requirements: 3.7_
 - [ ] 38. Diff-MST mix settings from a reference — _CHANGED: dropped. No public Diff-MST checkpoint exists, so there is no mix-like-the-reference prediction. Nothing was built; requirement 6.5 and design.md still name Diff-MST and need the founder's decision_
   - _Requirements: 6.5_

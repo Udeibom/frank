@@ -61,6 +61,8 @@ def main() -> int:
     audio = audio[np.newaxis, :]
     ddsp.spectral_ops.reset_crepe()
     feats = ddsp.training.metrics.compute_audio_features(audio)
+    # TensorFlow 2.11 hands back tensors where the colab got arrays; everything below works on plain arrays.
+    feats = {k: np.asarray(v) for k, v in feats.items()}
     feats["loudness_db"] = feats["loudness_db"].astype(np.float32)
 
     model_dir = fetch(instrument, cache)
