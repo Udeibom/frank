@@ -158,6 +158,7 @@ def _encode_mastered_mp3(audio: np.ndarray) -> bytes:
 
 # ── finishing from an uncompressed mix (finish-and-intent spec 11, requirement 2) ──
 
+MAX_PUSH_DB = 8.0            # most the limiter is ever driven to reach the target
 LOUDNESS_TOLERANCE = 1.0     # units of the streaming loudness scale
 TRUE_PEAK_DB = -1.0
 
@@ -253,24 +254,34 @@ def finish(audio: np.ndarray) -> tuple[bytes, dict]:
     path = chained(0.0)
     try:
         measured = measure_loudness(path)
+        passes = 1
+        # Can plain volume reach the target without the peaks going over the ceiling? If not, the loudness pass
+        # falls back to a gentler mode that stops short (a quiet song with sharp peaks finished at -15.0 against
+        # -14, every time). Then the limiter closes the gap first: pushed by the measured shortfall, once more by
+        # what is still missing, capped so the music is never crushed.
+        push = 0.0
+        for _ in range(2):
+            if measured is None:
+                break
+            need = TARGET_LUFS - measured["input_i"]
+            headroom = TRUE_PEAK_DB - measured["input_tp"]
+            if need <= headroom + 0.1:
+                break
+            step = need - headroom + 0.5
+            if push >= MAX_PUSH_DB or step < 0.3:
+                break
+            push = min(MAX_PUSH_DB, push + step)
+            os.remove(path)
+            path = chained(round(push, 2))
+            measured = measure_loudness(path)
+            passes += 1
         mp3 = encode_finished(path, measured)
         report = check_finished(mp3)
-        passes = 1
         miss = None if report["loudness"] is None else TARGET_LUFS - report["loudness"]
-        if miss is not None and miss > LOUDNESS_TOLERANCE:
-            # Too quiet: the peaks are already at the ceiling, so more volume alone cannot help (the loudness pass
-            # holds the peak limit). Drive the limiter by the missing amount instead, then measure again.
-            os.remove(path)
-            # Overshooting is safe (the loudness pass brings a loud song back down); capped so nothing is crushed.
-            path = chained(round(min(6.0, 1.5 * miss + 0.5), 2))
-            measured = measure_loudness(path)
-            mp3 = encode_finished(path, measured)
-            report = check_finished(mp3)
-            passes = 2
-        elif (miss is not None and abs(miss) > LOUDNESS_TOLERANCE) or (report["clipping"] or 0) > cfg.CLIPPING_SHARE:
+        if (miss is not None and abs(miss) > LOUDNESS_TOLERANCE) or (report["clipping"] or 0) > cfg.CLIPPING_SHARE:
             mp3 = encode_finished(path, measured, extra_gain_db=round(miss or -0.5, 2))
             report = check_finished(mp3)
-            passes = 2
+            passes += 1
     finally:
         if os.path.exists(path):
             os.remove(path)
