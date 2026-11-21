@@ -29,25 +29,48 @@ CONSONANT_S = 0.07
 def _yaml(path: str) -> dict:
     import yaml
 
+    loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)      # the C parser: the dictionaries are large
     with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+        return yaml.load(f, Loader=loader) or {}
 
 
-@lru_cache(maxsize=1)
+_vb_lock = __import__("threading").Lock()
+
+
 def voicebank(cache: str) -> Path:
+    """Download and unpack the voicebank once per Space start (to disk, never whole in memory)."""
     root = Path(cache) / "tiger"
-    if not any(root.rglob("dsconfig.yaml")):
-        root.mkdir(parents=True, exist_ok=True)
-        pack = root / "pack.zip"
-        if not pack.exists():
-            urllib.request.urlretrieve(PACK, pack)
-        with zipfile.ZipFile(pack) as outer:
-            inner_name = next(n for n in outer.namelist() if n.endswith(".zip"))
-            with outer.open(inner_name) as f:
-                inner = zipfile.ZipFile(io.BytesIO(f.read()))
-            inner.extractall(root / "vb")
-        pack.unlink()
-    return next(p.parent for p in root.rglob("dsconfig.yaml") if "dsdur" not in str(p) and "dspitch" not in str(p) and "dsvariance" not in str(p))
+    with _vb_lock:
+        found = [p for p in root.rglob("dsconfig.yaml") if p.parent.name not in ("dsdur", "dspitch", "dsvariance", "dsacoustic")]
+        if not found:
+            root.mkdir(parents=True, exist_ok=True)
+            pack = root / "pack.zip"
+            if not pack.exists():
+                tmp = root / "pack.part"
+                urllib.request.urlretrieve(PACK, tmp)
+                tmp.replace(pack)
+            inner_path = root / "inner.zip"
+            with zipfile.ZipFile(pack) as outer:
+                inner_name = next(n for n in outer.namelist() if n.endswith(".zip"))
+                with outer.open(inner_name) as src, open(inner_path, "wb") as dst:
+                    import shutil
+
+                    shutil.copyfileobj(src, dst, 1 << 20)
+            with zipfile.ZipFile(inner_path) as inner:
+                inner.extractall(root / "vb")
+            pack.unlink(missing_ok=True)
+            inner_path.unlink(missing_ok=True)
+            found = [p for p in root.rglob("dsconfig.yaml") if p.parent.name not in ("dsdur", "dspitch", "dsvariance", "dsacoustic")]
+    return found[0].parent
+
+
+def warm(cache: str) -> None:
+    try:
+        voicebank(cache)
+        _models(cache)
+        _dictionary(cache)
+    except Exception as e:  # noqa: BLE001
+        print("voicebank warm-up failed:", e, flush=True)
 
 
 def layout(cache: str) -> dict:
@@ -100,7 +123,8 @@ def _fetch_vocoder(cache: str, name: str | None) -> str:
 def _dictionary(cache: str) -> dict:
     vb = voicebank(cache)
     out: dict = {}
-    for p in list(vb.rglob("dsdict*.yaml")):
+    english = sorted(vb.rglob("dsdict-en.yaml")) or sorted(vb.rglob("dsdict.yaml"))
+    for p in english[:1]:                      # English only: the other languages' dictionaries are not needed
         d = _yaml(str(p))
         for e in d.get("entries") or []:
             if isinstance(e, dict) and e.get("grapheme") and e.get("phonemes"):
@@ -149,7 +173,20 @@ def _is_vowel(p: str) -> bool:
     return p.split("/")[-1] in VOWELS
 
 
+def _speaker(cfg: dict, wanted: str | None) -> np.ndarray:
+    """One of the voicebank's voice colours (.emb, float32 per hidden unit). 'fresh' is the plainest."""
+    vb = voicebank(_CACHE[0])
+    names = cfg.get("speakers") or []
+    pick = next((n for n in names if wanted and n.endswith(wanted)), None) or next((n for n in names if n.endswith("fresh")), names[0])
+    emb = np.fromfile(str(vb / f"{pick}.emb"), dtype=np.float32)
+    return emb.reshape(1, -1)
+
+
+_CACHE: list[str] = [""]
+
+
 def render(payload: dict, out_path: str, cache: str) -> None:
+    _CACHE[0] = cache
     import soundfile as sf
 
     cfg, acoustic, vocoder, table, _ = _models(cache)
@@ -215,7 +252,7 @@ def render(payload: dict, out_path: str, cache: str) -> None:
         elif name in ("gender", "velocity", "energy", "breathiness", "voicing", "tension"):
             feeds[name] = np.full((1, n_frames), 1.0 if name == "velocity" else (-12.0 if name == "breathiness" else 0.0), dtype=np.float32)
         elif name == "spk_embed":
-            feeds[name] = np.zeros((1, n_frames, inp.shape[-1] if isinstance(inp.shape[-1], int) else 256), dtype=np.float32)
+            feeds[name] = np.repeat(_speaker(cfg, payload.get("voice")), n_frames, axis=0)[None, :, :]
         elif name == "languages":
             feeds[name] = np.zeros((1, len(tokens)), dtype=np.int64)
     mel = acoustic.run(None, feeds)[0]

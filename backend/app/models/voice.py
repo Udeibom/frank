@@ -16,6 +16,7 @@ class VocalTakeResponse(BaseModel):
     is_harmony: bool = False
     params: dict[str, Any] = Field(default_factory=dict)
     facts: dict[str, Any] = Field(default_factory=dict)
+    words: Optional[dict[str, Any]] = None  # word timings and lyric-line spans (frankenstein spec 14, 4.4)
 
 
 class UploadTakeResponse(BaseModel):

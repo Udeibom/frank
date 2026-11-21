@@ -24,7 +24,7 @@ from typing import Optional
 
 import numpy as np
 
-from app.services.generation import composer, fingerprint as fp_utils, lead as lead_mod, moments as moments_mod, polish, theory
+from app.services.generation import chord_tables, composer, fingerprint as fp_utils, lead as lead_mod, moments as moments_mod, polish, theory
 from app.services.generation.renderer import SAMPLE_RATE, TAIL_SECONDS, SynthSession
 from app.services.generation.rng import derive_seed
 from app.services.generation.styles import StyleChoice, pick_style
@@ -234,6 +234,7 @@ def plan_contexts(
         if playing and min(playing) < lead.bars:
             lead = lead_mod.fit_to(lead, min(playing))      # one consistent, whole-phrase version of the tune
     progressions: dict[str, dict] = {}
+    used_loops: set[tuple] = set()
     # When the person has hummed a tune, the whole song sits in the key of that tune.
     key = (lead.key if lead else "") or fp["key"]
     for s in sections:
@@ -242,11 +243,20 @@ def plan_contexts(
         if lead and s.name in lead_mod.LEAD_SECTIONS:
             progressions[s.name] = lead_mod.harmonize(lead, key, style.extension)
         else:
+            variant = (ROLE_VARIANT.get(s.name, 0) + offset) % 4
+            # Real songs in this style decide which of the family's loops this kind of section takes
+            # (Chordonomicon, frankenstein spec 14, 3.2); never the same loop as another section already has.
+            _, mode = theory.parse_key(key)
+            options = theory.PROGRESSIONS[theory.choose_progression_family(mode, fp["energy_level"], fp["tempo_feel"])]
+            order = chord_tables.ranked(options, style.name, s.name, mode)
+            if order:
+                variant = next((i for i in order if tuple(options[i]) not in used_loops), variant)
+            used_loops.add(tuple(options[variant % len(options)]))
             progressions[s.name] = theory.build_progression(
                 key=key,
                 energy=fp["energy_level"],
                 tempo_feel=fp["tempo_feel"],
-                variant=(ROLE_VARIANT.get(s.name, 0) + offset) % 4,
+                variant=variant,
                 extension=style.extension,
                 seed=derive_seed(seed, "voicing", s.name),
             )

@@ -1,0 +1,3 @@
+{"id": "calebudeibom/frank-arrangement-stats", "title": "frank-arrangement-stats", "code_file": "mine.py", "language": "python",
+ "kernel_type": "script", "is_private": true, "enable_gpu": false, "enable_internet": false,
+ "dataset_sources": ["imsparsh/lakh-midi-clean"], "competition_sources": [], "kernel_sources": []}

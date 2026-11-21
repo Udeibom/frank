@@ -49,6 +49,7 @@ def _take_to_response(take: dict) -> VocalTakeResponse:
         is_harmony=bool(take.get("is_harmony")),
         params=take.get("params") or {},
         facts=take.get("facts") or {},
+        words=take.get("words"),
     )
 
 

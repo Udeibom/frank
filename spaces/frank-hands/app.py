@@ -79,7 +79,7 @@ def _melody_midi(notes: list[dict], bpm: float, program: int) -> str:
     return p
 
 
-@GPU(duration=120)
+@GPU(duration=45)
 def _amt_generate(melody_path: str, seconds: float, top_p: float) -> list:
     import torch
     from anticipation import ops
@@ -144,16 +144,20 @@ def _ddsp_env() -> Path:
     py = DDSP_ENV / "bin" / "python"
     if not py.exists():
         subprocess.run([sys.executable, "-m", "venv", str(DDSP_ENV)], check=True)
-        subprocess.run([str(py), "-m", "pip", "install", "-q", "ddsp==3.7.0", "tensorflow==2.15.1",
-                        "tensorflow-probability==0.23.0", "numpy<1.27", "crepe==0.0.16"], check=True, timeout=1500)
+        r = subprocess.run([str(py), "-m", "pip", "install", "-q", "ddsp==3.7.0"], capture_output=True,
+                           text=True, timeout=1500)
+        if r.returncode != 0:
+            raise RuntimeError("DDSP install failed: " + (r.stderr or r.stdout)[-800:])
     return py
 
 
 def timbre(f, instrument: str) -> str:
     instrument = instrument if instrument in DDSP_INSTRUMENTS else "violin"
     out = tempfile.mktemp(suffix=".wav", prefix="timbre-")
-    subprocess.run([str(_ddsp_env()), str(HERE / "ddsp_worker.py"), _path(f), instrument, out, str(CACHE)],
-                   check=True, timeout=900, capture_output=True)
+    r = subprocess.run([str(_ddsp_env()), str(HERE / "ddsp_worker.py"), _path(f), instrument, out, str(CACHE)],
+                       timeout=900, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError("DDSP failed: " + r.stderr[-800:])
     return out
 
 
@@ -163,7 +167,7 @@ def timbre(f, instrument: str) -> str:
 def _kokoro():
     from kokoro import KPipeline
 
-    return KPipeline(lang_code="a")
+    return KPipeline(lang_code="a", device="cpu")
 
 
 def speak(text: str, voice: str = "af_heart") -> str:
@@ -183,13 +187,24 @@ def speak(text: str, voice: str = "af_heart") -> str:
 STABLE_MODELS = ["stabilityai/stable-audio-3-small-music", "stabilityai/stable-audio-open-small", "stabilityai/stable-audio-open-1.0"]
 
 
-@lru_cache(maxsize=1)
-def _stable():
+def _install_stable_audio() -> None:
+    """stable-audio-tools pins an older torch than ZeroGPU allows, so it goes in without its pins, at start-up
+    (in the main process, before any GPU call)."""
     try:
         import stable_audio_tools  # noqa: F401
     except ImportError:
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--no-deps", "--ignore-requires-python",
-                        "stable-audio-tools==0.0.20", "v-diffusion-pytorch==0.0.2"], check=True, timeout=900)
+                        "stable-audio-tools==0.0.20", "v-diffusion-pytorch==0.0.2"], timeout=900)
+        import importlib
+
+        importlib.invalidate_caches()
+
+
+_install_stable_audio()
+
+
+@lru_cache(maxsize=1)
+def _stable():
     from stable_audio_tools import get_pretrained_model
 
     last = None
@@ -199,10 +214,11 @@ def _stable():
             return model, cfg, name
         except Exception as e:  # noqa: BLE001 - gated or missing: try the next
             last = e
-    raise RuntimeError(f"no Stable Audio model available: {last}")
+    raise RuntimeError("no Stable Audio model could be downloaded; its licence must be accepted on the Hugging Face "
+                       f"account that owns HF_TOKEN ({last})")
 
 
-@GPU(duration=90)
+@GPU(duration=40)
 def _ambience(prompt: str, seconds: float) -> str:
     import torch
     import torchaudio
@@ -266,6 +282,26 @@ ENDPOINTS = [
 ]
 
 
+
+def _reporting(fn):
+    """Errors go back to Frank's backend with the real reason and where it happened (the run log is not always
+    readable), as a Gradio error the client receives."""
+    import functools
+    import traceback
+
+    @functools.wraps(fn)
+    def run(*args):
+        try:
+            return fn(*args)
+        except gr.Error:
+            raise
+        except Exception as e:  # noqa: BLE001
+            tb = traceback.extract_tb(e.__traceback__)
+            where = "; ".join(f"{p.filename.rsplit('/', 1)[-1]}:{p.lineno}" for p in tb[-3:])
+            raise gr.Error(f"{type(e).__name__}: {str(e)[:600]} [{where}]")
+    return run
+
+
 def _component(kind: str):
     if kind == "file":
         return gr.File(visible=False)
@@ -275,11 +311,18 @@ def _component(kind: str):
 
 
 sys.path.insert(0, str(HERE))
+# Space storage is wiped on restart: fetch the singing voice in the background as soon as the Space starts.
+import threading  # noqa: E402
+
+from diffsinger_worker import warm  # noqa: E402
+
+threading.Thread(target=warm, args=(str(CACHE),), daemon=True).start()
+
 with gr.Blocks(title="frank-hands") as demo:
     gr.Markdown("**frank-hands**: the models Frank makes things with. An API for Frank's backend, "
                 "[github.com/Udeibom/frank](https://github.com/Udeibom/frank). Not a user interface.")
     for fn, ins, outs in ENDPOINTS:
         button = gr.Button(fn.__name__, visible=False)
-        button.click(fn, [_component(k) for k in ins], [_component(k) for k in outs], api_name=fn.__name__)
+        button.click(_reporting(fn), [_component(k) for k in ins], [_component(k) for k in outs], api_name=fn.__name__)
 
 demo.queue(default_concurrency_limit=1).launch(show_error=True)

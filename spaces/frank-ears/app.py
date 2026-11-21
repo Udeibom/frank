@@ -190,6 +190,7 @@ def _aes():
     return initialize_predictor()
 
 
+@GPU(duration=20)
 def aesthetics(f) -> str:
     r = _aes().forward([{"path": _path(f)}])[0]
     names = {"PQ": "made_well", "PC": "how_much_going_on", "CE": "enjoyment", "CU": "usefulness"}
@@ -198,9 +199,9 @@ def aesthetics(f) -> str:
 
 # ── All-In-One structure (MIT) ───────────────────────────────────────────────────────────────────────────
 
-@GPU(duration=120)
+@GPU(duration=45)
 def _allin1(path: str) -> dict:
-    import allin1
+    import allin1_infer as allin1
 
     r = allin1.analyze(path)
     return {"bpm": r.bpm, "beats": [round(float(b), 3) for b in r.beats], "downbeats": [round(float(b), 3) for b in r.downbeats],
@@ -235,7 +236,7 @@ def chords(f) -> str:
 ROFORMER = "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
 
 
-@GPU(duration=180)
+@GPU(duration=60)
 def _separate(path: str, out_dir: str) -> list[str]:
     from audio_separator.separator import Separator
 
@@ -273,6 +274,7 @@ def _emo():
     return pipeline("text-classification", model="SamLowe/roberta-base-go_emotions", top_k=None)
 
 
+@GPU(duration=15)
 def emotions(lines_json: str) -> str:
     lines = [str(l)[:400] for l in json.loads(lines_json)][:200]
     res = _emo()(lines) if lines else []
@@ -330,6 +332,7 @@ def _df():
     return init_df()
 
 
+@GPU(duration=30)
 def denoise(f):
     import soundfile as sf
     import torch
@@ -364,6 +367,26 @@ ENDPOINTS = [
 ]
 
 
+
+def _reporting(fn):
+    """Errors go back to Frank's backend with the real reason and where it happened (the run log is not always
+    readable), as a Gradio error the client receives."""
+    import functools
+    import traceback
+
+    @functools.wraps(fn)
+    def run(*args):
+        try:
+            return fn(*args)
+        except gr.Error:
+            raise
+        except Exception as e:  # noqa: BLE001
+            tb = traceback.extract_tb(e.__traceback__)
+            where = "; ".join(f"{p.filename.rsplit('/', 1)[-1]}:{p.lineno}" for p in tb[-3:])
+            raise gr.Error(f"{type(e).__name__}: {str(e)[:600]} [{where}]")
+    return run
+
+
 def _component(kind: str):
     return gr.File(visible=False) if kind == "file" else gr.Textbox(visible=False)
 
@@ -373,6 +396,6 @@ with gr.Blocks(title="frank-ears") as demo:
                 "[github.com/Udeibom/frank](https://github.com/Udeibom/frank). Not a user interface.")
     for fn, ins, outs in ENDPOINTS:
         button = gr.Button(fn.__name__, visible=False)
-        button.click(fn, [_component(k) for k in ins], [_component(k) for k in outs], api_name=fn.__name__)
+        button.click(_reporting(fn), [_component(k) for k in ins], [_component(k) for k in outs], api_name=fn.__name__)
 
 demo.queue(default_concurrency_limit=2).launch(show_error=True)
