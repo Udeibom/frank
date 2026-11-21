@@ -125,3 +125,6 @@ rooms. Each task is ticked only with evidence (file, test, live check). Live che
 ## H. Proof
 - [ ] 55. Property tests for every pure mapping in design.md "Testing", and frontend fast-check
 - [ ] 56. Live end-to-end run on the deployed services, recorded in `docs/demo-runs/`
+
+## Found along the way
+- [ ] 57. Plain Language Auditor on `brief.py` (hook run, 21 Nov): the fingerprint (line ~202) and the beat, vocal and mix records (~210) are dumped raw into the brief with internal keys (tempo_bpm, key, effect names). Translate them to everyday words before they reach the prompt. Done in that run: references' differences pass the jargon filter, and the header bans technical sound terms.

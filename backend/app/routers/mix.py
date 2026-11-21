@@ -281,3 +281,46 @@ async def set_active_mix_version(
         project_id, {"active_mix_id": body.mix_version_id}
     )
     return {"status": "ok", "active_mix_id": body.mix_version_id}
+
+
+# ── an atmosphere under the song (frankenstein spec 14, requirement 3.7) ──────────────────────────────────
+
+from typing import Literal, Optional  # noqa: E402
+
+from pydantic import BaseModel, Field  # noqa: E402
+
+
+class AtmosphereRequest(BaseModel):
+    source: Literal["recorded", "generated"] = "recorded"
+    words: Optional[list[str]] = Field(default=None, max_length=8)
+    level_db: float = Field(default=-20.0, ge=-36.0, le=-8.0)
+
+
+@router.post("/atmosphere", response_model=JobResponse)
+async def add_atmosphere(project_id: str, body: AtmosphereRequest, background: BackgroundTasks) -> JobResponse:
+    """A real recorded sound (rain, a city at night) or one made from the song's feeling, as its own layer."""
+    from app.services.jobs.atmosphere_runner import run_atmosphere_job
+
+    job = await jobs_db.create_job(project_id, job_type="atmosphere")
+    background.add_task(run_atmosphere_job, job["id"], project_id, body.source, body.words, body.level_db)
+    return JobResponse(job_id=job["id"])
+
+
+class AtmosphereSwitch(BaseModel):
+    enabled: bool
+    level_db: Optional[float] = Field(default=None, ge=-36.0, le=-8.0)
+
+
+@router.post("/atmosphere/switch", response_model=JobResponse)
+async def switch_atmosphere(project_id: str, body: AtmosphereSwitch, background: BackgroundTasks) -> JobResponse:
+    """Take the atmosphere out (or put it back, or change how loud it is): a new mix version, the old one kept."""
+    state = await projects_db.get_project_active_state(project_id) or {}
+    current = await mix_db.get_mix_version(state["active_mix_id"]) if state.get("active_mix_id") else None
+    params = dict((current or {}).get("params") or {})
+    if not params.get("atmosphere"):
+        raise HTTPException(status_code=404, detail="There's no atmosphere in this mix yet.")
+    params["atmosphere"] = {**params["atmosphere"], "enabled": body.enabled,
+                            **({"level_db": body.level_db} if body.level_db is not None else {})}
+    job = await jobs_db.create_job(project_id, job_type="mix_render")
+    background.add_task(run_mix_job, job["id"], project_id, {**DEFAULT_MIX_PARAMS, **params}, "preview")
+    return JobResponse(job_id=job["id"])

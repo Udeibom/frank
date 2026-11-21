@@ -30,6 +30,7 @@ ORGANS: dict[str, tuple[str, Optional[str]]] = {
     "atmosphere_generated": ("Atmosphere: made from your words", "Stable Audio 3 Small, Stability AI (Community Licence)"),
     "reference_master": ("Finish: matched to the song you picked", "Matchering 2 (GPL-3.0)"),
     "reference_mix": ("Balance: settings worked out from the song you picked", "Diff-MST (research code)"),
+    "reference": ("Reference: a song you pointed at, listened to for its feeling", None),
     "listened": ("Frank listened to the mix before suggesting this", "Google Gemini"),
     "looked": ("Feeling: taken from the picture you shared", "Google Gemini"),
     "moment": ("Feeling: taken from your time and weather right now", "Open-Meteo (CC BY 4.0)"),

@@ -16,6 +16,8 @@ _CONTENT_TYPES = {
     "m4a": "audio/mp4",
     "mp4": "audio/mp4",
     "zip": "application/zip",
+    "mid": "audio/midi",
+    "json": "application/json",
 }
 
 _MAX_UPLOAD_ATTEMPTS = 3

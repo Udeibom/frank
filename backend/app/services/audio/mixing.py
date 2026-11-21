@@ -234,12 +234,49 @@ def render_mix(
     if mix is None:
         return np.zeros((2, 0), dtype=np.float32)
 
+    atmo = mix_params.get("atmosphere") or {}
+    if atmo.get("url") and atmo.get("enabled", True):
+        # A recorded or generated atmosphere (frankenstein spec 14, 3.7): one removable layer, looped under the
+        # whole song, faded in and out, kept low. It never fails the mix.
+        try:
+            from app.services.storage.signing import fetch_audio_bytes
+
+            layer = _load_stereo(fetch_audio_bytes(atmo["url"]))
+            mix += atmosphere_bed(layer, mix.shape[1], float(atmo.get("level_db", -20.0)))
+            del layer
+        except Exception:  # noqa: BLE001
+            pass
+
     # Protect against clipping with a touch of headroom
     peak = float(np.abs(mix).max())
     if peak > 0.97:
         mix *= 0.97 / peak
 
     return mix
+
+
+def atmosphere_bed(layer: np.ndarray, length: int, level_db: float, fade_s: float = 3.0) -> np.ndarray:
+    """Loop a (2, N) sound to `length` samples with short crossfades at the joins, fade the ends, set its level."""
+    if layer.shape[1] == 0 or length <= 0:
+        return np.zeros((2, max(0, length)), dtype=np.float32)
+    xf = min(int(0.5 * SR), layer.shape[1] // 4)
+    out = np.zeros((2, length), dtype=np.float32)
+    pos = 0
+    ramp = np.linspace(0, 1, xf, dtype=np.float32) if xf > 0 else np.zeros(0, dtype=np.float32)
+    while pos < length:
+        seg = layer[:, : min(layer.shape[1], length - pos)].astype(np.float32).copy()
+        if pos > 0 and xf > 0 and seg.shape[1] > xf:
+            seg[:, :xf] *= ramp
+            out[:, pos : pos + xf] *= 1 - ramp[: min(xf, length - pos)]
+        out[:, pos : pos + seg.shape[1]] += seg
+        step = layer.shape[1] - xf if layer.shape[1] > xf else layer.shape[1]
+        pos += max(1, step)
+    f = min(int(fade_s * SR), length // 2)
+    if f > 0:
+        out[:, :f] *= np.linspace(0, 1, f, dtype=np.float32)
+        out[:, -f:] *= np.linspace(1, 0, f, dtype=np.float32)
+    peak = float(np.abs(out).max()) or 1.0
+    return out / peak * _db_to_linear(level_db)
 
 
 def to_mp3_bytes(mix: np.ndarray, bitrate: str = "192k") -> bytes:

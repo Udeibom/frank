@@ -415,3 +415,82 @@ async def start_from_recording(project_id: str, background: BackgroundTasks, fil
     job = await jobs_db.create_job(project_id, job_type="hum_intake")
     background.add_task(run_hum_intake_job, job["id"], project_id, raw, ext)
     return RecordingResponse(kind="hum", job_id=job["id"])
+
+
+# ── a picture, or right now (frankenstein spec 14, requirements 6.6 and 6.7) ─────────────────────────────────
+
+async def _fill_hints(project_id: str, hints: dict) -> list[str]:
+    """Measured hints fill gaps in the song's direction; they never overwrite what the person or Frank set."""
+    if not hints:
+        return []
+    latest = await feel_db.get_latest_fingerprint(project_id)
+    merged, filled, _ = merge_svc.merge_fingerprint((latest or {}).get("fingerprint"), hints)
+    if filled:
+        try:
+            saved = await feel_db.save_fingerprint(project_id, merged, (latest or {}).get("conversation_summary"))
+            await projects_db.update_project_active_state(project_id, {"active_fingerprint_id": saved["id"]})
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not save hints: %s", type(exc).__name__)
+            return []
+    return filled
+
+
+IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"}
+
+
+@router.post("/picture", response_model=DescriptionResponse)
+async def start_from_picture(project_id: str, file: UploadFile = File(...)) -> DescriptionResponse:
+    """A photo that shows the feeling. Colours are measured here; the feeling is read by Gemini where allowed."""
+    from app.services import provenance, region
+    from app.services.intake import picture
+    from app.services.llm import gemini_media
+
+    if file.content_type and file.content_type not in IMAGE_TYPES:
+        raise HTTPException(status_code=415, detail="That doesn't look like a picture. A photo or screenshot works best.")
+    data = await _read_limited(file)
+    try:
+        px = await asyncio.to_thread(picture.pixels, data)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail="I couldn't open that picture. Want to try another one?") from exc
+    colours = picture.colours(px)
+    look = await asyncio.to_thread(gemini_media.look, data, file.content_type or "image/jpeg") if region.gemini_allowed() else None
+    text = picture.description_from(look, colours)
+    result = await _from_description(project_id, text, "picture")
+    filled = await _fill_hints(project_id, picture.hints(colours))
+    if look:
+        await asyncio.to_thread(provenance.note, project_id, "feeling", None, "looked")
+    else:
+        await asyncio.to_thread(provenance.note, project_id, "feeling", None, "looked",
+                                "Feeling: taken from the colours of your picture", "Measured by Frank")
+    result.filled = sorted(set(result.filled) | set(filled))
+    if not look and not region.gemini_allowed():
+        result.message = f"{result.message} (I went by the picture's colours: {region.GEMINI_REGION_MESSAGE[0].lower()}{region.GEMINI_REGION_MESSAGE[1:]})"
+    return result
+
+
+class MomentRequest(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    hour: Optional[int] = Field(default=None, ge=0, le=23)     # the browser's local hour, if weather is unavailable
+
+
+@router.post("/moment", response_model=DescriptionResponse)
+async def start_from_moment(project_id: str, body: MomentRequest) -> DescriptionResponse:
+    """Right now: the person's time of day and weather become the feeling."""
+    from app.services import provenance
+    from app.services.intake import moment
+
+    code = temp = None
+    hour = body.hour if body.hour is not None else 21
+    try:
+        w = await asyncio.to_thread(moment.weather, body.latitude, body.longitude)
+        code, temp = w.get("code"), w.get("temp_c")
+        if w.get("local_time") and "T" in str(w["local_time"]):
+            hour = int(str(w["local_time"]).split("T")[1][:2])
+    except Exception:  # noqa: BLE001 - no weather: the time of day still says a lot
+        log.info("open-meteo unavailable; using the time of day only")
+    result = await _from_description(project_id, moment.describe(hour, code, temp, None), "moment")
+    filled = await _fill_hints(project_id, moment.hints(hour, code))
+    await asyncio.to_thread(provenance.note, project_id, "feeling", None, "moment")
+    result.filled = sorted(set(result.filled) | set(filled))
+    return result

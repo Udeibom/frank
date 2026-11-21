@@ -11,6 +11,8 @@ its words to the user.
 
 from __future__ import annotations
 
+from app.services.team.plain import find_jargon
+
 import json
 from typing import Any, Optional
 
@@ -61,7 +63,15 @@ def _references_text(content: dict[str, Any]) -> Optional[str]:
     The names never reach any prompt: nobody on the team aims at sounding like someone.
     """
     loved = [w for item in content.get("items", []) for w in item.get("loved", []) if isinstance(w, str)]
-    return ("things they love in music they named: " + ", ".join(dict.fromkeys(loved))) if loved else None
+    # Differences Frank measured between a reference and this song (frankenstein spec 14, 6.2); they never name it.
+    diffs = [d for item in content.get("items", []) if item.get("active", True)
+             for d in item.get("differences", []) if isinstance(d, str) and not find_jargon(d)][:3]
+    parts = []
+    if loved:
+        parts.append("things they love in music they pointed at: " + ", ".join(dict.fromkeys(loved)))
+    if diffs:
+        parts.append("compared with that music, " + " ".join(diffs).lower())
+    return "; ".join(parts) or None
 
 
 def _identity_text(content: dict[str, Any]) -> Optional[str]:
@@ -81,7 +91,8 @@ def _required_header(record: SongRecord) -> str:
     intent = (record.facets.get("intent") or {}).get("text")
     lines = [
         "SONG BRIEF (internal context). Talk about the song in feelings and everyday words. "
-        "Never repeat numbers, note names, key names, speeds or file addresses from this brief."
+        "Never repeat numbers, note names, key names, speeds, file addresses or technical sound terms (echo settings, "
+        "smoothing, tone settings, layers, loudness) from this brief; say them in everyday words."
     ]
     lines.append(f"Phase: {record.phase}")
     lines.append(f"What they said they want: {intent}" if intent else "What they said they want: (not said yet)")

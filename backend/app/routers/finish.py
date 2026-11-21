@@ -114,3 +114,37 @@ async def parts_zip(project_id: str, background: BackgroundTasks) -> JobResponse
     job = await jobs_db.create_job(project_id, job_type="parts_zip")
     background.add_task(run_parts_zip_job, job["id"], project_id)
     return JobResponse(job_id=job["id"])
+
+
+# ── the notes, and the credits (frankenstein spec 14, requirement 8.3) ───────────────────────────────────
+
+@router.post("/notes")
+async def download_notes(project_id: str) -> dict:
+    """The music of the active beat as a file any music app opens. Stored like an export, so it is never lost."""
+    import asyncio
+
+    from app.db import beat as beat_db
+    from app.db import projects as projects_db
+    from app.services.finish.notes_file import notes_file
+    from app.services.storage.files import create_signed_url, upload_audio_with_path
+
+    state = await projects_db.get_project_active_state(project_id) or {}
+    if not state.get("active_beat_version_id"):
+        raise HTTPException(status_code=404, detail="There's no music to write down yet. Make some in the Music room first.")
+    bv = await beat_db.get_beat_version(state["active_beat_version_id"])
+    data = await asyncio.to_thread(notes_file, bv["params"])
+    path, _ = await asyncio.to_thread(upload_audio_with_path, "exports", data, "mid", "notes")
+    url = await asyncio.to_thread(create_signed_url, "exports", path, 3600)
+    label = (bv.get("label") or "song").replace(" ", "-").lower()
+    return {"url": url, "filename": f"frank-{label}-notes.mid"}
+
+
+@router.get("/credits")
+async def song_credits(project_id: str) -> dict:
+    """Who and what made each part of the song, and what needs to be credited when it is shared."""
+    import asyncio
+
+    from app.services import provenance
+
+    rows = await asyncio.to_thread(provenance.for_project, project_id)
+    return {"credits": provenance.credits(rows), "made_with": "Frank (frank-bay-zeta.vercel.app)"}
