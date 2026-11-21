@@ -4,6 +4,9 @@ from typing import Optional
 from app.db.client import get_supabase
 
 
+MATCHED = "320k-matched"
+
+
 def create_export_sync(
     project_id: str,
     audio_url: str,
@@ -47,6 +50,7 @@ def find_existing_export_sync(
         .eq("project_id", project_id)
         .eq("mix_version_id", mix_version_id)
         .eq("mastered", mastered)
+        .neq("quality", MATCHED)              # a master matched to a reference is never the default master
         .order("created_at", desc=True)
         .limit(1)
         .execute()

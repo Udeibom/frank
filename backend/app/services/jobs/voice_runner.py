@@ -437,3 +437,97 @@ def _delay_sync(wav_bytes: bytes, click_times: list[float]) -> dict:
     mono = _read_mono(wav_bytes)
     delay, conf = align_svc.detect_delay(mono, pitch_svc.SR, click_times)
     return {"delay_ms": None if delay is None else round(delay * 1000, 1), "confidence": round(conf, 2)}
+
+
+# ── organs on frank-ears / frank-hands (frankenstein spec 14, requirements 4.1-4.3) ──────────────────────
+
+def _remote_take_sync(project_id: str, take: dict, organ: str, kind: str, label: str, params: dict) -> dict:
+    """Send a take to a remote organ and keep the result as a derived take; the original is untouched."""
+    from app.services import provenance
+    from app.services.remote import organs
+    from app.services.remote.spaces import RemoteUnavailable
+
+    raw = _fetch(take["audio_url"])
+    try:
+        if organ == "quiet":
+            out = organs.denoise(raw, "mp3" if take["audio_url"].split("?")[0].endswith(".mp3") else "wav")
+        else:
+            out = organs.timbre(raw, params.get("instrument", "violin"),
+                                "mp3" if take["audio_url"].split("?")[0].endswith(".mp3") else "wav")
+    except RemoteUnavailable as e:
+        return {"failed": e.plain}
+    mono = _read_mono(out)
+    derived = _derive(project_id, take, mono, kind, label, params, {"organ": organ})
+    provenance.note(project_id, "voice", derived["id"], organ)
+    return {"take_id": derived["id"], "parent_take_id": take["id"], "audio_url": derived["audio_url"]}
+
+
+async def _remote_job(job_id: str, fail_message: str, fn, *args):
+    """Like _job, but outside the one-heavy-job gate: the waiting is on the Space, and a slow Space must never
+    hold up a beat render here. The local work (decode, one mp3) is small."""
+    try:
+        await jobs_db.mark_processing(job_id)
+        result = await asyncio.to_thread(fn, *args)
+        if isinstance(result, dict) and result.get("failed"):
+            await jobs_db.mark_failed(job_id, result["failed"])
+            return None
+        await jobs_db.mark_complete(job_id, result)
+        return result
+    except Exception as exc:  # noqa: BLE001
+        try:
+            await jobs_db.mark_failed(job_id, fail_message)
+        except Exception:  # noqa: BLE001
+            pass
+        raise exc
+
+
+INSTRUMENT_WORDS = {"violin": "violin", "flute": "flute", "flute2": "soft flute", "trumpet": "trumpet",
+                    "tenor_saxophone": "saxophone"}
+
+
+async def run_quiet_job(job_id: str, project_id: str, take: dict) -> None:
+    label = f"{take.get('label') or 'Take'} · background noise taken out"
+    await _remote_job(job_id, "I couldn't clean that take just now. Your original is safe.", _remote_take_sync,
+               project_id, take, "quiet", "quiet", label, {})
+
+
+async def run_instrument_job(job_id: str, project_id: str, take: dict, instrument: str) -> None:
+    label = f"{take.get('label') or 'Take'} · played as {INSTRUMENT_WORDS.get(instrument, instrument)}"
+    await _remote_job(job_id, "I couldn't turn that into an instrument just now. Your original is safe.", _remote_take_sync,
+               project_id, take, "timbre", "instrument", label, {"instrument": instrument})
+
+
+def _sung_guide_sync(project_id: str, song: song_notes.SongNotes, lyrics: str | None) -> dict:
+    from app.services import provenance
+    from app.services.audio import sung_guide
+    from app.services.remote import organs
+    from app.services.remote.spaces import RemoteUnavailable
+
+    p = sung_guide.payload(song, lyrics)
+    if p is None:
+        return {"guide_url": None, "message": "There's no tune in the song yet, so just sing it your way."}
+    try:
+        audio = _sing_with_phonemes(p)
+    except RemoteUnavailable as e:
+        return {"failed": e.plain}
+    url = upload_audio("vocals", audio, extension="mp3", name_prefix="sung-guide")
+    provenance.note(project_id, "voice", None, "singer")
+    return {"guide_url": url, "sung": True}
+
+
+def _sing_with_phonemes(p: dict) -> bytes:
+    import json as _json
+
+    from app.services.remote import spaces
+
+    return spaces.read_file(spaces.call("hands", "/sing", _json.dumps(p), timeout=900))
+
+
+async def run_sung_guide_job(job_id: str, project_id: str) -> None:
+    song = await song_notes.for_project(project_id)
+    lyrics = None
+    state = await projects_db.get_project_active_state(project_id) or {}
+    if state.get("active_lyrics_id"):
+        lyrics = ((await lyrics_db.get_version(state["active_lyrics_id"])) or {}).get("content")
+    await _remote_job(job_id, "I couldn't make the singing guide just now. The humming guide still works.",
+               _sung_guide_sync, project_id, song, lyrics)

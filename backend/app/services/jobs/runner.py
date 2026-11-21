@@ -65,6 +65,16 @@ async def run_texture_job(
             job_id,
             {"audio_url": audio_url, "texture_id": texture["id"], "cached": False, "waveform": points},
         )
+        # After the person has their sound: remember what it sounds like (frankenstein spec 14, 2.1). Best-effort.
+        try:
+            from app.services.memory import sounds
+            from app.services.taste.store import owner_of
+
+            owner = await asyncio.to_thread(owner_of, project_id)
+            await asyncio.to_thread(sounds.embed_and_remember, "texture", texture["id"], wav, "wav", owner, project_id,
+                                    {"fingerprint_id": fingerprint_id})
+        except Exception:  # noqa: BLE001
+            pass
     except Exception as exc:  # noqa: BLE001 — we translate to a friendly message
         # Guard the failure write itself: if marking failed also throws, we must
         # not mask the original error, and the job must not silently vanish.

@@ -179,3 +179,52 @@ async def save_fingerprint(
         conversation_summary=saved.get("conversation_summary"),
         created_at=str(saved["created_at"]),
     )
+
+
+
+# ── directions ranked by the person's own words (frankenstein spec 14, requirement 2.1) ─────────────────────
+
+async def _remember_liked_sound(project_id: str, texture_id: Optional[str]) -> None:
+    """The texture they said yes to is kept as taste-by-sound, for their next songs. Best-effort."""
+    if not texture_id:
+        return
+    try:
+        from app.services.memory import sounds
+        from app.services.taste.store import owner_of
+
+        v = await asyncio.to_thread(sounds.embedding_of, "texture", texture_id)
+        if v:
+            owner = await asyncio.to_thread(owner_of, project_id)
+            await asyncio.to_thread(sounds.remember, "taste", f"texture:{texture_id}", v, owner, project_id, {"texture_id": texture_id})
+    except Exception:  # noqa: BLE001
+        pass
+
+
+@router.get("/ranked")
+async def ranked_directions(project_id: str) -> dict:
+    """Which directions sound closest to the person's words (and to sounds they liked before). Empty when the
+    ears are asleep or nothing has been heard yet; the room then keeps its own order."""
+    from app.db.client import get_supabase
+    from app.services.memory import sounds
+    from app.services.song import record as song_record
+    from app.services.taste.store import owner_of
+
+    rows = await asyncio.to_thread(lambda: get_supabase().table("sound_embeddings").select("ref_id,embedding")
+                                   .eq("project_id", project_id).eq("kind", "texture").execute().data or [])
+    if not rows:
+        return {"ranked": [], "words": []}
+    feeling = await song_record.active_facet(project_id, "feeling") or {}
+    intent = await song_record.active_facet(project_id, "intent") or {}
+    words = [str(w) for w in feeling.get("words", []) + feeling.get("loved_qualities", [])][:10]
+    if intent.get("text"):
+        words.append(str(intent["text"])[:200])
+    owner = await asyncio.to_thread(owner_of, project_id)
+    liked_rows = await asyncio.to_thread(lambda: get_supabase().table("sound_embeddings").select("embedding")
+                                         .eq("user_id", owner).eq("kind", "taste").order("created_at", desc=True)
+                                         .limit(10).execute().data or []) if owner else []
+    parse = lambda raw: [float(x) for x in raw.strip("[]").split(",")] if isinstance(raw, str) else list(raw)  # noqa: E731
+    items = [(r["ref_id"], parse(r["embedding"])) for r in rows]
+    liked = [parse(r["embedding"]) for r in liked_rows] or None
+    ranked = await asyncio.to_thread(sounds.rank_by_words, words, items, liked)
+    return {"ranked": [{"texture_id": t, "score": s} for t, s in ranked], "words": words,
+            "note": "Directions that sound closest to what you've said come first." if words else None}

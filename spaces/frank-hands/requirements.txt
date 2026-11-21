@@ -1,0 +1,30 @@
+# frank-hands (frankenstein spec 14, section E). ZeroGPU needs torch >= 2.8.
+torch==2.8.0
+torchaudio==2.8.0
+numpy<2
+spaces
+transformers==4.57.1
+huggingface_hub<1
+git+https://github.com/jthickstun/anticipation.git
+mido
+kokoro==0.9.4
+misaki[en]
+soundfile
+librosa==0.10.2.post1
+onnxruntime==1.22.1
+pyyaml
+cmudict
+# Stable Audio's own dependencies (stable-audio-tools itself is installed at first use with --no-deps,
+# because it pins an older torch than ZeroGPU allows)
+einops
+einops-exts
+alias-free-torch==0.0.6
+torchsde
+nnAudio
+PyWavelets
+safetensors
+sentencepiece
+soxr
+vector-quantize-pytorch==1.14.41
+dill
+k-diffusion

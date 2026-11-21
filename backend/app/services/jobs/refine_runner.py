@@ -8,6 +8,8 @@ ever written here (spec 08 property 1); the "before" is cut from the current son
 """
 from __future__ import annotations
 
+from app.services import provenance
+
 import asyncio
 import logging
 import os
@@ -187,6 +189,33 @@ def _beat_preview_sync(basis: dict, d: Direction) -> dict:
     return {"preview_url": preview_url, "before_url": before_url}
 
 
+def made_well_words(before: float, after: float) -> str:
+    """Audiobox's production-quality score (1..10) as a plain sentence. Small moves are within its noise."""
+    d = after - before
+    if d >= 0.3:
+        return "This version sounds more polished than the one you have."
+    if d <= -0.3:
+        return "This version sounds a little less polished than the one you have, though you may still like it more."
+    return "It's about as polished as the one you have; it's a matter of taste."
+
+
+def score_change(before_url: Optional[str], after_url: Optional[str]) -> Optional[dict]:
+    """Before and after, scored by Meta Audiobox Aesthetics on frank-ears (frankenstein spec 14, 2.4). None if asleep."""
+    from app.services.remote import organs
+    from app.services.storage.signing import fetch_audio_bytes
+
+    if not before_url or not after_url:
+        return None
+    try:
+        b = organs.try_(organs.aesthetics, fetch_audio_bytes(before_url), "mp3")
+        a = organs.try_(organs.aesthetics, fetch_audio_bytes(after_url), "mp3")
+    except Exception:  # noqa: BLE001
+        return None
+    if not a or not b or "made_well" not in a or "made_well" not in b:
+        return None
+    return {"before": b["made_well"], "after": a["made_well"], "plain": made_well_words(b["made_well"], a["made_well"])}
+
+
 async def run_preview_job(job_id: str, project_id: str, proposal_id: str, n: int) -> None:
     from app.routers.mix import apply_actions
     from app.services.jobs import mix_runner
@@ -216,6 +245,11 @@ async def run_preview_job(job_id: str, project_id: str, proposal_id: str, n: int
             async with HEAVY:
                 urls = await asyncio.to_thread(mix_runner._render_preview_sync, layers, params)
             urls = {"preview_url": urls["render_url"], "before_url": (basis.get("mix") or {}).get("render_url")}
+        await _progress(job_id, "Checking whether it sounds better made...")
+        made_well = await asyncio.to_thread(score_change, urls.get("before_url"), urls.get("preview_url"))
+        if made_well:
+            urls["made_well"] = made_well
+            await asyncio.to_thread(provenance.note, project_id, "refine", proposal_id, "aesthetics")
         await asyncio.to_thread(refine_db.update_direction, proposal_id, n, urls)
         await jobs_db.mark_complete(job_id, {"n": n, **urls})
     except Exception as exc:  # noqa: BLE001

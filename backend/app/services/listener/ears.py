@@ -94,3 +94,30 @@ async def hear(project_id: str, report: MeasurementReport, found: FindingsReport
     except Exception:  # noqa: BLE001
         log.warning("listening with Gemini failed", exc_info=True)
         return None
+
+
+async def style_check(project_id: str) -> Optional[dict]:
+    """Styles and moods the render sounds like (frank-ears), and a finding when they drift from the brief."""
+    from app.db import feel as feel_db
+    from app.services.listener import style
+    from app.services.remote import organs
+
+    try:
+        state = await projects_db.get_project_active_state(project_id) or {}
+        mix = await mix_db.get_mix_version(state["active_mix_id"]) if state.get("active_mix_id") else None
+        beat = await beat_db.get_beat_version(state["active_beat_version_id"]) if state.get("active_beat_version_id") else None
+        url = (mix or {}).get("render_url") or (beat or {}).get("render_url")
+        if not url:
+            return None
+        audio = await asyncio.to_thread(fetch_audio_bytes, url)
+        clip = await asyncio.to_thread(_clip_mp3, audio, 10.0, 60.0)
+        del audio
+        got = await asyncio.to_thread(organs.try_, organs.labels, clip, "mp3")
+        if not got:
+            return None
+        fp = ((await feel_db.get_latest_fingerprint(project_id)) or {}).get("fingerprint") or {}
+        f = style.finding(list(fp.get("genre_proximity") or []), got.get("styles", []), got.get("moods", []))
+        return {"styles": got.get("styles", []), "moods": got.get("moods", []), "finding": f.model_dump() if f else None}
+    except Exception:  # noqa: BLE001
+        log.warning("style check failed", exc_info=True)
+        return None

@@ -56,7 +56,9 @@ class SynthSession:
             audio = synth.render(part, bpm, total_beats)
     """
 
-    def __init__(self) -> None:
+    def __init__(self, sampled: bool = True) -> None:
+        # Recorded piano and strings (frankenstein spec 14, 3.5) play instead of the SoundFont when available.
+        self._sampled = sampled
         # Dynamic sample loading: only the samples of the instruments a song actually uses are decoded into
         # memory. Without it the whole compressed SoundFont is unpacked on load (+228 MB measured), which
         # alone breaks the 512 MB free server (ship-it spec 13, requirement 2.1; measured Nov 17).
@@ -79,6 +81,12 @@ class SynthSession:
             self._take(SYNTH_BLOCK - off)
 
     def render(self, part: Part, bpm: float, total_beats: float) -> np.ndarray:
+        if self._sampled:
+            from app.services.generation import sampled
+
+            recorded = sampled.render(part, bpm, total_beats, TAIL_SECONDS)
+            if recorded is not None:
+                return recorded
         fs = self._fs
         self._align()
         channel = DRUM_CHANNEL if part.is_drums else 0

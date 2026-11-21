@@ -78,3 +78,42 @@ async def get_download_url(project_id: str, export_id: str) -> DownloadUrlRespon
             url = export.get("audio_url")
 
     return DownloadUrlResponse(url=url, filename=_safe_filename(title))
+
+
+# ── a second master, matched to a song they picked (frankenstein spec 14, requirement 6.4) ───────────────
+
+from typing import Optional  # noqa: E402
+
+from fastapi import File, Form, UploadFile  # noqa: E402
+
+
+@router.post("/match", response_model=JobResponse)
+async def match_to_reference(project_id: str, background: BackgroundTasks, mix_version_id: str = Form(...),
+                             file: Optional[UploadFile] = File(None), jamendo_track_id: Optional[str] = Form(None),
+                             rights_confirmed: bool = Form(False)) -> JobResponse:
+    """Finish the song so it sits as loud, bright and wide as a song they picked. Frank's own finish is kept."""
+    from app.services.jobs.export_runner import run_matched_job
+
+    if file is not None:
+        if not rights_confirmed:
+            raise HTTPException(status_code=400, detail="Only use a song you're allowed to use. Tick the box to say so.")
+        data = await file.read(50 * 1024 * 1024 + 1)
+        if len(data) > 50 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="That file is too big for me. A song under 50 MB works.")
+        ext = (file.filename or "song.mp3").rsplit(".", 1)[-1].lower()
+    elif jamendo_track_id:
+        import asyncio
+
+        from app.services.reference import jamendo
+
+        if not jamendo.available():
+            raise HTTPException(status_code=503, detail="Picking from free music isn't switched on yet.")
+        track = await asyncio.to_thread(jamendo.get, jamendo_track_id)
+        if not track:
+            raise HTTPException(status_code=404, detail="I couldn't find that song any more.")
+        data, ext = await asyncio.to_thread(jamendo.fetch_audio, track), "mp3"
+    else:
+        raise HTTPException(status_code=400, detail="Pick a song to match first.")
+    job = await jobs_db.create_job(project_id, job_type="export_matched")
+    background.add_task(run_matched_job, job["id"], project_id, mix_version_id, data, ext)
+    return JobResponse(job_id=job["id"])

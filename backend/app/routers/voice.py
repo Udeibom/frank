@@ -341,3 +341,34 @@ async def voice_conversation(
     result["message"] = await convo.enforce_reply(project_id, "voice", result.get("message", ""))
     await convo.record(project_id, "voice", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return VoiceConversationResponse(message=result.get("message", ""), actions=actions)
+
+
+# ── organs (frankenstein spec 14, requirements 4.1-4.3) ────────────────────���─────────────────────────────
+
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+
+class InstrumentRequest(_BaseModel):
+    instrument: str = "violin"
+
+
+@router.post("/takes/{take_id}/quiet", response_model=JobResponse)
+async def quiet_take(project_id: str, take_id: str, background: BackgroundTasks) -> JobResponse:
+    """Take the room noise out (fans, hiss, traffic). A new take; the original is kept."""
+    take = await _owned_take(project_id, take_id)
+    return await _job(project_id, "vocal_quiet", background, vr.run_quiet_job, project_id, take)
+
+
+@router.post("/takes/{take_id}/instrument", response_model=JobResponse)
+async def take_as_instrument(project_id: str, take_id: str, body: InstrumentRequest, background: BackgroundTasks) -> JobResponse:
+    """Play this hum or line as an instrument, keeping the way they sang it."""
+    if body.instrument not in vr.INSTRUMENT_WORDS:
+        raise HTTPException(status_code=400, detail="I can play it as a violin, flute, soft flute, trumpet or saxophone.")
+    take = await _owned_take(project_id, take_id)
+    return await _job(project_id, "vocal_instrument", background, vr.run_instrument_job, project_id, take, body.instrument)
+
+
+@router.post("/guide/sung", response_model=JobResponse)
+async def sung_guide(project_id: str, background: BackgroundTasks) -> JobResponse:
+    """A guide voice that sings their words on the tune, so they can hear how a line goes."""
+    return await _job(project_id, "sung_guide", background, vr.run_sung_guide_job, project_id)

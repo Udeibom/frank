@@ -20,6 +20,8 @@ class Direction(BaseModel):
     sections: list[int] = Field(default_factory=list)    # sections a preview plays (beat), empty for the whole song
     preview_url: Optional[str] = None
     before_url: Optional[str] = None
+    # Meta Audiobox Aesthetics before/after (frankenstein spec 14, 2.4): {"before", "after", "plain"}
+    made_well: Optional[dict[str, Any]] = None
 
     def signature(self) -> str:
         """Two directions with the same signature would sound the same: they are not two choices."""

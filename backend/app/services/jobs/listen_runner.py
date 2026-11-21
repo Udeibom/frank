@@ -36,8 +36,14 @@ async def run_listen_job(job_id: str, project_id: str, scope: Optional[list[str]
         heard = await ears.hear(project_id, report, found, scope, concern)
         if heard:
             provenance.note(project_id, "listen", None, "listened")
+        styles = await ears.style_check(project_id)
+        if styles and styles.get("finding"):
+            from app.services.listener.models import Finding
+
+            found.findings.append(Finding(**styles["finding"]))
+            provenance.note(project_id, "listen", None, "style")
         await jobs_db.mark_complete(job_id, {"measurements": report.model_dump(), "findings": found.model_dump(),
-                                             "heard": heard})
+                                             "heard": heard, "sounds_like": styles})
     except Exception as exc:  # noqa: BLE001
         try:
             await jobs_db.mark_failed(job_id, "Frank couldn't listen to the song just now — want to try again?")

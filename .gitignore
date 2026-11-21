@@ -70,3 +70,4 @@ backend/.reference_report.log
 backend/assets/words.sqlite
 backend/assets/sfz/
 backend/assets/plugins/
+tools/spaces/.venv/
