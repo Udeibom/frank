@@ -22,13 +22,22 @@ from dotenv import dotenv_values
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 ENV = dotenv_values(ROOT / ".env")
 FENV = dotenv_values(ROOT.parent / "frontend" / ".env.local")
-SB, SRK, ANON = ENV["SUPABASE_URL"], ENV["SUPABASE_SERVICE_ROLE_KEY"], FENV["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+# From the environment first, so the check can run off this machine (e.g. a Kaggle kernel when this network drops
+# large requests to Render) with only a throwaway account and the public anon key: FRANK_EMAIL / FRANK_PASSWORD.
+SB = os.environ.get("SUPABASE_URL") or ENV["SUPABASE_URL"]
+SRK = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or ENV.get("SUPABASE_SERVICE_ROLE_KEY", "")
+ANON = os.environ.get("SUPABASE_ANON_KEY") or FENV["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
 API = os.environ.get("FRANK_API", "https://frank-api-pzjo.onrender.com")
 ADMIN = {"apikey": SRK, "Authorization": f"Bearer {SRK}"}
 c = httpx.Client(timeout=180)
 
 
 def login() -> tuple[str, dict]:
+    """A throwaway account. With FRANK_EMAIL set, that account is used and the caller deletes it (uid is "")."""
+    if os.environ.get("FRANK_EMAIL"):
+        tok = c.post(f"{SB}/auth/v1/token?grant_type=password", headers={"apikey": ANON},
+                     json={"email": os.environ["FRANK_EMAIL"], "password": os.environ["FRANK_PASSWORD"]}).json()["access_token"]
+        return "", {"Authorization": f"Bearer {tok}"}
     email, pw = f"e2e-{uuid.uuid4().hex[:8]}@example.com", "E2e-pass-12345"
     r = c.post(f"{SB}/auth/v1/admin/users", headers=ADMIN, json={"email": email, "password": pw, "email_confirm": True})
     r.raise_for_status()
@@ -214,7 +223,8 @@ def main() -> None:
         print("  downloaded", len(mp3), "bytes", dl["format"], dl["quality"])
         print(f"E2E OK in {time.time() - started:.0f}s")
     finally:
-        c.delete(f"{SB}/auth/v1/admin/users/{uid}", headers=ADMIN)
+        if uid:
+            c.delete(f"{SB}/auth/v1/admin/users/{uid}", headers=ADMIN)
 
 
 if __name__ == "__main__":

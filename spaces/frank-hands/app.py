@@ -252,10 +252,13 @@ def ambience(prompt: str, seconds: float) -> str:
 
 def sing(payload: str) -> str:
     """payload: {"notes": [{note, start, duration}], "words": ["one", "syllable", "per", "note"], "bpm"}."""
-    from diffsinger_worker import render
-
     out = tempfile.mktemp(suffix=".wav", prefix="sing-")
-    render(json.loads(payload), out, str(CACHE))
+    job = out[:-4] + ".json"
+    Path(job).write_text(payload)
+    run = subprocess.run([sys.executable, str(HERE / "diffsinger_worker.py"), job, out, str(CACHE)],
+                         capture_output=True, text=True, timeout=240)
+    if run.returncode != 0 or not os.path.exists(out):
+        raise RuntimeError(f"singer stopped (code {run.returncode}): {(run.stderr or run.stdout)[-500:]}")
     mp3 = out[:-4] + ".mp3"
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", out, "-b:a", "128k", mp3], check=True)
     return mp3

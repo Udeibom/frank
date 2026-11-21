@@ -66,8 +66,7 @@ def voicebank(cache: str) -> Path:
 
 def warm(cache: str) -> None:
     try:
-        voicebank(cache)
-        _models(cache)
+        voicebank(cache)        # downloads only: loading the models here once aborted the whole Space
         _dictionary(cache)
     except Exception as e:  # noqa: BLE001
         print("voicebank warm-up failed:", e, flush=True)
@@ -86,7 +85,11 @@ def _models(cache: str):
 
     vb = voicebank(cache)
     cfg = _yaml(str(vb / "dsconfig.yaml"))
-    acoustic = ort.InferenceSession(str(vb / cfg["acoustic"]), providers=["CPUExecutionProvider"])
+    # onnxruntime's graph optimiser hit a C++ assertion (NodeArg index) on this voicebank and aborted the process;
+    # these models are small enough to run unoptimised.
+    opts = ort.SessionOptions()
+    opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+    acoustic = ort.InferenceSession(str(vb / cfg["acoustic"]), opts, providers=["CPUExecutionProvider"])
     voc_ref = cfg.get("vocoder")
     voc_path = None
     for cand in glob.glob(str(vb / "**" / "*.onnx"), recursive=True):
@@ -95,7 +98,7 @@ def _models(cache: str):
                 voc_path = cand
     if voc_path is None:
         voc_path = _fetch_vocoder(cache, voc_ref)
-    vocoder = ort.InferenceSession(voc_path, providers=["CPUExecutionProvider"])
+    vocoder = ort.InferenceSession(voc_path, opts, providers=["CPUExecutionProvider"])
     phonemes_file = vb / cfg["phonemes"]
     if phonemes_file.suffix == ".json":
         table = json.loads(phonemes_file.read_text(encoding="utf-8"))
@@ -262,3 +265,10 @@ def render(payload: dict, out_path: str, cache: str) -> None:
     wav = vocoder.run(None, vfeeds)[0].reshape(-1)
     wav = wav / (np.abs(wav).max() + 1e-9) * 0.8
     sf.write(out_path, wav.astype(np.float32), sr)
+
+
+if __name__ == "__main__":
+    # Run in its own process by app.py, so a crash inside onnxruntime fails one request, not the whole Space.
+    import sys
+
+    render(json.loads(Path(sys.argv[1]).read_text()), sys.argv[2], sys.argv[3])

@@ -15,7 +15,13 @@ import zlib
 import httpx
 import numpy as np
 from e2e import ADMIN, API, SB, c, login, sung_take  # noqa: E402  (same folder)
-from app.services.team.plain import find_jargon  # noqa: E402
+try:
+    from app.services.team.plain import find_jargon  # noqa: E402
+except ImportError:                                     # running off this machine: the same word list
+    import re
+    def find_jargon(text: str) -> list[str]:
+        rx = r"\b(bpm|tempo|reverb|compress\w*|eq|quanti[sz]\w*|stems?|midi|daw|vst|lufs|k?hz|db)\b"
+        return sorted({m.group(0).lower() for m in re.finditer(rx, text or "", re.I)})
 RESULTS: list[tuple[str, str, str]] = []
 REGION = {"X-Frank-Region": "NG"}                       # a region where Gemini is allowed
 def record(step: str, status: str, note: str) -> None:
@@ -152,7 +158,8 @@ def main() -> None:
             url = r.get("url") or r.get("audio_url") or ""
             record("conversation/speak", "ok" if url or r.get("audio") else "FAIL", str(r)[:160])
     finally:
-        c.delete(f"{SB}/auth/v1/admin/users/{uid}", headers=ADMIN)
+        if uid:
+            c.delete(f"{SB}/auth/v1/admin/users/{uid}", headers=ADMIN)
     print("\nSUMMARY")
     for s, st, n in RESULTS:
         if st != "ok" or not s.endswith("(status)"):
