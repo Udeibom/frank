@@ -40,6 +40,13 @@ def owns_project(project: Optional[dict], user_id: str) -> bool:
 
 
 def _bearer_token(request: Request) -> Optional[str]:
+    # X-Frank-Auth carries the token from the frontend to avoid Render's
+    # Cloudflare WAF, which blocks Authorization headers over ~511 bytes.
+    # Supabase JWTs are ~930 bytes and are silently dropped otherwise.
+    frank_auth = request.headers.get("x-frank-auth", "").strip()
+    if frank_auth:
+        return frank_auth
+    # Fall back to standard Authorization: Bearer <token> for direct API calls.
     header = request.headers.get("authorization", "")
     scheme, _, token = header.partition(" ")
     if scheme.lower() == "bearer" and token.strip():

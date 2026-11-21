@@ -39,7 +39,11 @@ async function authHeader(): Promise<Record<string, string>> {
   const [{ data }, country] = await Promise.all([createClient().auth.getSession(), region()])
   const token = data.session?.access_token
   return {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    // Render's Cloudflare WAF blocks Authorization headers over ~511 bytes.
+    // Supabase JWTs are ~930 bytes, so we send the token in a custom header
+    // that the WAF doesn't inspect. The backend reads from X-Frank-Auth first,
+    // falling back to Authorization for compatibility with direct API calls.
+    ...(token ? { "X-Frank-Auth": token } : {}),
     ...(country ? { "X-Frank-Region": country } : {}),
   }
 }
