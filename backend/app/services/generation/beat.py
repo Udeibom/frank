@@ -237,7 +237,10 @@ def plan_contexts(
     used_loops: set[tuple] = set()
     # When the person has hummed a tune, the whole song sits in the key of that tune.
     key = (lead.key if lead else "") or fp["key"]
-    for s in sections:
+    # Each kind of section gets its chords in a fixed order (not the arrangement's), so moving a section never
+    # changes which chords it plays (ops property: a moved section keeps its own notes).
+    kind_order = {"verse": 0, "chorus": 1, "pre-chorus": 2, "bridge": 3}
+    for s in sorted({x.name: x for x in sections}.values(), key=lambda x: (kind_order.get(x.name, 9), x.name)):
         if s.name in progressions:
             continue
         if lead and s.name in lead_mod.LEAD_SECTIONS:

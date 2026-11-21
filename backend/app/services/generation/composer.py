@@ -18,6 +18,8 @@ What makes this sound like music and not a loop:
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from dataclasses import dataclass, field, replace
 from typing import Any, Optional
 
@@ -516,6 +518,31 @@ def _trim_overlaps(part: Part) -> Part:
 # Section-level composition
 # ─────────────────────────────────────────────
 
+_EDGE_PARTS = ("drums", "bass", "pad", "strings")      # Lakh families Frank can follow at a song's edges
+
+
+@lru_cache(maxsize=1)
+def _arrangement_stats() -> dict:
+    import json
+    from pathlib import Path
+
+    p = Path(__file__).resolve().parent / "styles" / "arrangement_stats.json"
+    return json.loads(p.read_text()).get("families", {}) if p.exists() else {}
+
+
+def _edge_layers(edge: str, energy: float) -> list[str]:
+    """
+    Which parts play in an intro or an ending, from how often real songs have them there (Lakh MIDI, 15,565 songs;
+    frankenstein spec 14, 3.3). The keys always play (the harmony); the tune stays out (the voice carries it). A part
+    joins when it is at least as common there as the song's energy demands: calm songs keep only the most common.
+    """
+    stats = _arrangement_stats()
+    if not stats:
+        return []
+    threshold = (0.9 if edge == "intro" else 0.95) - (0.4 if edge == "intro" else 0.3) * max(0.0, min(1.0, energy))
+    return ["keys"] + [p for p in _EDGE_PARTS if stats.get(p, {}).get(edge, 0.0) >= threshold]
+
+
 def layers_for_section(
     section: str,
     energy: float,
@@ -530,9 +557,7 @@ def layers_for_section(
     """
     extra = list(style.extra_layers) if style else []
     if section == "intro":
-        base = ["keys", "pad"]
-        if energy >= 0.5:
-            base.append("drums")
+        base = _edge_layers("intro", energy) or ["keys", "pad"] + (["drums"] if energy >= 0.5 else [])
     elif section == "verse":
         base = ["keys", "bass", "drums"]
         if density >= 0.6 or repeat >= 1:
@@ -552,7 +577,7 @@ def layers_for_section(
         if energy >= 0.75:
             base.append("drums")
     elif section == "outro":
-        base = ["keys", "pad"]
+        base = _edge_layers("ending", energy) or ["keys", "pad"]
         if repeat >= 1:
             base.append("melody")
     else:

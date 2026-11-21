@@ -72,7 +72,7 @@ def test_the_input_plan_is_never_modified_and_a_bad_edit_changes_nothing():
 @pytest.mark.parametrize("raw", [
     [], [{"op": "explode"}], [{"op": "busier", "part": "trombone"}], [{"op": "resize", "section": 0, "bars": 0}],
     [{"op": "swap_sound", "part": "keys", "sound": "theremin"}], [{"op": "busier", "part": "keys", "section": 1, "extra": 1}],
-    [{"op": "add_fill", "section": 0}],     # the intro has no drums at this energy
+    [{"op": "add_fill", "section": 5}],     # the bridge has no drums at this energy
 ])
 def test_invalid_edits_are_refused_in_plain_words(raw):
     with pytest.raises(ops.OpError) as e:

@@ -1,0 +1,46 @@
+{
+ "_note": "From the Lakh MIDI Dataset (Colin Raffel, CC BY 4.0), clean subset, by data/mining/lakh_arrangement/mine.py. For each family of parts: the share of songs using it where it already plays in the first 8 bars and where it still plays in the last 8.",
+ "songs": 15565,
+ "families": {
+  "bass": {
+   "songs": 14617,
+   "intro": 0.769,
+   "ending": 0.961
+  },
+  "drums": {
+   "songs": 15096,
+   "intro": 0.846,
+   "ending": 0.97
+  },
+  "guitar": {
+   "songs": 12768,
+   "intro": 0.793,
+   "ending": 0.9
+  },
+  "keys": {
+   "songs": 11776,
+   "intro": 0.769,
+   "ending": 0.875
+  },
+  "melody": {
+   "songs": 11264,
+   "intro": 0.624,
+   "ending": 0.794
+  },
+  "pad": {
+   "songs": 7747,
+   "intro": 0.485,
+   "ending": 0.714
+  },
+  "strings": {
+   "songs": 8595,
+   "intro": 0.612,
+   "ending": 0.834
+  }
+ },
+ "parts_playing": {
+  "intro": 0.737,
+  "middle": 0.916,
+  "ending": 0.887
+ }
+}
