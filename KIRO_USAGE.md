@@ -4,6 +4,21 @@ This is an honest record of how we used Kiro to build Frank — what worked, wha
 failed, what we changed as a result. We've tried not to overclaim. Where a tool
 or approach fell short, we say so and say what we did about it.
 
+## Summary (as of Nov 21, 2026)
+
+| Kiro feature | How Frank uses it | Where |
+|---|---|---|
+| Specs | 14 specs, each with requirements, design and tasks. Every ticked task names its evidence. The Spec Keeper agent un-ticks a task when the evidence is missing. | `.kiro/specs/`, `scripts/check_specs.py` |
+| Steering | Product, tech and structure files always load. Six room and infrastructure files load only when a matching file is open (fileMatch). `scripts/check_steering.py` fails CI when steering disagrees with the code. | `.kiro/steering/` |
+| Skills | The team roles and producer craft, loaded when the work needs them. | `.kiro/skills/` |
+| Hooks | Property tests run after a task completes. Two agent hooks run on save: a jargon review of prompt files, and a reference-song render after an engine change. A steering check runs on stop. | `.kiro/hooks/` |
+| Custom agents | Spec Keeper, PBT Author, Listening Lab, Frank Code Reviewer, Integration Tester, Plain Language Auditor, Database Steward, and a Producer that runs them in order. | `.kiro/agents/` |
+| MCP | Supabase, Context7 and Playwright, plus Frank's own Listener, which lets Kiro hear a render with the product's own measurements. | `.kiro/settings/mcp.json.example`, `tools/listener_mcp/` |
+| Power | `frank-sound-engineering` packages the Listener MCP with its skills. | `powers/frank-sound-engineering/` |
+| Kiro CLI + Crew | A nightly listening regression. | `scripts/listening_regression.sh`, `docs/kiro/crew.md` |
+
+Tests: 505 backend tests, 252 of them Hypothesis properties. The frontend has 13 vitest tests with fast-check properties. CI runs all of them, plus the plain-language, steering and break-it-on-purpose (mutation) checks.
+
 ---
 
 ## MCP Servers
@@ -182,6 +197,8 @@ This was a manual spot-check, not a mutation-testing tool.
 
 No frontend property tests (fast-check) yet. No test covers mastering loudness,
 pitch correction accuracy, or comp assembly. Nothing here runs in CI.
+*(Updated Nov 21: the frontend now has fast-check properties, the backend has 252 Hypothesis properties, and
+both run in CI. See the summary at the top and the Nov 19 to 21 section.)*
 
 ---
 
@@ -654,3 +671,54 @@ than ten times, and each time the session resumed from that file, not from memor
 - **Not tried in a real browser with a microphone**: the sing-along timing (lead-in, delay check), the start
   surface recording and the A/B players are type-checked and built, and their server side runs on production,
   but nobody has sung into them yet. That is the founder's first test.
+
+---
+
+## Nov 19 to 21: Frankenstein (spec 14) and the Kiro craft tasks
+
+Prompted by a review of how Frank used Kiro (`docs/research/FRANK-KIRO-AND-TECHNOLOGY-REVIEW.md`), the founder asked
+for every improvement in it. Two plans came out of that. Kiro-craft got requirement 7 and tasks 7 to 15. A new spec,
+`.kiro/specs/frankenstein/`, covers the outside parts Frank is now stitched from: two Hugging Face Spaces of free
+models, mined datasets, recorded instruments, and starting points from outside music. Those include a picture,
+the time and weather, the person's camera, a spoken voice, the feelings in their words, and how words sound.
+The credit for each part is in `THIRD_PARTY.md`.
+
+### What Kiro's pieces did, concretely
+- **The rules were checked before anything was built.** The research step read the terms of every service
+  first. Two plans were changed as a result. Deezer previews were dropped: their terms forbid AI use and local
+  copies, so Frank uses Jamendo (Creative Commons) and the person's own uploads instead. Gemini is never called
+  for the EEA, Switzerland or the UK, where its free tier is not allowed; an unknown region is treated the same.
+- **The Listener MCP found a problem by listening.** Kiro rendered the reference song through `frank-listener`
+  after the Lakh arrangement statistics went in, and found that the intro had become a copy of verse 1. The fix:
+  an intro is always smaller than the verse it leads into. The test that guards it lives with the other
+  arrangement properties.
+- **fast-check found a frontend bug.** The first frontend property (`frontend/tests/songShape.test.ts`) showed
+  that `sectionAt` rounded a time at a section boundary into the wrong section. It was fixed the same hour.
+- **Measurement decided between two pitch trackers.** Basic Pitch was added as a second hum tracker, and
+  `backend/scripts/pitch_compare.py` scored both on the founder's real hums. pyin scored 0.98 and Basic Pitch 0.81
+  (Basic Pitch was weaker on vibrato and breathy hums), so pyin stays the default.
+- **The prompt-review hook ran twice on `brief.py`.** The first run found reference differences reaching the
+  prompt unfiltered, and those now pass the jargon filter. The second run, after task 57 replaced the raw dumps of
+  the fingerprint and the beat, vocal and mix records with everyday words, found layer, effect and kind names
+  passing straight from the data. Every record line now goes through `plain.guard`.
+- **Kiro craft tasks.**
+  - The team roles and producer craft became Skills.
+  - Six steering files now load by fileMatch, and `scripts/check_steering.py` catches drift.
+  - Three hooks were added: property tests after a task, a jargon review of prompts on save, and a steering check
+    on stop.
+  - A Producer agent runs Spec Keeper, PBT Author, Listening Lab and Frank Code Reviewer in order.
+  - The `frank-sound-engineering` Power packages the Listener. Its MCP was tested with a real client.
+  - The nightly listening regression is ready for Kiro Crew (`docs/kiro/crew.md`).
+
+### What went wrong, honestly
+- **Versions that would not live together.** ZeroGPU needs torch 2.8 or newer, Gradio 6 needs `huggingface_hub` 1.x,
+  and transformers 4.57 needs the old one. The Spaces are pinned to Gradio 5.50. Kokoro had to run on CPU, and
+  DDSP's install conflicts took several rounds.
+- **A client bug that only the live Space showed.** The Space client was passing `token=` where `gradio_client`
+  expects `hf_token=`, so every call was made without credentials. It worked locally and failed live.
+- **Things still waiting** at the time of writing:
+  - Stable Audio is gated until its licence is accepted on the Hugging Face account.
+  - Freesound, Jamendo, Exa and Firecrawl need free keys from the founder. Each feature says so plainly until then.
+  - Kiro CLI sign-in needs the founder at the keyboard.
+  - The ACE-Step blind test is not prepared yet.
+  - Diff-MST was dropped: no public trained model exists.

@@ -565,6 +565,9 @@ def layers_for_section(
     extra = list(style.extra_layers) if style else []
     if section == "intro":
         base = _edge_layers("intro", energy) or ["keys", "pad"] + (["drums"] if energy >= 0.5 else [])
+        # Always smaller than the verse it leads into, at any energy (Lakh's busy intros at high energy had made
+        # the intro as full as the verse, so the song's first lift was gone). The most common parts stay.
+        base = base[: len(layers_for_section("verse", energy, density)) - 1]
     elif section == "verse":
         base = ["keys", "bass", "drums"]
         if density >= 0.6 or repeat >= 1:

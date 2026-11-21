@@ -71,7 +71,7 @@ PART_GAIN = {
 
 LEAD_GAIN = 1.1              # the person's own tune sits a little in front of the other parts
 PEAK_TARGET = 0.89
-ENGINE_VERSION = 5          # bumps when a change would make an old beat sound different if re-rendered
+ENGINE_VERSION = 6          # bumps when a change would make an old beat sound different if re-rendered
 FADE_OUT_SECONDS = 1.5
 EQ_MIN_DB = 0.25
 

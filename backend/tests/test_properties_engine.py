@@ -575,3 +575,14 @@ def test_a_broken_groove_leaves_the_style_alone():
     base = {"kick": "x...", "half_kick": "x...", "hat": "x...", "half_hat": "x..."}
     for bad in ({}, {"kick": "x", "hat": "x"}, {"kick": "." * 16, "hat": "." * 16}):
         assert groove_to_style_drums(bad, base) == base
+
+
+# ─── An intro leads into the verse (found by listening through the frank-listener MCP, 21 Nov) ─
+
+@settings(max_examples=200, deadline=None)
+@given(st.floats(0, 1), st.floats(0, 1))
+def test_the_intro_always_has_fewer_parts_than_the_first_verse(energy, density):
+    intro = composer.layers_for_section("intro", energy, density)
+    verse = composer.layers_for_section("verse", energy, density)
+    assert "keys" in intro
+    assert len(intro) < len(verse), (intro, verse)
