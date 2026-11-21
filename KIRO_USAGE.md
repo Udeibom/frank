@@ -695,7 +695,7 @@ The credit for each part is in `THIRD_PARTY.md`.
 - **fast-check found a frontend bug.** The first frontend property (`frontend/tests/songShape.test.ts`) showed
   that `sectionAt` rounded a time at a section boundary into the wrong section. It was fixed the same hour.
 - **Measurement decided between two pitch trackers.** Basic Pitch was added as a second hum tracker, and
-  `backend/scripts/pitch_compare.py` scored both on the founder's real hums. pyin scored 0.98 and Basic Pitch 0.81
+  `backend/scripts/pitch_compare.py` scored both on made-up hums whose notes are known in advance (so the score is exact). pyin scored 0.98 and Basic Pitch 0.81
   (Basic Pitch was weaker on vibrato and breathy hums), so pyin stays the default.
 - **The prompt-review hook ran twice on `brief.py`.** The first run found reference differences reaching the
   prompt unfiltered, and those now pass the jargon filter. The second run, after task 57 replaced the raw dumps of

@@ -386,3 +386,18 @@ These show the creature working, in the Path A and Path B flows the product alre
 ---
 
 *Sources are linked inline. Quoted material is limited to short phrases, and the rest is paraphrased; content was rephrased for compliance with licensing restrictions. Licences, quotas and model availability change often, so re-check each one when integrating.*
+
+---
+
+## Part 4. What changed when it was built (21 Nov)
+
+The build followed this review. These points came out differently, and each was decided by a rule or a measurement:
+
+- **Deezer and iTunes previews: dropped.** Deezer's terms forbid AI use, local copies and playback outside its own player. Reference music now comes from Jamendo (Creative Commons tracks, free non-commercial key) or from the person's own upload. Uploads need a rights checkbox and are analysed in memory, never stored.
+- **Gemini: region rule.** Google's Gemini API terms allow only paid use for people in the EEA, Switzerland and the UK. Frank never sends sound or pictures to Gemini from those places, and an unknown country is treated the same way. Elsewhere, Gemini listens to the mix and vocals and looks at pictures, as the founder approved. Calls retry, then fall back to a lighter Gemini model, because the free model is often busy. The API key travels in a header so it never appears in logs.
+- **Diff-MST: dropped.** No public trained model exists (its evaluation script points at a local file). Frank's matched master (Matchering) remains for "make it sound like this song".
+- **Basic Pitch: kept as a second opinion only.** On made-up hums with known notes, pyin scored 0.98 and Basic Pitch 0.81 (`backend/scripts/pitch_compare.py`), so pyin stays the default.
+- **Research-only licences: left out** (Music Flamingo, MUSDB18, DEAM). **Modal: left out** (needs a card).
+- **Small free allowances are rationed.** Exa and Firecrawl run only when the person names a song. They have monthly caps below the free allowance, and each song is researched once for everyone (migration 011).
+- **Music in the demo video:** only music made in Frank. No commercial recordings.
+- The full list of every part and its licence is in `THIRD_PARTY.md`.

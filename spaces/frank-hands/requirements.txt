@@ -28,3 +28,5 @@ soxr
 vector-quantize-pytorch==1.14.41
 dill
 k-diffusion
+# stable-audio-tools imports a training callback at load time (models/lora/__init__ -> callbacks)
+pytorch-lightning==2.5.5

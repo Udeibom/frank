@@ -149,7 +149,17 @@ DDSP_DEPS = ["tensorflow-cpu==2.11.1", "tensorflow-probability==0.19.0", "numpy=
              "future", "soundfile", "matplotlib", "mir_eval==0.7", "hmmlearn==0.2.7"]
 
 
+import threading as _threading  # noqa: E402
+
+_DDSP_LOCK = _threading.Lock()                          # the start-up warm-up and a first request never both install
+
+
 def _ddsp_env() -> Path:
+    with _DDSP_LOCK:
+        return _ddsp_install()
+
+
+def _ddsp_install() -> Path:
     py = DDSP_ENV / "bin" / "python"
     ready = DDSP_ENV / "ready"                          # only written after a full install, so a failed one retries
     if not ready.exists():
@@ -218,15 +228,15 @@ _install_stable_audio()
 def _stable():
     from stable_audio_tools import get_pretrained_model
 
-    last = None
+    errors = []
     for name in STABLE_MODELS:
         try:
             model, cfg = get_pretrained_model(name)
             return model, cfg, name
         except Exception as e:  # noqa: BLE001 - gated or missing: try the next
-            last = e
-    raise RuntimeError("no Stable Audio model could be downloaded; its licence must be accepted on the Hugging Face "
-                       f"account that owns HF_TOKEN ({last})")
+            errors.append(f"{name}: {type(e).__name__}: {str(e)[:160]}")
+    # Every model's own reason (a gated model says 403; a missing package says so), not one guess for all.
+    raise RuntimeError("no Stable Audio model could be loaded. " + " | ".join(errors))
 
 
 @GPU(duration=40)
@@ -243,7 +253,7 @@ def _ambience(prompt: str, seconds: float) -> str:
     steps = 8 if "small" in name else 80
     sampler = "pingpong" if "small" in name else "dpmpp-3m-sde"
     audio = generate_diffusion_cond(model, steps=steps, cfg_scale=1.0 if "small" in name else 7.0,
-                                    conditioning=[{"prompt": prompt, "seconds_total": seconds}],
+                                    conditioning=[{"prompt": prompt, "seconds_start": 0, "seconds_total": seconds}],
                                     sample_size=size, sampler_type=sampler, device=dev)
     audio = audio[0, :, : int(seconds * sr)].to(torch.float32)
     audio = (audio / (audio.abs().max() + 1e-9)).clamp(-1, 1).cpu()
@@ -331,6 +341,17 @@ import threading  # noqa: E402
 from diffsinger_worker import warm  # noqa: E402
 
 threading.Thread(target=warm, args=(str(CACHE),), daemon=True).start()
+
+
+def _warm_ddsp() -> None:
+    """DDSP's own environment takes minutes to install; do it at start-up, not on someone's first request."""
+    try:
+        _ddsp_env()
+    except Exception as e:  # noqa: BLE001
+        print("DDSP warm-up failed:", e, flush=True)
+
+
+threading.Thread(target=_warm_ddsp, daemon=True).start()
 
 with gr.Blocks(title="frank-hands") as demo:
     gr.Markdown("**frank-hands**: the models Frank makes things with. An API for Frank's backend, "

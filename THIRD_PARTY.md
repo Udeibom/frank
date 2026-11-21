@@ -12,6 +12,7 @@ Frank's own source code is MIT (see `LICENSE`). Frank is stitched together from 
   - `arrangement_stats.json`: Lakh MIDI, CC BY 4.0.
   - `feeling_words.json`: Song Describer, CC BY-SA 4.0.
 - **No copyrighted music is stored.** A reference song chosen by the person is either a Jamendo track (Creative Commons) or an upload they confirmed they have rights to. Uploads are analysed in memory and never stored. Deezer and iTunes previews were rejected, because their terms forbid this kind of use.
+- **Music in the demo video.** The video uses only music Frank made with the founder (the founder's voice and words, Frank's engine, and the CC0 or Creative Commons parts listed here, credited on screen when the licence asks). No commercial recordings and no reference songs appear in it.
 - **Gemini region rule.** Google's Gemini API terms allow only paid services for people in the EEA, Switzerland and the UK. Frank never calls Gemini for those regions, and it treats an unknown region the same way (`backend/app/services/region.py`).
 
 ## Models

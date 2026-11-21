@@ -28,6 +28,7 @@ from app.services.team.plain import guard
 log = logging.getLogger("frank.gemini")
 
 MODEL = "gemini-flash-latest"
+BACKUP_MODEL = "gemini-flash-lite-latest"   # Google's free models are often "overloaded" (503); the lighter one answers
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 MAX_NOTES = 3
 MAX_INLINE_BYTES = 15 * 1024 * 1024
@@ -66,15 +67,28 @@ def _post(parts: list[dict]) -> Optional[dict]:
         return None
     body = {"contents": [{"role": "user", "parts": parts}],
             "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2}}
-    try:
-        r = httpx.post(URL.format(model=MODEL), params={"key": key}, json=body, timeout=120.0)
-        r.raise_for_status()
-        text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        out = json.loads(text)
-        return out if isinstance(out, dict) else None
-    except Exception:  # noqa: BLE001 - rate limit, outage, odd reply: fall back to Frank's own measurements
-        log.warning("gemini media call failed", exc_info=True)
-        return None
+    import time
+
+    # The key goes in a header, never the address: addresses end up in error messages and server logs.
+    headers = {"x-goog-api-key": key}
+    for attempt, model in enumerate((MODEL, MODEL, BACKUP_MODEL, BACKUP_MODEL)):
+        try:
+            r = httpx.post(URL.format(model=model), headers=headers, json=body, timeout=60.0)
+            if r.status_code in (429, 500, 502, 503, 504) and attempt < 3:
+                log.info("gemini %s busy (%s); trying again", model, r.status_code)
+                time.sleep(2 + 3 * attempt)
+                continue
+            r.raise_for_status()
+            text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            out = json.loads(text)
+            return out if isinstance(out, dict) else None
+        except httpx.TransportError as e:                 # timeout or dropped connection: try the next
+            log.info("gemini %s unreachable (%s)", model, type(e).__name__)
+            continue
+        except Exception as e:  # noqa: BLE001 - odd reply or refusal: fall back to Frank's own measurements
+            log.warning("gemini media call failed (%s): %s", model, type(e).__name__)
+            return None
+    return None
 
 
 def _inline(data: bytes, mime: str) -> dict:

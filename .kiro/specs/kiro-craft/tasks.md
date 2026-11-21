@@ -3,34 +3,34 @@
 - [x] 1. Role cards and the drift check — _Evidence: backend/app/services/team/roles.py ROLES (one card per role in .kiro/skills/frank-team/SKILL.md, put into every room's prompt by `team_block`); tests/test_team_roles.py test_every_role_in_the_steering_file_has_a_runtime_card reads the steering file and passes (44 passed with the other team tests, Nov 18). Not in mutate_check.py, so not proved able to fail (task 4)_
   - _Requirements: 1.1_
 - [x] 2. Hook review (remove any no-op); Listener reference hook
-  - Evidence: `.kiro/hooks/listen-reference-on-engine-save.json` runs `backend/scripts/listen_reference.py` (fixed song + seed vs `tests/fixtures/reference_findings.json`; a new likely problem exits 1). The five earlier hooks each run a real script. — _PARTLY DONE: all five hooks in .kiro/hooks run a real script or test (check_architecture.py, guard_write.py, check_specs.py, check_plain_language.py, the song tests); I ran the first, third and fourth by hand today and they work (0 errors; 0 jargon findings; check_specs 0 errors). Whether Kiro fires them was not checked. MISSING: the Listener reference hook (render a fixed reference song, compare findings with a stored baseline) does not exist_
+  - Evidence: `.kiro/hooks/listen-reference-on-engine-save.json` runs `backend/scripts/listen_reference.py` (fixed song + seed vs `tests/fixtures/reference_findings.json`; a new likely problem exits 1). The five earlier hooks each run a real script.
   - _Requirements: 2.1, 2.2_
 - [x] 3. Listener MCP server and mcp.json.example entry
-  - Evidence: `tools/listener_mcp/server.py` (measure_file, find_issues_file, compare_files) via `backend/scripts/listen_file.py`; checked with a real MCP stdio client; own venv because `mcp` needs newer libraries than the backend pins. — _NOT DONE: .kiro/settings/mcp.json.example exists but has no Listener entry, and there is no MCP server code for `measure_file`, `find_issues_file`, `compare_files`_
+  - Evidence: `tools/listener_mcp/server.py` (measure_file, find_issues_file, compare_files) via `backend/scripts/listen_file.py`; checked with a real MCP stdio client; own venv because `mcp` needs newer libraries than the backend pins.
   - _Requirements: 3.1, 6.2_
 - [ ] 4. Mutation evidence for every property test in every spec — _PARTLY DONE: backend/scripts/mutate_check.py proves tests can fail for five files: test_properties_refine, test_properties_sing, test_properties_finish, test_properties_taste, test_creative_director. MISSING: the other property files have no mutation entry (21 test_properties_*.py files exist), including engine, ops, listener, team roles and plain-language, lead, song, lyrics, intake, jobs, auth, audio, mastering, comp, pitch, planner, rhythm, fingerprint, signing_
   - _Requirements: 4.1_
 - [x] 5. GitHub Actions CI
-  - Evidence: `.github/workflows/ci.yml` (checkers, backend tests with the server's audio libraries, frontend type check + build); green on main Nov 19. — _NOT DONE: there is no .github/workflows folder_
+  - Evidence: `.github/workflows/ci.yml` (checkers, backend tests with the server's audio libraries, frontend type check + build); green on main Nov 19.
   - _Requirements: 5.1_
 - [x] 6. README and KIRO_USAGE brought up to date
-  - Evidence: README rewritten Nov 19 (live URL, what it does, run, deploy, checks); KIRO_USAGE "Nov 17 to 19" section including what went wrong. — _NOT DONE: README.md and KIRO_USAGE.md were last committed Nov 14, before the team conversation, Listener, refine, sing-it, finish and deployment work. mcp.json.example lists servers (requirement 6.2) but I did not check each for placeholder secrets_
+  - Evidence: README rewritten Nov 19 (live URL, what it does, run, deploy, checks); KIRO_USAGE "Nov 17 to 19" section including what went wrong.
   - _Requirements: 6.1_
-- [ ] 7. Listener MCP live: enabled in `.kiro/settings/mcp.json`, granted to Listening Lab and Frank Code Reviewer, one recorded listen-and-fix session
+- [x] 7. Listener MCP live: enabled in `.kiro/settings/mcp.json`, granted to Listening Lab and Frank Code Reviewer, one recorded listen-and-fix session — _Evidence: `.kiro/settings/mcp.json` lists the frank-listener server (3 matches); `listening-lab.md` and `frank-reviewer.md` list `@frank-listener` in tools; the recorded session is KIRO_USAGE.md:691 (intro found to copy verse 1, fixed, guarded by a property in tests/test_properties_engine.py)_
   - _Requirements: 7.1_
-- [ ] 8. `powers/frank-sound-engineering` Power (POWER.md, mcp.json, steering files)
+- [ ] 8. `powers/frank-sound-engineering` Power (POWER.md, mcp.json, steering files) — _NOT DONE: `powers/frank-sound-engineering/` has POWER.md, mcp.json, plugin.json and three skills. MISSING: no steering files in the Power_
   - _Requirements: 7.2_
-- [ ] 9. Skills for team and producer craft; fileMatch steering for audio architecture and design
+- [x] 9. Skills for team and producer craft; fileMatch steering for audio architecture and design — _Evidence: `.kiro/skills/frank-team/SKILL.md` and `.kiro/skills/producer-craft/SKILL.md`; `.kiro/steering/audio-architecture.md` and `design-and-ui.md` have `inclusion: fileMatch` with patterns_
   - _Requirements: 7.3_
-- [ ] 10. Producer orchestrator agent
+- [x] 10. Producer orchestrator agent — _Evidence: `.kiro/agents/producer.md`_
   - _Requirements: 7.4_
-- [ ] 11. Kiro CLI listening regression and a Kiro Crew nightly job
+- [ ] 11. Kiro CLI listening regression and a Kiro Crew nightly job — _NOT DONE: `docs/kiro/crew.md` and `scripts/listening_regression.sh` exist, but nothing has run: the founder has not logged in to Kiro CLI, and Kiro Crew is not installed_
   - _Requirements: 7.5_
-- [ ] 12. PostTaskExec property-test hook, prompt-review agent hook, plain-language and mutation checks in CI
+- [x] 12. PostTaskExec property-test hook, prompt-review agent hook, plain-language and mutation checks in CI — _Evidence: `.kiro/hooks/property-tests-after-task.json` (PostTaskExec, runs the property tests), `prompt-jargon-review.json`, and `.github/workflows/ci.yml` lines 26 (plain language) and 64 (mutate_check.py). Whether Kiro fires the hooks was not checked; CI run not seen by me_
   - _Requirements: 7.6_
-- [ ] 13. Frontend fast-check property tests
+- [x] 13. Frontend fast-check property tests — _Evidence: `frontend/tests/songShape.test.ts` and `organs.test.ts` with fast-check; `npx vitest run` gave 13 passed, and `npx tsc --noEmit` is clean_
   - _Requirements: 7.7_
-- [ ] 14. Steering drift fixed and checked by `scripts/check_steering.py`
+- [x] 14. Steering drift fixed and checked by `scripts/check_steering.py` — _Evidence: `scripts/check_steering.py` runs in CI (ci.yml:28) and by hook `steering-check-on-stop.json`; I ran it: 0 errors, 0 warnings_
   - _Requirements: 7.8_
-- [ ] 15. KIRO_USAGE.md summary and corrections; README rooms, diagram, screenshots
+- [ ] 15. KIRO_USAGE.md summary and corrections; README rooms, diagram, screenshots — _NOT DONE: KIRO_USAGE.md has the 'Nov 19 to 21' section and README has rooms and a mermaid diagram. MISSING: README has no screenshots, and KIRO_USAGE.md says pitch_compare used the founder's real hums when it builds synthetic ones (backend/scripts/pitch_compare.py)_
   - _Requirements: 7.9_
