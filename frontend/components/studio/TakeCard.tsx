@@ -9,6 +9,7 @@
 import { useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 import { PitchDisplay } from "@/components/audio/PitchDisplay"
+import { Waveform, type WaveRegion } from "@/components/audio/Waveform"
 import { PlayButton } from "@/components/audio/PlayButton"
 import { ChoiceMenu, type Choice } from "@/components/ui/choice-menu"
 import type { VocalTake } from "@/lib/api/voice"
@@ -19,16 +20,29 @@ const KIND_WORDS: Record<string, string> = {
   tuned: "Tuned",
   lined_up: "Lined up with the music",
   cleaned: "Music taken out",
+  quiet: "Background noise taken out",
+  instrument: "Played as an instrument",
 }
+
+export const INSTRUMENTS: { id: string; label: string }[] = [
+  { id: "violin", label: "a violin" },
+  { id: "flute", label: "a flute" },
+  { id: "flute2", label: "a soft flute" },
+  { id: "trumpet", label: "a trumpet" },
+  { id: "tenor_saxophone", label: "a saxophone" },
+]
 
 export type TakeAction =
   | { kind: "tune"; mode: "light" | "moderate" | "full" }
   | { kind: "line_up" }
   | { kind: "remove_bleed" }
   | { kind: "use_as_melody" }
+  | { kind: "quiet" }
+  | { kind: "instrument"; instrument: string }
   | { kind: "harmony"; type: "above" | "below" | "both"; sections: string[] | null }
 
 interface TakeCardProps {
+  projectId: string
   take: VocalTake
   versions: VocalTake[]
   activeId: string | null
@@ -46,11 +60,18 @@ const HARMONY_PLACES: { label: string; sections: string[] | null }[] = [
   { label: "only the verses", sections: ["verse"] },
 ]
 
+/** The lines of the person's words, where Frank heard them in this take (frankenstein spec 14, 4.4). */
+export function lineRegions(v: VocalTake): WaveRegion[] {
+  return (v.words?.lines ?? [])
+    .filter((l): l is typeof l & { start: number; end: number } => l.start !== null && l.end !== null)
+    .map((l) => ({ start: l.start, end: l.end, label: l.text }))
+}
+
 export function takeTrack(v: VocalTake, name: string): Track {
   return { id: `take:${v.id}`, url: v.audio_url, label: name, material: "voice" }
 }
 
-export function TakeCard({ take, versions, activeId, busy, picked, canUseAsMelody, onUse, onPick, onAction }: TakeCardProps) {
+export function TakeCard({ projectId, take, versions, activeId, busy, picked, canUseAsMelody, onUse, onPick, onAction }: TakeCardProps) {
   const [harmonyType, setHarmonyType] = useState<"above" | "below" | "both">("above")
   const [harmonyPlace, setHarmonyPlace] = useState(0)
   const [showHarmony, setShowHarmony] = useState(false)
@@ -71,6 +92,14 @@ export function TakeCard({ take, versions, activeId, busy, picked, canUseAsMelod
     ...(beatInMic && take.kind !== "cleaned"
       ? [{ label: "Take the music out of my voice", hint: "The music got into the mic", onSelect: () => onAction(target, { kind: "remove_bleed" }) }]
       : []),
+    ...(take.kind !== "quiet"
+      ? [{ label: "Take the background noise out", hint: "Fans, hiss, the room", onSelect: () => onAction(target, { kind: "quiet" }) }]
+      : []),
+    ...INSTRUMENTS.map((ins) => ({
+      label: `Play it as ${ins.label}`,
+      hint: "Keeps the way you sang it",
+      onSelect: () => onAction(target, { kind: "instrument", instrument: ins.id }),
+    })),
     { label: "Add a second voice…", hint: "A harmony made from this take", onSelect: () => setShowHarmony(true) },
     ...(canUseAsMelody ? [{ label: "Make this the song's tune", onSelect: () => onAction(target, { kind: "use_as_melody" }) }] : []),
   ]
@@ -108,6 +137,13 @@ export function TakeCard({ take, versions, activeId, busy, picked, canUseAsMelod
           )
         })}
       </ul>
+
+      <div className="mt-3">
+        <Waveform projectId={projectId} track={takeTrack(target, takeName)} regions={lineRegions(target === take ? take : target)} />
+      </div>
+      {lineRegions(take).length > 0 && (
+        <p className="mt-1 text-xs text-ink-3">Each line you sang is marked. Click one to hear just that line.</p>
+      )}
 
       <div className="mt-3">
         <PitchDisplay pitchData={take.pitch_data} />

@@ -60,6 +60,29 @@ export class SessionPlayer {
     this.sources.push(osc)
   }
 
+  /** The headphone check (frankenstein spec 14, 8.4): a short chime in one ear only (-1 left, 1 right). */
+  async sideChime(side: -1 | 1): Promise<void> {
+    const ctx = this.context()
+    await ctx.resume()
+    const at = ctx.currentTime + 0.1
+    const pan = ctx.createStereoPanner()
+    pan.pan.value = side
+    pan.connect(ctx.destination)
+    ;[660, 880, 990].forEach((f, k) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.frequency.value = f
+      const t = at + k * 0.18
+      gain.gain.setValueAtTime(0.0001, t)
+      gain.gain.exponentialRampToValueAtTime(0.3, t + 0.01)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35)
+      osc.connect(gain).connect(pan)
+      osc.start(t)
+      osc.stop(t + 0.4)
+      this.sources.push(osc)
+    })
+  }
+
   /** Clicks only (the timing check). Returns the performance.now() time of each click. */
   async clicks(count: number, every: number, startIn = 0.5): Promise<number[]> {
     const ctx = this.context()

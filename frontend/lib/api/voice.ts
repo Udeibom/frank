@@ -1,8 +1,9 @@
+import type { TakeWords } from "@/types/api"
 import { api, uploadFile } from "./client"
 import type { ConversationMessage, ConversationAction } from "@/types/api"
 import type { PitchPoint } from "@/types/audio"
 
-export type TakeKind = "take" | "tuned" | "lined_up" | "cleaned" | "harmony"
+export type TakeKind = "take" | "tuned" | "lined_up" | "cleaned" | "harmony" | "quiet" | "instrument"
 
 /** Plain facts the backend measured about a take (sing-it spec 06). */
 export interface TakeFacts {
@@ -28,6 +29,8 @@ export interface VocalTake {
   is_harmony: boolean
   params: Record<string, unknown>
   facts: TakeFacts
+  /** Word timings and where each lyric line falls (frankenstein spec 14, 4.4). */
+  words?: TakeWords | null
 }
 
 export interface UploadTakeResult {

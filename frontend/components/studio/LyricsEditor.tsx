@@ -5,13 +5,27 @@
  * reading width, with nothing in the way. Saves itself after 2 seconds of stillness; every save that changes the
  * words becomes a new draft (server-side). Sections can be marked plainly ("Chorus" on its own line) or in
  * brackets; the margin outline shows the ones found.
+ *
+ * Tiptap (frankenstein spec 14, requirement 5.1): one paragraph per line, so the words stay plain text. With
+ * "Show the rhythm" on, each line shows how many beats it has, its words show their strong and soft syllables,
+ * and lines that rhyme share a colour. The analysis comes from Frank's pronouncing dictionary on the server.
  */
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { EditorContent, useEditor, type Editor } from "@tiptap/react"
+import StarterKit from "@tiptap/starter-kit"
+import { Extension } from "@tiptap/core"
+import { Plugin, PluginKey } from "@tiptap/pm/state"
+import { Decoration, DecorationSet } from "@tiptap/pm/view"
+import type { Node as PMNode } from "@tiptap/pm/model"
 import { saveLyrics } from "@/lib/api/lyrics"
+import { analyseLyrics, findRhymes } from "@/lib/api/organs"
 import { useProjectStore } from "@/store/project"
+import type { LyricLineSound, RhymeSuggestions } from "@/types/api"
 
 const AUTOSAVE_DELAY_MS = 2000
+const ANALYSE_DELAY_MS = 1200
+const HEADING = /^\s*[[(]?\s*(intro|verse|pre-?chorus|chorus|hook|refrain|bridge|outro)\b[^\])]*[\])]?\s*:?\s*$/i
 
 type SaveState = "idle" | "saving" | "saved" | "failed"
 
@@ -23,27 +37,108 @@ interface LyricsEditorProps {
   onVersionSaved?: (versionId: string, content: string) => void
 }
 
+/** Plain text <-> one paragraph per line. */
+export function textToDoc(text: string) {
+  return {
+    type: "doc",
+    content: text.split("\n").map((line) => (line ? { type: "paragraph", content: [{ type: "text", text: line }] } : { type: "paragraph" })),
+  }
+}
+
+export function docToText(doc: PMNode): string {
+  const lines: string[] = []
+  doc.forEach((node) => lines.push(node.textContent))
+  return lines.join("\n")
+}
+
+/** The analysed lines matched to the document's paragraphs (blank lines and headings are not analysed). */
+export function matchLines(paragraphs: string[], analysed: LyricLineSound[]): (LyricLineSound | null)[] {
+  let k = 0
+  return paragraphs.map((text) => {
+    if (!text.trim() || HEADING.test(text)) return null
+    const a = analysed[k]
+    if (a && a.text.trim() === text.trim()) {
+      k++
+      return a
+    }
+    return null
+  })
+}
+
+const rhythmKey = new PluginKey<DecorationSet>("frank-rhythm")
+
+function stressMarks(stresses: string): string {
+  return stresses.replace(/1/g, "●").replace(/2/g, "•").replace(/0/g, "·")
+}
+
+function buildDecorations(doc: PMNode, analysed: LyricLineSound[] | null): DecorationSet {
+  if (!analysed) return DecorationSet.empty
+  const paragraphs: { node: PMNode; pos: number }[] = []
+  doc.forEach((node, pos) => paragraphs.push({ node, pos }))
+  const matched = matchLines(paragraphs.map((p) => p.node.textContent), analysed)
+  const decos: Decoration[] = []
+  paragraphs.forEach(({ node, pos }, i) => {
+    const line = matched[i]
+    if (!line) return
+    const text = node.textContent
+    if (line.rhyme_group !== null) {
+      decos.push(Decoration.node(pos, pos + node.nodeSize, { "data-rhyme": String(line.rhyme_group % 6) }))
+    }
+    // strong and soft syllables, word by word
+    let from = 0
+    for (const w of line.words) {
+      const at = text.indexOf(w.text, from)
+      if (at < 0) continue
+      from = at + w.text.length
+      const end = pos + 1 + from
+      decos.push(Decoration.widget(end, () => {
+        const span = document.createElement("span")
+        span.className = "frank-stress"
+        span.setAttribute("aria-hidden", "true")
+        span.textContent = stressMarks(w.stresses)
+        return span
+      }, { side: 1, key: `s${i}-${at}-${w.stresses}` }))
+    }
+    decos.push(Decoration.widget(pos + node.nodeSize - 1, () => {
+      const span = document.createElement("span")
+      span.className = "frank-beats"
+      span.textContent = `${line.syllables} beat${line.syllables === 1 ? "" : "s"}${line.guessed ? " (about)" : ""}`
+      return span
+    }, { side: 1, key: `b${i}-${line.syllables}` }))
+  })
+  return DecorationSet.create(doc, decos)
+}
+
+function rhythmExtension(get: () => LyricLineSound[] | null) {
+  return Extension.create({
+    name: "frankRhythm",
+    addProseMirrorPlugins() {
+      return [
+        new Plugin<DecorationSet>({
+          key: rhythmKey,
+          state: {
+            init: (_, state) => buildDecorations(state.doc, get()),
+            apply: (tr, old, _o, state) => (tr.docChanged || tr.getMeta(rhythmKey) ? buildDecorations(state.doc, get()) : old),
+          },
+          props: { decorations: (state) => rhythmKey.getState(state) },
+        }),
+      ]
+    },
+  })
+}
+
 export function LyricsEditor({ projectId, initialContent, onSelectionChange, onContentChange, onVersionSaved }: LyricsEditorProps) {
   const [content, setContent] = useState(initialContent)
   const [saveState, setSaveState] = useState<SaveState>("idle")
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [showRhythm, setShowRhythm] = useState(false)
+  const [notes, setNotes] = useState<string[]>([])
+  const [rhymes, setRhymes] = useState<RhymeSuggestions | null>(null)
+  const analysedRef = useRef<LyricLineSound[] | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const analyseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedRef = useRef(initialContent)
+  const showRef = useRef(false)
   const { updateActiveState } = useProjectStore()
-
-  // Keep content in sync if the active version changes externally (e.g. restore)
-  useEffect(() => {
-    setContent(initialContent)
-    lastSavedRef.current = initialContent
-  }, [initialContent])
-
-  // The page grows with the words, so the stage scrolls as one piece (no box inside a box).
-  useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = "auto"
-    el.style.height = `${Math.max(el.scrollHeight, 420)}px`
-  }, [content])
 
   const doSave = useCallback(
     async (text: string) => {
@@ -66,24 +161,79 @@ export function LyricsEditor({ projectId, initialContent, onSelectionChange, onC
     [projectId, updateActiveState, onVersionSaved],
   )
 
-  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const text = e.target.value
-    setContent(text)
-    onContentChange?.(text)
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => void doSave(text), AUTOSAVE_DELAY_MS)
-  }
+  const refreshRhythm = useCallback(
+    (editor: Editor, text: string) => {
+      if (!showRef.current || !text.trim()) {
+        analysedRef.current = null
+        editor.view.dispatch(editor.state.tr.setMeta(rhythmKey, true))
+        return
+      }
+      analyseLyrics(projectId, text)
+        .then((res) => {
+          analysedRef.current = res.lines
+          setNotes(res.notes)
+          if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(rhythmKey, true))
+        })
+        .catch(() => setNotes([]))
+    },
+    [projectId],
+  )
 
-  function handleSelect() {
-    const el = textareaRef.current
-    if (!el) return
-    const selected = el.value.substring(el.selectionStart, el.selectionEnd)
-    if (selected.trim()) onSelectionChange?.(selected)
-  }
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({ heading: false, bulletList: false, orderedList: false, blockquote: false, codeBlock: false, horizontalRule: false }),
+      rhythmExtension(() => analysedRef.current),
+    ],
+    content: textToDoc(initialContent),
+    editorProps: {
+      attributes: {
+        class: "frank-lyrics min-h-[420px] w-full font-written text-xl leading-[1.6] text-ink focus-visible:outline-none",
+        "aria-label": "Your words",
+        spellcheck: "true",
+        role: "textbox",
+        "aria-multiline": "true",
+      },
+    },
+    onUpdate: ({ editor: ed }) => {
+      const text = docToText(ed.state.doc)
+      setContent(text)
+      onContentChange?.(text)
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(() => void doSave(text), AUTOSAVE_DELAY_MS)
+      if (analyseTimerRef.current) clearTimeout(analyseTimerRef.current)
+      analyseTimerRef.current = setTimeout(() => refreshRhythm(ed, text), ANALYSE_DELAY_MS)
+    },
+    onSelectionUpdate: ({ editor: ed }) => {
+      const { from, to } = ed.state.selection
+      const selected = ed.state.doc.textBetween(from, to, "\n")
+      if (selected.trim()) onSelectionChange?.(selected)
+      const word = selected.trim()
+      if (/^[A-Za-z']{2,30}$/.test(word)) {
+        findRhymes(projectId, word).then(setRhymes).catch(() => setRhymes(null))
+      } else {
+        setRhymes(null)
+      }
+    },
+  })
+
+  // Keep content in sync if the active version changes externally (e.g. restore)
+  useEffect(() => {
+    if (!editor || initialContent === docToText(editor.state.doc)) return
+    editor.commands.setContent(textToDoc(initialContent), false)
+    setContent(initialContent)
+    lastSavedRef.current = initialContent
+  }, [initialContent, editor])
+
+  useEffect(() => {
+    showRef.current = showRhythm
+    if (editor) refreshRhythm(editor, docToText(editor.state.doc))
+  }, [showRhythm, editor, refreshRhythm])
 
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      if (analyseTimerRef.current) clearTimeout(analyseTimerRef.current)
     }
   }, [])
 
@@ -100,21 +250,47 @@ export function LyricsEditor({ projectId, initialContent, onSelectionChange, onC
 
   return (
     <div className="flex flex-col">
-      <p role="status" aria-live="polite" className={saveState === "failed" ? "mb-2 h-5 text-sm text-problem" : "mb-2 h-5 text-sm text-ink-3"}>
-        {status}
-      </p>
-      <textarea
-        ref={textareaRef}
-        value={content}
-        onChange={handleChange}
-        onSelect={handleSelect}
-        placeholder={
-          "Start writing.\n\nA line, a feeling, a whole chorus. Mark a section by giving it its own line: Verse, Chorus, Bridge."
-        }
-        className="w-full resize-none overflow-hidden bg-transparent font-written text-xl leading-[1.6] text-ink placeholder:font-sans placeholder:text-base placeholder:leading-relaxed placeholder:text-ink-3 focus-visible:outline-none"
-        aria-label="Your words"
-        spellCheck
-      />
+      <div className="mb-2 flex h-6 items-center justify-between gap-3">
+        <p role="status" aria-live="polite" className={saveState === "failed" ? "text-sm text-problem" : "text-sm text-ink-3"}>
+          {status}
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowRhythm((v) => !v)}
+          aria-pressed={showRhythm}
+          className="rounded-full border border-line px-3 py-0.5 text-xs text-ink-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-words"
+        >
+          {showRhythm ? "Hide the rhythm" : "Show the rhythm"}
+        </button>
+      </div>
+      <div className="relative" data-rhythm={showRhythm ? "on" : "off"}>
+        {editor && !content && (
+          <p aria-hidden className="pointer-events-none absolute left-0 top-0 whitespace-pre-line text-base leading-relaxed text-ink-3">
+            {"Start writing.\n\nA line, a feeling, a whole chorus. Mark a section by giving it its own line: Verse, Chorus, Bridge."}
+          </p>
+        )}
+        <EditorContent editor={editor} />
+      </div>
+      {showRhythm && notes.length > 0 && (
+        <ul className="mt-4 space-y-1 text-sm text-ink-2" aria-label="What Frank noticed about the rhythm">
+          {notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
+      {rhymes && (rhymes.rhymes.length > 0 || rhymes.near.length > 0) && (
+        <div className="mt-4 rounded-lg border border-line bg-surface p-3 text-sm" aria-live="polite">
+          <p className="text-ink-2">
+            Words that rhyme with <span className="font-written text-ink">{rhymes.word}</span>
+          </p>
+          <p className="mt-1 text-ink">{rhymes.rhymes.slice(0, 10).join(", ")}</p>
+          {rhymes.near.length > 0 && (
+            <p className="mt-2 text-ink-3">
+              Nearly rhyme: <span className="text-ink-2">{rhymes.near.slice(0, 8).join(", ")}</span>
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

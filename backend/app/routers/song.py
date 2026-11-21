@@ -120,7 +120,7 @@ PEAK_BUCKETS = {"vocals", "mixes", "beats", "textures", "hums", "exports", "voic
 
 
 @_lru(maxsize=256)
-def _peaks(bucket: str, path: str, points: int) -> tuple[float, ...]:
+def _peaks(bucket: str, path: str, points: int) -> tuple[float, tuple[float, ...]]:
     import subprocess
 
     import numpy as np
@@ -133,11 +133,11 @@ def _peaks(bucket: str, path: str, points: int) -> tuple[float, ...]:
     del data
     a = np.abs(np.frombuffer(pcm, dtype=np.int16).astype(np.float32)) / 32768.0
     if a.size == 0:
-        return ()
+        return 0.0, ()
     step = max(1, a.size // points)
     p = a[: step * (a.size // step)].reshape(-1, step).max(axis=1)
     top = float(p.max()) or 1.0
-    return tuple(round(float(x) / top, 3) for x in p)
+    return round(a.size / 8000.0, 2), tuple(round(float(x) / top, 3) for x in p)
 
 
 @router.get("/peaks")
@@ -152,7 +152,7 @@ async def sound_peaks(project_id: str, url: str, points: int = 600) -> dict:
     if not ref or ref[0] not in PEAK_BUCKETS:
         raise HTTPException(status_code=400, detail="That isn't one of your song's sounds.")
     try:
-        peaks = await asyncio.to_thread(_peaks, ref[0], ref[1], max(50, min(2000, points)))
+        seconds, peaks = await asyncio.to_thread(_peaks, ref[0], ref[1], max(50, min(2000, points)))
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail="I couldn't draw that sound just now.") from exc
-    return {"peaks": list(peaks)}
+    return {"peaks": list(peaks), "seconds": seconds}

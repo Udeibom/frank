@@ -12,6 +12,8 @@ import { useParams, useRouter } from "next/navigation"
 import { ConversationPanel, type ChatTurn } from "@/components/conversation/ConversationPanel"
 import { VocalRecorder, type SongSection } from "@/components/audio/VocalRecorder"
 import { DelayCheck } from "@/components/audio/DelayCheck"
+import { HeadphoneCheck, headphonesChecked } from "@/components/audio/HeadphoneCheck"
+import { quietTake, sungGuide, takeAsInstrument } from "@/lib/api/organs"
 import { TakeCard, type TakeAction } from "@/components/studio/TakeCard"
 import { CompView } from "@/components/studio/CompView"
 import { FrankNote } from "@/components/conversation/FrankNote"
@@ -88,6 +90,10 @@ export default function VoiceRoomPage() {
   const [guide, setGuide] = useState<{ url: string | null; note: string | null; beatId: string | null }>({ url: null, note: null, beatId: null })
   const [delayKnown, setDelayKnown] = useState<boolean | null>(null)
   const [showDelayCheck, setShowDelayCheck] = useState(false)
+  const [showHeadphoneCheck, setShowHeadphoneCheck] = useState(false)
+  const [wearingHeadphones, setWearingHeadphones] = useState<boolean | null>(null)
+  const [sungGuideUrl, setSungGuideUrl] = useState<string | null>(null)
+  const play = useAudio((st) => st.play)
   const [comp, setComp] = useState<ActiveComp | null>(null)
   const [heard, setHeard] = useState<HeardTune | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -175,6 +181,16 @@ export default function VoiceRoomPage() {
     }
   }
 
+  async function wantSungGuide() {
+    if (!beat) return
+    await runJob(() => sungGuide(projectId), "A guide voice is learning your words. This takes a minute or two…", "Here's how the line could go.", (r) => {
+      if (typeof r.guide_url === "string") {
+        setSungGuideUrl(r.guide_url)
+        void play({ id: `sung-guide:${beat.id}`, url: r.guide_url, label: "The guide singing your words", material: "voice" })
+      }
+    })
+  }
+
   async function handleRecorded(blob: Blob, ext: string, placement: TakePlacement | null, headphones: boolean | null) {
     setUploading(true)
     try {
@@ -225,6 +241,14 @@ export default function VoiceRoomPage() {
         return runJob(() => removeBleed(projectId, take.id), "Taking the music out of your vocal…", "Done. Have a listen with and without.")
       case "harmony":
         return runJob(() => generateHarmony(projectId, take.id, action.type, action.sections), "Building a harmony from your voice…", "Your harmony is ready.")
+      case "quiet":
+        return runJob(() => quietTake(projectId, take.id), "Taking the room noise out of your take…", "Done. Your original is kept, so you can compare.")
+      case "instrument":
+        return runJob(
+          () => takeAsInstrument(projectId, take.id, action.instrument),
+          "Playing what you sang on an instrument. This one takes a minute or two…",
+          "Here it is, played the way you sang it. Your original is kept.",
+        )
       case "use_as_melody":
         return runJob(() => takeAsMelody(projectId, take.id), "Listening for the tune in what you sang…", "Here's what I heard.", (r) => {
           if (r.ok && typeof r.version_id === "string") {
@@ -367,12 +391,31 @@ export default function VoiceRoomPage() {
             <h1 className="text-base font-medium text-ink">Voice</h1>
             <span className="text-sm text-ink-2">Record your voice</span>
           </div>
+          <div className="flex items-center gap-4">
+          {!showHeadphoneCheck && (
+            <button onClick={() => setShowHeadphoneCheck(true)} className="text-sm text-ink-2 hover:text-ink">
+              Check my headphones
+            </button>
+          )}
+          {beat && words && (
+            <button onClick={() => void wantSungGuide()} disabled={busy} className="text-sm text-ink-2 hover:text-ink disabled:text-ink-3">
+              {sungGuideUrl ? "Hear the guide sing it again" : "Hear it sung with my words"}
+            </button>
+          )}
           {delayKnown && !showDelayCheck && (
             <button onClick={() => setShowDelayCheck(true)} className="flex items-center gap-1.5 text-sm text-ink-2 hover:text-ink">
               <Timer className="h-4 w-4" aria-hidden="true" /> Check the timing again
             </button>
           )}
+          </div>
         </div>
+
+        {showHeadphoneCheck && (
+          <HeadphoneCheck
+            onResult={(wearing) => setWearingHeadphones(wearing)}
+            onClose={() => setShowHeadphoneCheck(false)}
+          />
+        )}
 
         <FrankNote answers={answers} material="voice" busy={busy}>
           {note}
@@ -423,6 +466,7 @@ export default function VoiceRoomPage() {
               onWantGuide={wantGuide}
               uploading={uploading}
               onRecorded={handleRecorded}
+              initialHeadphones={wearingHeadphones ?? headphonesChecked()}
             />
           </section>
         </div>
@@ -450,6 +494,7 @@ export default function VoiceRoomPage() {
             roots.map((take) => (
               <TakeCard
                 key={take.id}
+                projectId={projectId}
                 take={take}
                 versions={children[take.id] ?? []}
                 activeId={activeTakeId}

@@ -122,3 +122,18 @@
     background-position: -200% 0;
   }
 }
+
+/* Words room editor (frankenstein spec 14, 5.1): one paragraph per line, rhythm marks only when asked for. */
+.frank-lyrics p { margin: 0; min-height: 1.6em; position: relative; }
+[data-rhythm="off"] .frank-stress, [data-rhythm="off"] .frank-beats { display: none; }
+.frank-stress { font-family: var(--font-sans); font-size: 9px; letter-spacing: 1px; vertical-align: super; margin-left: 2px; color: rgb(var(--ink-3)); }
+.frank-beats { font-family: var(--font-sans); font-size: 12px; margin-left: 12px; color: rgb(var(--ink-3)); white-space: nowrap; }
+[data-rhythm="on"] .frank-lyrics p[data-rhyme]::before {
+  content: ""; position: absolute; left: -18px; top: 0.6em; width: 7px; height: 7px; border-radius: 9999px;
+}
+.frank-lyrics p[data-rhyme="0"]::before { background: rgb(var(--words)); }
+.frank-lyrics p[data-rhyme="1"]::before { background: rgb(var(--feel)); }
+.frank-lyrics p[data-rhyme="2"]::before { background: rgb(var(--music)); }
+.frank-lyrics p[data-rhyme="3"]::before { background: rgb(var(--voice)); }
+.frank-lyrics p[data-rhyme="4"]::before { background: rgb(var(--ok)); }
+.frank-lyrics p[data-rhyme="5"]::before { background: rgb(var(--caution)); }

@@ -14,11 +14,34 @@ export class ApiError extends Error {
   }
 }
 
-/** The signed-in user's access token, or null when signed out. */
+let regionPromise: Promise<string | null> | null = null
+
+/** The visitor's country (once per tab), so the backend can follow Google's regional terms. */
+export function region(): Promise<string | null> {
+  if (typeof window === "undefined") return Promise.resolve(null)
+  if (!regionPromise) {
+    const cached = window.sessionStorage.getItem("frank.region")
+    regionPromise = cached !== null
+      ? Promise.resolve(cached || null)
+      : fetch("/api/region")
+          .then((r) => r.json() as Promise<{ country: string | null }>)
+          .then((d) => {
+            window.sessionStorage.setItem("frank.region", d.country ?? "")
+            return d.country
+          })
+          .catch(() => null)
+  }
+  return regionPromise
+}
+
+/** The signed-in user's access token, or null when signed out, plus the visitor's country. */
 async function authHeader(): Promise<Record<string, string>> {
-  const { data } = await createClient().auth.getSession()
+  const [{ data }, country] = await Promise.all([createClient().auth.getSession(), region()])
   const token = data.session?.access_token
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(country ? { "X-Frank-Region": country } : {}),
+  }
 }
 
 /**

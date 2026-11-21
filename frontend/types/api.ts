@@ -239,3 +239,126 @@ export interface VersionCandidate {
   render_url: string | null
   created_at: string
 }
+
+// ── Frankenstein (spec 14): Frank's new organs ────────────────────────────────────────────────────────
+
+export interface LyricWordSound {
+  text: string
+  syllables: number
+  /** One digit per syllable: 1 strong, 2 medium, 0 weak. */
+  stresses: string
+}
+
+export interface LyricLineSound {
+  text: string
+  syllables: number
+  /** Lines with the same number rhyme with each other; null when the line rhymes with none. */
+  rhyme_group: number | null
+  guessed: boolean
+  words: LyricWordSound[]
+}
+
+export interface LyricsAnalysis {
+  lines: LyricLineSound[]
+  notes: string[]
+}
+
+export interface RhymeSuggestions {
+  word: string
+  rhymes: string[]
+  near: string[]
+  sounds_like: string[]
+}
+
+export interface LyricEmotionSection {
+  section: string
+  feels: string[]
+  energy: number
+}
+
+export interface LyricEmotions {
+  sections: LyricEmotionSection[]
+  message: string
+}
+
+export interface StartReply {
+  ok: boolean
+  message: string
+  heard?: string | null
+  asked?: string | null
+  filled: string[]
+}
+
+export interface JamendoTrack {
+  id: string
+  title: string
+  artist: string
+  seconds: number
+  license: string
+  attribution: string
+  image?: string | null
+  moods: string[]
+  genres: string[]
+}
+
+export interface SongReference {
+  id: string
+  source: "upload" | "jamendo" | "named"
+  title: string | null
+  artist: string | null
+  license: string | null
+  attribution: string | null
+  analysis: { feeling_words?: string[]; differences?: string[] }
+  active: boolean
+  created_at: string
+}
+
+export interface CreditLine {
+  organ: string
+  plain: string
+  attribution: string | null
+  layer: string
+}
+
+export interface RankedDirection {
+  texture_id: string
+  score: number
+}
+
+export interface HeardNote {
+  tag: string
+  plain: string
+  confidence: number
+  confirmed: boolean
+}
+
+export interface HeardByFrank {
+  heard: string
+  notes: HeardNote[]
+  from_seconds: number
+  seconds: number
+}
+
+export interface WordTiming {
+  word: string
+  start: number
+  end: number
+}
+
+export interface LineSpan {
+  line: number
+  text: string
+  start: number | null
+  end: number | null
+}
+
+export interface TakeWords {
+  words: WordTiming[]
+  lines: LineSpan[]
+}
+
+export interface MadeWell {
+  before: number
+  after: number
+  plain: string
+}

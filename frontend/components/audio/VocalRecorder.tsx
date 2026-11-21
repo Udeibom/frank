@@ -34,6 +34,8 @@ interface VocalRecorderProps {
   onWantGuide: () => Promise<void>
   uploading: boolean
   onRecorded: (blob: Blob, fileExtension: string, placement: TakePlacement | null, headphones: boolean | null) => void
+  /** From the headphone check, when it was done. */
+  initialHeadphones?: boolean
 }
 
 function formatTime(seconds: number): string {
@@ -52,10 +54,14 @@ export function VocalRecorder({
   onWantGuide,
   uploading,
   onRecorded,
+  initialHeadphones,
 }: VocalRecorderProps) {
   const recorder = useRecorder()
   const [withBeat, setWithBeat] = useState(true)
-  const [headphones, setHeadphones] = useState(false)
+  const [headphones, setHeadphones] = useState(Boolean(initialHeadphones))
+  useEffect(() => {
+    if (initialHeadphones) setHeadphones(true)
+  }, [initialHeadphones])
   const [startAt, setStartAt] = useState(-1)           // index into `sections`, or -1 for the top of the song
   const [guideOn, setGuideOn] = useState(false)
   const [guideLevel, setGuideLevel] = useState(0.5)
