@@ -3,27 +3,61 @@
 import { useRouter } from "next/navigation"
 import { createProject } from "@/lib/api/projects"
 import { createClient } from "@/lib/supabase/client"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 
 export default function LandingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [slowStart, setSlowStart] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Clear the slow-start timer if the component unmounts mid-request
+  useEffect(() => {
+    return () => {
+      if (slowTimer.current) clearTimeout(slowTimer.current)
+    }
+  }, [])
 
   async function handleStart() {
     setLoading(true)
+    setError(null)
+    setSlowStart(false)
+
+    // If the backend takes more than 8 seconds (Render free-tier cold start),
+    // show an honest message so the user knows something is happening.
+    slowTimer.current = setTimeout(() => setSlowStart(true), 8000)
+
     try {
       // Signed-out visitors make an account first; signed-in users go straight in.
       const { data } = await createClient().auth.getUser()
       if (!data.user) {
+        setLoading(false)
         router.push("/signup")
         return
       }
       const project = await createProject({ title: "Untitled Song" })
+      // Navigation is happening — leave the loading state so there's no flash.
       router.push(`/${project.id}/idea`)
-    } catch {
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong — want to try again?"
+      setError(message)
       setLoading(false)
+      setSlowStart(false)
+    } finally {
+      if (slowTimer.current) {
+        clearTimeout(slowTimer.current)
+        slowTimer.current = null
+      }
     }
   }
+
+  const buttonLabel = slowStart
+    ? "Frank is waking up\u2026"
+    : loading
+      ? "Opening the studio\u2026"
+      : "Start a Song"
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-4">
@@ -48,13 +82,28 @@ export default function LandingPage() {
         </div>
 
         {/* CTA */}
-        <button
-          onClick={handleStart}
-          disabled={loading}
-          className="group relative mt-4 rounded-full bg-primary px-10 py-4 text-base font-semibold text-primary-foreground transition-all hover:bg-primary/90 hover:glow-amber disabled:opacity-60"
-        >
-          {loading ? "Opening the studio\u2026" : "Start a Song"}
-        </button>
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={handleStart}
+            disabled={loading}
+            className="group relative mt-4 rounded-full bg-primary px-10 py-4 text-base font-semibold text-primary-foreground transition-all hover:bg-primary/90 hover:glow-amber disabled:opacity-60"
+          >
+            {buttonLabel}
+          </button>
+
+          {/* Error message — shown in place, beneath the button */}
+          {error && (
+            <p className="text-sm text-[#E26A5F] max-w-xs">
+              {error}{" "}
+              <button
+                onClick={handleStart}
+                className="underline underline-offset-2 hover:no-underline"
+              >
+                Try again
+              </button>
+            </p>
+          )}
+        </div>
 
         {/* Subtle tagline */}
         <p className="text-xs text-muted-foreground/50 tracking-widest uppercase">
