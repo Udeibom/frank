@@ -267,3 +267,13 @@ async def update_section(
         "id", version_id
     ).execute()
     return {"status": "ok"}
+
+
+@router.post("/accompany", response_model=JobResponse)
+async def accompany(project_id: str, background: BackgroundTasks) -> JobResponse:
+    """A new part written around the person's own tune (frankenstein spec 14, requirement 3.4)."""
+    from app.services.jobs.beat_runner import run_accompany_job
+
+    job = await jobs_db.create_job(project_id, job_type="beat_accompany")
+    background.add_task(run_accompany_job, job["id"], project_id)
+    return JobResponse(job_id=job["id"])

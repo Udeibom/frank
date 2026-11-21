@@ -141,3 +141,53 @@ async def find_rhymes(project_id: str, body: RhymesRequest) -> dict:
 
     word = body.word.strip().split()[-1]
     return await asyncio.to_thread(sound.rhymes, word)
+
+
+class EmotionsRequest(BaseModel):
+    text: str = Field(max_length=20_000)
+
+
+EMOTION_WORDS = {"admiration": "admiring", "amusement": "playful", "anger": "angry", "annoyance": "irritated",
+                 "approval": "warm", "caring": "tender", "confusion": "unsure", "curiosity": "curious", "desire": "longing",
+                 "disappointment": "let down", "disapproval": "bitter", "disgust": "disgusted", "embarrassment": "exposed",
+                 "excitement": "excited", "fear": "afraid", "gratitude": "grateful", "grief": "grieving", "joy": "joyful",
+                 "love": "in love", "nervousness": "nervous", "optimism": "hopeful", "pride": "proud", "realization": "awake",
+                 "relief": "relieved", "remorse": "sorry", "sadness": "sad", "surprise": "surprised", "neutral": "calm"}
+ENERGY = {"anger": 0.85, "excitement": 0.85, "joy": 0.75, "amusement": 0.7, "pride": 0.7, "optimism": 0.6, "desire": 0.55,
+          "love": 0.5, "admiration": 0.5, "fear": 0.6, "nervousness": 0.55, "surprise": 0.65, "sadness": 0.3, "grief": 0.25,
+          "remorse": 0.3, "disappointment": 0.35, "caring": 0.4, "relief": 0.4, "neutral": 0.45}
+
+
+@router.post("/emotions")
+async def lyric_emotions(project_id: str, body: EmotionsRequest) -> dict:
+    """The feelings in each section of the words, as the song's shape (frankenstein spec 14, requirement 5.3)."""
+    import re as _re
+
+    from app.services import provenance
+    from app.services.remote import organs
+
+    sections: list[tuple[str, list[str]]] = []
+    for line in body.text.splitlines():
+        s = line.strip()
+        m = _re.match(r"^[\[(]?\s*(intro|verse|pre-?chorus|chorus|hook|refrain|bridge|outro)\b[^\])]*[\])]?\s*:?\s*$", s, _re.I)
+        if m:
+            sections.append((m.group(1).capitalize(), []))
+        elif s:
+            if not sections:
+                sections.append(("Start", []))
+            sections[-1][1].append(s)
+    sections = [x for x in sections if x[1]]
+    if not sections:
+        return {"sections": [], "message": "Write a few lines and I'll tell you how they feel."}
+    got = await asyncio.to_thread(organs.try_, organs.emotions, [" ".join(lines)[:400] for _, lines in sections])
+    if not got:
+        return {"sections": [], "message": "I can't read the feelings right now. Try again in a minute."}
+    out = []
+    for (name, _), top in zip(sections, got):
+        feel = [EMOTION_WORDS.get(t["name"], t["name"]) for t in top if t["score"] >= 0.15][:2] or ["calm"]
+        energy = sum(ENERGY.get(t["name"], 0.45) * t["score"] for t in top) / max(1e-6, sum(t["score"] for t in top))
+        out.append({"section": name, "feels": feel, "energy": round(energy, 2)})
+    await asyncio.to_thread(provenance.note, project_id, "words", None, "emotion")
+    rises = [b["section"] for a, b in zip(out, out[1:]) if b["energy"] - a["energy"] > 0.15]
+    msg = f"Your words lift in the {rises[0].lower()}, so the music could lift there too." if rises else "Your words keep one feeling all the way through."
+    return {"sections": out, "message": msg}

@@ -19,7 +19,7 @@ from app.services.generation.rng import derive_seed
 
 PARTS = ("drums", "bass", "keys", "melody", "pad", "strings", "arp")
 PLAIN_PART = {"drums": "the drums", "bass": "the bass", "keys": "the keys", "melody": "the tune", "pad": "the soft background",
-              "strings": "the strings", "arp": "the running pattern"}
+              "strings": "the strings", "arp": "the running pattern", "accompaniment": "the part written around your tune"}
 PLURAL_PARTS = {"drums", "keys", "strings"}
 PLAIN_SECTION = {"intro": "intro", "verse": "verse", "pre-chorus": "build-up", "chorus": "chorus", "bridge": "bridge", "outro": "ending"}
 
@@ -34,7 +34,7 @@ SOUNDS: dict[str, int] = {
 MIN_BARS, MAX_BARS, MAX_SECTIONS = 1, 32, 16
 
 Scope = Union[int, list[int], None]
-PartName = Literal["drums", "bass", "keys", "melody", "pad", "strings", "arp"]
+PartName = Literal["drums", "bass", "keys", "melody", "pad", "strings", "arp", "accompaniment"]
 
 
 class _Op(BaseModel):

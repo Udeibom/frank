@@ -619,6 +619,20 @@ def compose_section(
     if "arp" in active:
         c, _ = setting("arp")
         add(_held_busy(compose_arp(progression, bars, energy, c), ctx.parts.get("arp")))
+    if "accompaniment" in active:
+        # Notes written around the person's tune by the Anticipatory Music Transformer (frankenstein spec 14, 3.4),
+        # stored on the plan, played by Frank's own engine and editable like any part.
+        edit = ctx.parts.get("accompaniment") or {}
+        loop_bars = max(1, int(edit.get("bars", bars)))
+        events = []
+        for rnd in range((bars + loop_bars - 1) // loop_bars):
+            off = rnd * loop_bars * 4.0
+            for n, st, du, ve in edit.get("notes") or []:
+                t = off + float(st)
+                if t < bars * 4.0 - 0.05:
+                    events.append(NoteEvent(int(n), t, max(0.05, min(float(du), bars * 4.0 - t - GAP)), int(ve)))
+        if events:
+            parts.append(Part("accompaniment", int(edit.get("preset", 0)), False, events))
     if ctx.moments:
         from app.services.generation import touches   # imported here: touches builds on this module
         parts = touches.apply_moments(parts, ctx.moments, progression, bars, ctx)

@@ -50,7 +50,7 @@ def main() -> int:
         ("structure", lambda: organs.structure(clip).get("sections")),
         ("denoise", lambda: len(organs.denoise(voice))),
         ("separate", lambda: [len(x) for x in organs.separate(clip)]),
-        ("match_master", lambda: len(organs.match_master(clip, clip, "mp3", "mp3"))),
+        ("match_master", lambda: len(organs.match_master(voice, clip, "wav", "mp3"))),
     ]
     notes = [{"note": n, "start": i * 1.0, "duration": 0.9, "velocity": 90} for i, n in enumerate([60, 62, 64, 65, 67, 65, 64, 62])]
     hands = [

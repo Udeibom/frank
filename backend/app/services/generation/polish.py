@@ -65,7 +65,7 @@ STRIPS: dict[str, Strip] = {
 }
 ALIASES = {
     "finale_keys": "keys", "finale_pad": "pad", "finale_bass": "bass", "finale_drums": "drums",
-    "color_once": "color", "sweep": "riser",
+    "color_once": "color", "sweep": "riser", "accompaniment": "keys",
 }
 
 

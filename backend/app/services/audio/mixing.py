@@ -61,11 +61,17 @@ def _load_stereo(wav_bytes: bytes) -> np.ndarray:
 
 # Plain-language effect ids -> pedalboard chains. These are what the LLM emits
 # (never raw DSP terms) and what we translate to actual processing.
+def _space(kind: str, amount: float):
+    from app.services.audio import plugins as studio
+
+    return studio.space(kind, amount)
+
+
 def _vocal_effect_board(effect_ids: list[str]) -> Pedalboard:
     plugins = []
     for eid in effect_ids:
-        if eid == "space":          # "add a little space"
-            plugins.append(Reverb(room_size=0.35, wet_level=0.18, dry_level=0.85))
+        if eid == "space":          # "add a little space": a studio plate when installed (frankenstein spec 14, 3.6)
+            plugins.append(_space("plate", 0.18) or Reverb(room_size=0.35, wet_level=0.18, dry_level=0.85))
         elif eid == "warm":         # "warm it up"
             plugins.append(LowShelfFilter(cutoff_frequency_hz=200, gain_db=2.5))
             plugins.append(Compressor(threshold_db=-18, ratio=2.0))
@@ -144,7 +150,7 @@ def _part_board(settings: dict) -> Pedalboard:
         plugins.append(HighpassFilter(cutoff_frequency_hz=120))
         plugins.append(HighShelfFilter(cutoff_frequency_hz=3500, gain_db=1.5))
     if settings.get("space"):
-        plugins.append(Reverb(room_size=0.45, wet_level=0.2, dry_level=0.9))
+        plugins.append(_space("room", 0.2) or Reverb(room_size=0.45, wet_level=0.2, dry_level=0.9))
     return Pedalboard(plugins)
 
 

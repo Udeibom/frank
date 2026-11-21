@@ -68,3 +68,26 @@ async def room_history(project_id: str, room: str) -> list[dict]:
     if room not in convo.ROOMS:
         raise HTTPException(status_code=404, detail="I don't know that room.")
     return [{"role": t["role"], "content": t["content"], "created_at": str(t["created_at"])} for t in await convo.history(project_id, room)]
+
+
+# ── Frank reads its note aloud (frankenstein spec 14, requirement 4.5) ──────────────────────────────────
+
+from pydantic import BaseModel as _BaseModel, Field as _Field  # noqa: E402
+
+
+class SpeakRequest(_BaseModel):
+    text: str = _Field(min_length=1, max_length=1200)
+
+
+@router.post("/speak")
+async def speak(project_id: str, body: SpeakRequest) -> dict:
+    import asyncio as _asyncio
+
+    from app.services.remote import organs
+    from app.services.storage.files import upload_audio
+
+    audio = await _asyncio.to_thread(organs.try_, organs.speak, body.text)
+    if not audio:
+        return {"audio_url": None, "message": "My speaking voice is asleep right now. The words are on screen."}
+    url = await _asyncio.to_thread(upload_audio, "voice-memos", audio, "mp3", "frank-says")
+    return {"audio_url": url}

@@ -149,6 +149,7 @@ def _persist_sync(
     if section_gains is not None:
         params["section_gains"] = section_gains   # the parts can be rendered one at a time at the same level
     version = beat_db.create_beat_version_sync(project_id, render_url, label, params)
+    _credit_beat(project_id, version["id"], sections, fp)
 
     for section, mix in zip(sections, section_mixes):
         section_mp3 = to_mp3_bytes(mix)
@@ -160,6 +161,18 @@ def _persist_sync(
         )
 
     return version
+
+
+def _credit_beat(project_id: str, version_id: str, sections: list, fp: dict) -> None:
+    """Which of Frank's organs shaped this beat (frankenstein spec 14, 1.3): drummers' feel, recorded instruments."""
+    from app.services import provenance
+    from app.services.generation import grooves, sampled
+
+    layers = {p for s in sections for p in s.layers}
+    if "drums" in layers and not isinstance(fp.get("groove"), dict) and grooves.for_style("_default"):
+        provenance.note(project_id, "beat", version_id, "groove")
+    if sampled.enabled() and layers & set(sampled.INSTRUMENTS):
+        provenance.note(project_id, "beat", version_id, "samples")
 
 
 async def _fingerprint_and_lead(project_id: str, fingerprint: dict) -> tuple[dict, lead_mod.Lead | None]:
@@ -377,4 +390,59 @@ async def run_parts_job(job_id: str, project_id: str, beat_version_id: str) -> N
             await jobs_db.mark_failed(job_id, "Frank couldn't separate the parts just now. Want to try again?")
         except Exception:  # noqa: BLE001
             pass
+        raise exc
+
+
+# ── a part written around the person's tune (frankenstein spec 14, requirement 3.4) ──────────────────────
+
+def pick_accompaniment(parts: list[dict], max_notes: int = 400) -> dict | None:
+    """The fullest non-drum part the model wrote, as (note, start, duration, velocity) inside the tune's length."""
+    melodic = [p for p in parts if not p.get("drums") and p.get("notes")]
+    if not melodic:
+        return None
+    best = max(melodic, key=lambda p: len(p["notes"]))
+    notes = [(int(n["note"]), round(float(n["start"]), 4), round(float(n["duration"]), 4), max(1, min(127, int(n.get("velocity", 80)))))
+             for n in best["notes"]][:max_notes]
+    return {"preset": int(best["program"]) if 0 <= int(best["program"]) < 128 else 0, "notes": notes}
+
+
+async def run_accompany_job(job_id: str, project_id: str) -> None:
+    from app.services import provenance
+    from app.services.generation import lead as lead_mod
+    from app.services.remote import organs
+    from app.services.remote.spaces import RemoteUnavailable
+
+    try:
+        await jobs_db.mark_processing(job_id)
+        sections, fp, seed, lead = await _load_active_arrangement(project_id)
+        if lead is None:
+            await jobs_db.mark_failed(job_id, "I need your tune first. Hum it to me in the Feeling room, then I can write a part around it.")
+            return
+        notes = [{"note": p, "start": st, "duration": du, "velocity": 90} for p, st, du in lead.notes]
+        try:
+            parts = await asyncio.to_thread(organs.accompany, notes, float(fp["tempo_bpm"]), lead.bars * 4.0)
+        except RemoteUnavailable as e:
+            await jobs_db.mark_failed(job_id, e.plain)
+            return
+        chosen = pick_accompaniment(parts)
+        if not chosen:
+            await jobs_db.mark_failed(job_id, "Nothing came back that would sit well with your tune. Want to try again?")
+            return
+        hit = [s for s in sections if s.name in lead_mod.LEAD_SECTIONS] or sections
+        for s in hit:
+            s.parts["accompaniment"] = {**chosen, "bars": lead.bars}
+            if "accompaniment" not in s.layers:
+                s.layers.append("accompaniment")
+        changes = ["I wrote a new part around your tune where it plays, so your tune has company."]
+        count = await beat_db.count_beat_versions(project_id)
+        label = f"Beat v{count + 1}"
+        async with _one_at_a_time:
+            version = await asyncio.to_thread(_rerender_and_persist_sync, project_id, sections, fp, label, seed, lead,
+                                              changes, [{"op": "accompany"}])
+        await projects_db.update_project_active_state(project_id, {"active_beat_version_id": version["id"]})
+        await asyncio.to_thread(provenance.note, project_id, "beat", version["id"], "accompaniment")
+        await jobs_db.mark_complete(job_id, {"beat_version_id": version["id"], "render_url": version["render_url"],
+                                             "label": label, "changes": changes})
+    except Exception as exc:  # noqa: BLE001
+        await jobs_db.mark_failed(job_id, "I couldn't write that part just now. Your beat is unchanged. Want to try again?")
         raise exc
