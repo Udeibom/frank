@@ -24,10 +24,21 @@ def _table() -> dict:
     return json.loads(PATH.read_text()) if PATH.exists() else {}
 
 
+MIN_AGREEMENT = 0.5       # MTG-Jamendo mood tags on the same recordings must point the same way (requirement 9.5)
+
+
+def trusted(word: str) -> bool:
+    t = _table()
+    row = t.get("words", {}).get(word)
+    if not row or row.get("recordings", 0) < MIN_RECORDINGS:
+        return False
+    check = t.get("mood_check", {}).get(word)
+    return check is None or check["agreement"] >= MIN_AGREEMENT
+
+
 def words_in(text: str) -> list[str]:
-    table = _table().get("words", {})
     low = (text or "").lower()
-    return [w for w in table if re.search(rf"\b{re.escape(w)}\b", low) and table[w].get("recordings", 0) >= MIN_RECORDINGS]
+    return [w for w in _table().get("words", {}) if trusted(w) and re.search(rf"\b{re.escape(w)}\b", low)]
 
 
 def hints(text: str) -> dict:
@@ -43,7 +54,6 @@ def hints(text: str) -> dict:
         "density": clamp(0.5 + STRENGTH * avg["busyness"]),
         "energy_level": clamp(0.5 + STRENGTH * (avg["loudness"] + avg["busyness"]) / 2),
     }
-    scale = t.get("scale", {}).get("tempo")
-    if scale and abs(avg["tempo"]) >= 0.25:
-        out["tempo_bpm"] = int(round(max(60, min(150, scale["mean"] + 0.6 * avg["tempo"] * scale["std"]))))
+    # No speed from this table: the measured tempo did not follow how people hear speed ("slow" captions measured
+    # slightly faster than average, 21 Nov run), so the speed stays with the model and the person.
     return out

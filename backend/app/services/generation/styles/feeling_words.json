@@ -1,0 +1,312 @@
+{
+ "_note": "Song Describer captions (CC BY-SA 4.0) and MTG-Jamendo recordings, by data/mining/song_describer/mine.py. Per feeling word: how the music people described with it measures, in standard units against all recordings (positive = faster, brighter, busier, louder). 'mood_check' compares caption words with MTG-Jamendo mood tags on the same recordings (1 = same direction).",
+ "recordings": 706,
+ "captions": 1106,
+ "words": {
+  "relaxing": {
+   "recordings": 33,
+   "tempo": -0.15,
+   "brightness": -0.757,
+   "busyness": -0.352,
+   "loudness": -0.625
+  },
+  "upbeat": {
+   "recordings": 56,
+   "tempo": 0.211,
+   "brightness": 0.693,
+   "busyness": 0.474,
+   "loudness": 0.391
+  },
+  "fast": {
+   "recordings": 31,
+   "tempo": 0.166,
+   "brightness": 0.497,
+   "busyness": 0.547,
+   "loudness": 0.358
+  },
+  "playful": {
+   "recordings": 8,
+   "tempo": -0.218,
+   "brightness": -0.001,
+   "busyness": -0.168,
+   "loudness": -0.265
+  },
+  "uplifting": {
+   "recordings": 13,
+   "tempo": -0.131,
+   "brightness": 0.44,
+   "busyness": 0.479,
+   "loudness": 0.489
+  },
+  "lively": {
+   "recordings": 12,
+   "tempo": -0.022,
+   "brightness": 0.358,
+   "busyness": 0.366,
+   "loudness": -0.02
+  },
+  "joyful": {
+   "recordings": 11,
+   "tempo": -0.102,
+   "brightness": -0.491,
+   "busyness": 0.41,
+   "loudness": -0.756
+  },
+  "happy": {
+   "recordings": 43,
+   "tempo": -0.235,
+   "brightness": 0.247,
+   "busyness": 0.254,
+   "loudness": 0.204
+  },
+  "soft": {
+   "recordings": 40,
+   "tempo": -0.414,
+   "brightness": -0.481,
+   "busyness": 0.179,
+   "loudness": -0.151
+  },
+  "heavy": {
+   "recordings": 31,
+   "tempo": 0.287,
+   "brightness": 0.581,
+   "busyness": -0.209,
+   "loudness": 0.625
+  },
+  "hopeful": {
+   "recordings": 22,
+   "tempo": 0.122,
+   "brightness": -0.293,
+   "busyness": -0.037,
+   "loudness": 0.182
+  },
+  "funky": {
+   "recordings": 14,
+   "tempo": -0.248,
+   "brightness": 0.601,
+   "busyness": 0.025,
+   "loudness": 0.485
+  },
+  "bright": {
+   "recordings": 10,
+   "tempo": 0.319,
+   "brightness": 0.396,
+   "busyness": 0.158,
+   "loudness": 0.643
+  },
+  "ambient": {
+   "recordings": 34,
+   "tempo": -0.049,
+   "brightness": -0.528,
+   "busyness": -0.211,
+   "loudness": -0.206
+  },
+  "slow": {
+   "recordings": 48,
+   "tempo": 0.082,
+   "brightness": -0.421,
+   "busyness": -0.476,
+   "loudness": -0.216
+  },
+  "nostalgic": {
+   "recordings": 15,
+   "tempo": 0.068,
+   "brightness": -0.807,
+   "busyness": -0.165,
+   "loudness": -0.615
+  },
+  "sad": {
+   "recordings": 35,
+   "tempo": 0.223,
+   "brightness": -0.41,
+   "busyness": -0.387,
+   "loudness": -0.201
+  },
+  "dark": {
+   "recordings": 17,
+   "tempo": -0.108,
+   "brightness": -0.515,
+   "busyness": 0.071,
+   "loudness": 0.35
+  },
+  "calm": {
+   "recordings": 26,
+   "tempo": 0.021,
+   "brightness": -0.684,
+   "busyness": -0.322,
+   "loudness": -0.655
+  },
+  "epic": {
+   "recordings": 11,
+   "tempo": -0.782,
+   "brightness": -0.467,
+   "busyness": -0.087,
+   "loudness": -0.119
+  },
+  "cinematic": {
+   "recordings": 10,
+   "tempo": 0.331,
+   "brightness": -0.86,
+   "busyness": -1.017,
+   "loudness": -0.279
+  },
+  "smooth": {
+   "recordings": 13,
+   "tempo": -0.269,
+   "brightness": -0.039,
+   "busyness": 0.143,
+   "loudness": 0.109
+  },
+  "groovy": {
+   "recordings": 8,
+   "tempo": -0.157,
+   "brightness": 0.475,
+   "busyness": 0.366,
+   "loudness": 0.266
+  },
+  "energetic": {
+   "recordings": 44,
+   "tempo": 0.185,
+   "brightness": 1.006,
+   "busyness": 0.316,
+   "loudness": 0.717
+  },
+  "peaceful": {
+   "recordings": 12,
+   "tempo": -0.123,
+   "brightness": -0.603,
+   "busyness": -0.179,
+   "loudness": -0.379
+  },
+  "romantic": {
+   "recordings": 19,
+   "tempo": 0.103,
+   "brightness": -0.674,
+   "busyness": -0.605,
+   "loudness": -0.82
+  },
+  "emotional": {
+   "recordings": 29,
+   "tempo": 0.178,
+   "brightness": -0.486,
+   "busyness": -0.374,
+   "loudness": 0.115
+  },
+  "dreamy": {
+   "recordings": 18,
+   "tempo": -0.003,
+   "brightness": -0.511,
+   "busyness": -0.05,
+   "loudness": -0.435
+  },
+  "mellow": {
+   "recordings": 16,
+   "tempo": -0.248,
+   "brightness": -0.586,
+   "busyness": -0.134,
+   "loudness": -0.591
+  },
+  "chill": {
+   "recordings": 17,
+   "tempo": -0.049,
+   "brightness": 0.001,
+   "busyness": 0.198,
+   "loudness": 0.373
+  },
+  "mysterious": {
+   "recordings": 16,
+   "tempo": 0.023,
+   "brightness": -0.457,
+   "busyness": -0.372,
+   "loudness": -0.058
+  },
+  "warm": {
+   "recordings": 11,
+   "tempo": 0.474,
+   "brightness": -0.146,
+   "busyness": -0.267,
+   "loudness": -0.213
+  },
+  "melancholic": {
+   "recordings": 23,
+   "tempo": -0.294,
+   "brightness": -0.332,
+   "busyness": -0.446,
+   "loudness": -0.195
+  },
+  "gentle": {
+   "recordings": 8,
+   "tempo": 0.873,
+   "brightness": -1.349,
+   "busyness": -0.556,
+   "loudness": -1.038
+  },
+  "driving": {
+   "recordings": 21,
+   "tempo": 0.35,
+   "brightness": 0.49,
+   "busyness": 0.047,
+   "loudness": 0.401
+  }
+ },
+ "mood_check": {
+  "relaxing": {
+   "tagged_recordings": 32,
+   "agreement": 0.936
+  },
+  "upbeat": {
+   "tagged_recordings": 10,
+   "agreement": 0.785
+  },
+  "happy": {
+   "tagged_recordings": 45,
+   "agreement": 0.754
+  },
+  "soft": {
+   "tagged_recordings": 12,
+   "agreement": 0.621
+  },
+  "sad": {
+   "tagged_recordings": 18,
+   "agreement": 0.861
+  },
+  "epic": {
+   "tagged_recordings": 8,
+   "agreement": 0.525
+  },
+  "energetic": {
+   "tagged_recordings": 8,
+   "agreement": 0.992
+  },
+  "romantic": {
+   "tagged_recordings": 13,
+   "agreement": 0.95
+  },
+  "emotional": {
+   "tagged_recordings": 34,
+   "agreement": 0.311
+  },
+  "dreamy": {
+   "tagged_recordings": 18,
+   "agreement": 0.47
+  }
+ },
+ "scale": {
+  "tempo": {
+   "mean": 116.778,
+   "std": 19.456
+  },
+  "brightness": {
+   "mean": 1796.717,
+   "std": 665.76
+  },
+  "busyness": {
+   "mean": 3.551,
+   "std": 1.194
+  },
+  "loudness": {
+   "mean": -16.985,
+   "std": 5.857
+  }
+ }
+}

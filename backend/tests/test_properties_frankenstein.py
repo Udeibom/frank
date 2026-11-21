@@ -162,3 +162,22 @@ def test_at_most_three_plain_differences_from_a_reference(a, b):
     diffs = ref.compare(a, b)
     assert len(diffs) <= 3
     assert not any(find_jargon(d) for d in diffs)
+
+
+# ── feeling words measured by Song Describer ───────────────────────────────────────────────────────────
+
+from app.services.intake import feeling_table  # noqa: E402
+
+
+@given(st.lists(st.sampled_from(sorted(feeling_table._table().get("words", {})) or ["calm"]), max_size=6), st.text(max_size=40))
+def test_feeling_words_only_nudge_the_direction_within_range_and_never_set_speed(words, extra):
+    h = feeling_table.hints(" ".join(words) + " " + extra)
+    assert "tempo_bpm" not in h
+    for v in h.values():
+        assert 0.05 <= v <= 0.95
+
+
+def test_words_people_tag_differently_are_not_trusted():
+    for w, c in feeling_table._table().get("mood_check", {}).items():
+        assert feeling_table.trusted(w) == (c["agreement"] >= feeling_table.MIN_AGREEMENT
+                                           and feeling_table._table()["words"][w]["recordings"] >= feeling_table.MIN_RECORDINGS)
