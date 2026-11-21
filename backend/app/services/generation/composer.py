@@ -540,7 +540,14 @@ def _edge_layers(edge: str, energy: float) -> list[str]:
     if not stats:
         return []
     threshold = (0.9 if edge == "intro" else 0.95) - (0.4 if edge == "intro" else 0.3) * max(0.0, min(1.0, energy))
-    return ["keys"] + [p for p in _EDGE_PARTS if stats.get(p, {}).get(edge, 0.0) >= threshold]
+    joined = sorted((p for p in _EDGE_PARTS if stats.get(p, {}).get(edge, 0.0) >= threshold),
+                    key=lambda p: -stats[p][edge])
+    if edge == "intro":
+        # An intro leads into the verse, so it is always smaller than it: below high energy only the most common
+        # part joins the keys (measured with the frank-listener MCP, 21 Nov: an intro with the verse's own three
+        # parts played as loud and busy as the verse, and the first lift of the song was gone).
+        joined = joined[: 1 if energy < 0.7 else 3]
+    return ["keys"] + joined
 
 
 def layers_for_section(

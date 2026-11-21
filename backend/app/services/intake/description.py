@@ -73,6 +73,18 @@ def clean(raw: dict[str, Any]) -> dict[str, Any]:
     return {"summary": summary, "feeling_words": words, "hints": hints, "confidence": confidence, "question": question}
 
 
+def calibrate(reading: dict[str, Any], text: str) -> dict[str, Any]:
+    """Fill what the model left open from how real listeners' words measure (Song Describer; frankenstein 9.4)."""
+    from app.services.intake import feeling_table
+
+    measured = feeling_table.hints(text + " " + " ".join(reading.get("feeling_words") or []))
+    added = {k: v for k, v in measured.items() if k not in reading["hints"]}
+    if added:
+        reading = {**reading, "hints": {**reading["hints"], **added},
+                   "calibrated": sorted(added)}
+    return reading
+
+
 def read_description(text: str, chat_json: Callable[[str, str, float], str]) -> dict[str, Any]:
     """One model read with one repair retry. Raises only if the model is unreachable."""
     body = f"<description>\n{text.strip()[:MAX_CHARS]}\n</description>"
@@ -82,7 +94,7 @@ def read_description(text: str, chat_json: Callable[[str, str, float], str]) -> 
         try:
             raw = json.loads(out)
             if isinstance(raw, dict):
-                return clean(raw)
+                return calibrate(clean(raw), text)
         except (TypeError, ValueError) as exc:
             last = exc
     raise ValueError(f"the description could not be read: {last}")
