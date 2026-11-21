@@ -41,6 +41,7 @@ class StyleChoice:
     bass: dict[str, list]
     extra_layers: list[str] = field(default_factory=list)
     unsupported: list[str] = field(default_factory=list)   # words Frank could not act on
+    own_groove: bool = False                               # the person tapped this rhythm: play it as they did
 
 
 @lru_cache(maxsize=1)

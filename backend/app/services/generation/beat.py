@@ -71,7 +71,7 @@ PART_GAIN = {
 
 LEAD_GAIN = 1.1              # the person's own tune sits a little in front of the other parts
 PEAK_TARGET = 0.89
-ENGINE_VERSION = 4          # bumps when a change would make an old beat sound different if re-rendered
+ENGINE_VERSION = 5          # bumps when a change would make an old beat sound different if re-rendered
 FADE_OUT_SECONDS = 1.5
 EQ_MIN_DB = 0.25
 
@@ -227,7 +227,7 @@ def plan_contexts(
     if isinstance(fp.get("groove"), dict):
         # the person's own tapped rhythm replaces the style's kick and hat lanes
         from app.services.intake.rhythm import groove_to_style_drums
-        style = replace(style, drums=groove_to_style_drums(fp["groove"], style.drums))
+        style = replace(style, drums=groove_to_style_drums(fp["groove"], style.drums), own_groove=True)
     offset = derive_seed(seed, "chords") % 4
     if lead:
         playing = [s.bars for s in sections if s.name in lead_mod.LEAD_SECTIONS]

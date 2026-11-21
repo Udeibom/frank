@@ -62,10 +62,12 @@ def _client(which: str) -> Any:
     last: Exception | None = None
     while time.time() - started < WAKE_TIMEOUT_S:
         try:
-            c = Client(space, token=_token(), verbose=False)
+            c = Client(space, hf_token=_token(), verbose=False)
             with _lock:
                 _clients[space] = c
             return c
+        except (TypeError, ImportError, AttributeError) as e:      # a bug, not a sleeping Space: don't wait
+            raise RemoteUnavailable("That part of Frank isn't working right now.", repr(e)) from e
         except Exception as e:  # noqa: BLE001  asleep, building, network blip
             last = e
             time.sleep(8)

@@ -229,8 +229,22 @@ def compose_drums(bars: int, energy: float, density: float, ctx: Optional[Sectio
     gain = style.drum_gain
     part = Part("drums", 0, True)
 
-    def add(note: int, step_or_beat: float, vel: float, spread: float = 5.0, dur: float = 0.2, jitter: float = 0.0) -> None:
-        part.events.append(NoteEvent(note, max(0.0, step_or_beat + (rng.uniform(-jitter, jitter) if jitter else 0.0)), dur, _vel(rng, min(127, vel * gain), spread)))
+    # Real drummers' feel for this style (frankenstein spec 14, 3.1); its own random stream, so fills and
+    # variations stay exactly where they were.
+    from app.services.generation import grooves
+
+    groove = None if style.own_groove else grooves.for_style(style.name)
+    feel = int((ctx.parts.get("drums") or {}).get("feel", 0))
+    feel_rng = rng_for(ctx.seed, ctx.index, "drum-feel")
+    swung = style.swing > 0.2
+
+    def add(note: int, step_or_beat: float, vel: float, spread: float = 5.0, dur: float = 0.2, jitter: float = 0.0,
+            lane: Optional[str] = None, step: Optional[int] = None) -> None:
+        shift, accent = grooves.shape(groove, lane, step, feel, feel_rng, swung) if lane is not None else (0.0, 1.0)
+        if lane is not None:
+            jitter = 0.0                       # the drummers' own spread replaces the generic wobble
+        part.events.append(NoteEvent(note, max(0.0, step_or_beat + shift + (rng.uniform(-jitter, jitter) if jitter else 0.0)),
+                                     dur, _vel(rng, min(127, vel * gain * accent), spread)))
 
     for bar in range(bars):
         bs = bar * 4.0
@@ -239,27 +253,28 @@ def compose_drums(bars: int, energy: float, density: float, ctx: Optional[Sectio
 
         for i, ch in kick:
             if i < cut:
-                add(KICK, bs + i * STEP, 98 + energy * 14 + (4 if i == 0 else 0))
+                add(KICK, bs + i * STEP, 98 + energy * 14 + (4 if i == 0 else 0), lane="kick", step=i)
         # A small variation every fourth bar: an extra kick just before the downbeat.
         if bar % 4 == 3 and not fill and rng.random() < 0.4 and not half:
             add(KICK, bs + 14 * STEP, 84)
         for i, ch in snare:
             if i < cut:
-                add(SNARE, bs + i * STEP, 90 + energy * 12)
+                add(SNARE, bs + i * STEP, 90 + energy * 12, lane="snare", step=i)
         for i, ch in ghost:
             if i < cut:
-                add(SNARE, bs + i * STEP + _swing_shift(i, style.swing), 34, 6, 0.1)
+                add(SNARE, bs + i * STEP + _swing_shift(i, style.swing), 34, 6, 0.1, lane="ghost", step=i)
 
         thin = density < 0.3                             # sparse sections keep only the hats on the beat
         for i, ch in hat:
             if i >= cut or (thin and i % 4):
                 continue
             note = OPEN_HAT if ch == "o" else CLOSED_HAT
-            add(note, bs + i * STEP + _swing_shift(i, style.swing), 50 + energy * 22 + (10 if i % 4 == 0 else 0), 6, 0.15, 0.007)
+            add(note, bs + i * STEP + _swing_shift(i, style.swing), 50 + energy * 22 + (10 if i % 4 == 0 else 0), 6, 0.15, 0.007,
+                lane="open" if ch == "o" else "hat", step=i)
         if density >= 0.7 and energy >= 0.6 and not half:  # push: sixteenth hats between the eighths
             for i in range(1, 16, 2):
                 if i < cut:
-                    add(CLOSED_HAT, bs + i * STEP + _swing_shift(i, style.swing), 38 + energy * 10, 5, 0.1, 0.007)
+                    add(CLOSED_HAT, bs + i * STEP + _swing_shift(i, style.swing), 38 + energy * 10, 5, 0.1, 0.007, lane="hat", step=i)
 
         if fill:
             kind, first = fill

@@ -53,6 +53,17 @@ class Sparser(_Op):
     section: Scope = None
 
 
+class Looser(_Op):
+    """Drums played with more of a real drummer's push and drag (frankenstein spec 14, 3.1)."""
+    op: Literal["looser"]
+    section: Scope = None
+
+
+class Tighter(_Op):
+    op: Literal["tighter"]
+    section: Scope = None
+
+
 class Bigger(_Op):
     op: Literal["bigger"]
     section: Scope = None
@@ -122,7 +133,7 @@ class RemoveSection(_Op):
 
 
 Operation = Annotated[
-    Union[Busier, Sparser, Bigger, Smaller, AddPart, RemovePart, SwapSound, AddFill, Reseed, AnotherSong, Resize, Move,
+    Union[Busier, Sparser, Looser, Tighter, Bigger, Smaller, AddPart, RemovePart, SwapSound, AddFill, Reseed, AnotherSong, Resize, Move,
           Repeat, RemoveSection],
     Field(discriminator="op"),
 ]
@@ -196,6 +207,21 @@ def _apply(op, sections: list[SectionPlan], seed: int) -> tuple[int, str]:
             edit = s.parts.setdefault(op.part, {})
             edit["busy"] = max(-2.0, min(2.0, float(edit.get("busy", 0.0)) + step))
         return seed, f"I made {PLAIN_PART[op.part]} {'busier' if step > 0 else 'simpler'} {_scope_words(sections, op.section)}."
+    if isinstance(op, (Looser, Tighter)):
+        step = 1 if isinstance(op, Looser) else -1
+        hit = [s for s in _where(sections, op.section) if "drums" in s.layers]
+        if not hit:
+            raise OpError("The drums aren't playing there, so there's nothing to loosen or tighten.")
+        moved = False
+        for s in hit:
+            edit = s.parts.setdefault("drums", {})
+            new = max(-1, min(1, int(edit.get("feel", 0)) + step))
+            moved = moved or new != int(edit.get("feel", 0))
+            edit["feel"] = new
+        if not moved:
+            raise OpError("The drums are already as " + ("loose" if step > 0 else "tight") + " as I'll make them there.")
+        return seed, (f"I loosened the drums {_scope_words(sections, op.section)}, so they lean and push more like a person playing."
+                      if step > 0 else f"I tightened the drums {_scope_words(sections, op.section)}, so they sit right on the beat.")
     if isinstance(op, (Bigger, Smaller)):
         step = 0.15 if isinstance(op, Bigger) else -0.15
         moved = False
@@ -318,6 +344,8 @@ or null for every section. Prefer a list over null when the person names a kind 
 part is one of: drums, bass, keys, melody, pad, strings, arp.
 - {"op": "busier", "part": P, "section": S}        more going on in that part
 - {"op": "sparser", "part": P, "section": S}       simpler, more space
+- {"op": "looser", "section": S}                   drums lean and push more, like a person playing
+- {"op": "tighter", "section": S}                  drums sit exactly on the beat
 - {"op": "bigger", "section": S}                   hits harder, fuller
 - {"op": "smaller", "section": S}                  calmer, sits back
 - {"op": "add_part", "part": P, "section": S}
