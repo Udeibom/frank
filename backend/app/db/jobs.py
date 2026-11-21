@@ -72,15 +72,20 @@ async def fail_if_stale(job_id: str, error: str, changed_before: datetime) -> bo
 async def fail_jobs_active_before(error: str, changed_before: datetime) -> int:
     """Startup sweep: mark failed every job still active that last changed
     before `changed_before`. Returns how many were changed."""
-    result = (
-        get_supabase()
-        .table("async_jobs")
-        .update({"status": "failed", "error": error})
-        .in_("status", list(ACTIVE_STATUSES))
-        .lt("updated_at", changed_before.isoformat())
-        .execute()
-    )
-    return len(result.data or [])
+    import asyncio
+
+    def _run() -> int:
+        result = (
+            get_supabase()
+            .table("async_jobs")
+            .update({"status": "failed", "error": error})
+            .in_("status", list(ACTIVE_STATUSES))
+            .lt("updated_at", changed_before.isoformat())
+            .execute()
+        )
+        return len(result.data or [])
+
+    return await asyncio.to_thread(_run)
 
 
 async def get_job(job_id: str) -> Optional[dict]:

@@ -12,8 +12,10 @@ export default function LandingPage() {
   const [error, setError] = useState<string | null>(null)
   const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Clear the slow-start timer if the component unmounts mid-request
+  // Ping the backend the moment the page loads so it starts waking up
+  // before the user clicks anything. Fire-and-forget — we don't care if it fails.
   useEffect(() => {
+    fetch("/api/wake").catch(() => {})
     return () => {
       if (slowTimer.current) clearTimeout(slowTimer.current)
     }
@@ -24,16 +26,18 @@ export default function LandingPage() {
     setError(null)
     setSlowStart(false)
 
-    // If the backend takes more than 8 seconds (Render free-tier cold start),
-    // show an honest message so the user knows something is happening.
-    slowTimer.current = setTimeout(() => setSlowStart(true), 8000)
+    // If the backend takes more than 3 seconds (Render free-tier cold start),
+    // show an honest message so the user knows to keep waiting.
+    slowTimer.current = setTimeout(() => setSlowStart(true), 3000)
 
     try {
       // Signed-out visitors make an account first; signed-in users go straight in.
       const { data } = await createClient().auth.getUser()
       if (!data.user) {
         setLoading(false)
-        router.push("/signup")
+        // Pass ?next=/new-song so after sign-up/login the user lands on the
+        // trampoline page that creates a project and enters the studio.
+        router.push("/signup?next=%2Fnew-song")
         return
       }
       const project = await createProject({ title: "Untitled Song" })

@@ -38,6 +38,7 @@ export default function DashboardPage() {
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
+    fetch("/api/wake").catch(() => {})
     listProjects()
       .then(setProjects)
       .finally(() => setLoading(false))

@@ -73,14 +73,25 @@ async function request<T>(
 ): Promise<T> {
   const url = `${API_URL}${path}`
 
-  const res = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(await authHeader()),
-      ...options.headers,
-    },
-    ...options,
-  })
+  // 90-second timeout — long enough to survive a Render cold start (30–60s)
+  // without leaving the user hanging indefinitely.
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 90_000)
+
+  let res: Response
+  try {
+    res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(await authHeader()),
+        ...options.headers,
+      },
+      ...options,
+    })
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   if (!res.ok) {
     return fail(res, "Something went wrong — want to try again?")
