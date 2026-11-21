@@ -22,6 +22,7 @@ from app.config import get_settings
 log = logging.getLogger("frank.research")
 
 MAX_PAGES = 2
+MAX_READS = 3            # page reads tried per song, at most (each one costs a Firecrawl credit)
 MAX_CHARS = 6000
 
 EXTRACT_SYSTEM = """You read short articles about one song and say how it FEELS and how it is BUILT, in everyday words a
@@ -37,6 +38,29 @@ tempo numbers, keys, chords, BPM, reverb, synth names). Return JSON only:
 def available() -> bool:
     s = get_settings()
     return bool(s.exa_api_key and s.firecrawl_api_key)
+
+
+def song_key(title: Optional[str], artist: Optional[str]) -> str:
+    norm = lambda v: re.sub(r"[^a-z0-9]+", " ", (v or "").lower()).strip()  # noqa: E731
+    return f"{norm(title)}|{norm(artist)}"
+
+
+def _cached(key: str) -> tuple[bool, Optional[dict]]:
+    """(found, result). A song researched before is never paid for again, for anyone."""
+    try:
+        from app.db.client import get_supabase
+        rows = get_supabase().table("research_cache").select("result").eq("song_key", key).limit(1).execute().data
+        return (True, rows[0]["result"]) if rows else (False, None)
+    except Exception:  # noqa: BLE001
+        return False, None
+
+
+def _remember(key: str, result: Optional[dict]) -> None:
+    try:
+        from app.db.client import get_supabase
+        get_supabase().table("research_cache").upsert({"song_key": key, "result": result}).execute()
+    except Exception:  # noqa: BLE001
+        log.warning("could not cache song research", exc_info=True)
 
 
 def search(query: str) -> list[str]:
@@ -88,11 +112,23 @@ def research(title: Optional[str], artist: Optional[str]) -> Optional[dict]:
         return None
     from app.services.llm.groq_client import chat_json
 
+    from app.services import budget
+
     names = [n for n in (title, artist) if n]
+    key = song_key(title, artist)
+    found, cached = _cached(key)
+    if found:
+        return cached
+    if not budget.spend("exa"):
+        log.info("Exa allowance for this month is used up; going by the song's tags only")
+        return None
     try:
         urls = search(f"{title or ''} {artist or ''} song review sound mood production".strip())
         pages = []
-        for u in urls:
+        for u in urls[:MAX_READS]:
+            if not budget.spend("firecrawl"):
+                log.info("Firecrawl allowance for this month is used up")
+                break
             try:
                 text = read_page(u)
             except Exception:  # noqa: BLE001
@@ -102,9 +138,12 @@ def research(title: Optional[str], artist: Optional[str]) -> Optional[dict]:
             if len(pages) >= MAX_PAGES:
                 break
         if not pages:
+            _remember(key, None)
             return None
         raw = json.loads(chat_json(EXTRACT_SYSTEM, "\n\n---\n\n".join(pages)) or "{}")
-        return clean(raw if isinstance(raw, dict) else {}, names) | {"pages_read": len(pages)}
+        result = clean(raw if isinstance(raw, dict) else {}, names) | {"pages_read": len(pages)}
+        _remember(key, result)
+        return result
     except Exception:  # noqa: BLE001
         log.warning("researching a named song failed", exc_info=True)
         return None

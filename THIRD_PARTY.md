@@ -4,7 +4,7 @@ Frank's own source code is MIT (see `LICENSE`). Frank is stitched together from 
 
 ## Licence notes
 
-- **GPL and AGPL code.** The backend imports `pedalboard` (GPL-3.0) and `pylibrb` / Rubber Band (GPL-2.0+). It also runs Dragonfly Reverb (GPL-3.0) as a plugin. When the backend is distributed together with these libraries, the combined work falls under the GPL. Frank's own files stay MIT, because MIT is GPL-compatible. The two Hugging Face Spaces run Matchering (GPL-3.0) and other GPL tools, so their Space cards declare `agpl-3.0`. Their source is in `spaces/`.
+- **Licence decision: MIT for Frank's own code**, including the two Spaces' code in `spaces/`. MIT is an open-source licence and is compatible with the GPL. The backend imports `pedalboard` (GPL-3.0) and `pylibrb` / Rubber Band (GPL-2.0+), runs Dragonfly Reverb (GPL-3.0) as a plugin, and the frank-ears Space runs Matchering (GPL-3.0). These run as services and are not redistributed by this repo, so their licences do not change Frank's. Anyone who distributes a built image that bundles them must follow the GPL for that bundle; all source is public here either way.
 - **Non-commercial parts.** These allow non-commercial use only: Chordonomicon (CC BY-NC 4.0), the Essentia Discogs-EffNet and MTG-Jamendo heads (CC BY-NC-SA 4.0), and the Tiger DiffSinger voicebank (CC BY-NC-ND 4.0 + Commons Clause). The voicebank is downloaded at runtime from its official release and is never redistributed in this repo.
 - **Tables derived from datasets.** These files hold counts and statistics, never the songs themselves, and they keep their sources' terms:
   - `backend/app/services/generation/styles/grooves.json`: Groove MIDI, CC BY 4.0.

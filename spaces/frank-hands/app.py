@@ -140,14 +140,25 @@ DDSP_ENV = CACHE / "ddsp-env"
 DDSP_INSTRUMENTS = ["violin", "flute", "flute2", "trumpet", "tenor_saxophone"]
 
 
+# DDSP 3.7.0's own pins (TensorFlow 2.11 era, Python 3.10). Its requirement tflite-support<=0.1 exists only as
+# pre-releases, so pip refuses the package; DDSP itself goes in with --no-deps. Packages only its training,
+# export and cloud code imports (note-seq, tensorflow-datasets, hypertune, Google Cloud, tflite) are stubbed in
+# ddsp_worker.py, since timbre transfer never calls them.
+DDSP_DEPS = ["tensorflow-cpu==2.11.1", "tensorflow-probability==0.19.0", "numpy==1.23.5", "protobuf==3.19.6",
+             "crepe==0.0.12", "librosa==0.10.0", "scipy==1.10.1", "gin-config", "absl-py", "dill==0.3.4", "six",
+             "future", "soundfile", "matplotlib", "mir_eval==0.7", "hmmlearn==0.2.7"]
+
+
 def _ddsp_env() -> Path:
     py = DDSP_ENV / "bin" / "python"
-    if not py.exists():
-        subprocess.run([sys.executable, "-m", "venv", str(DDSP_ENV)], check=True)
-        r = subprocess.run([str(py), "-m", "pip", "install", "-q", "ddsp==3.7.0"], capture_output=True,
-                           text=True, timeout=1500)
-        if r.returncode != 0:
-            raise RuntimeError("DDSP install failed: " + (r.stderr or r.stdout)[-800:])
+    ready = DDSP_ENV / "ready"                          # only written after a full install, so a failed one retries
+    if not ready.exists():
+        subprocess.run([sys.executable, "-m", "venv", "--clear", str(DDSP_ENV)], check=True)
+        for args in (DDSP_DEPS, ["--no-deps", "ddsp==3.7.0"]):
+            r = subprocess.run([str(py), "-m", "pip", "install", "-q", *args], capture_output=True, text=True, timeout=1500)
+            if r.returncode != 0:
+                raise RuntimeError("DDSP install failed: " + (r.stderr or r.stdout)[-800:])
+        ready.write_text("ok")
     return py
 
 

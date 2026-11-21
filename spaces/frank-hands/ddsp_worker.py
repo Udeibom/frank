@@ -31,8 +31,25 @@ def fetch(instrument: str, cache: str) -> str:
     return d
 
 
+def _stub_unused() -> None:
+    """Modules ddsp.training imports at the top but timbre transfer never calls (see app.py DDSP_DEPS)."""
+    import types
+
+    for name in ("hypertune", "google", "google.cloud", "google.cloud.storage", "tensorflow_datasets", "note_seq",
+                 "note_seq.sequences_lib", "tflite_support", "tensorflowjs"):
+        try:
+            __import__(name)
+        except Exception:  # noqa: BLE001
+            mod = types.ModuleType(name)
+            sys.modules[name] = mod
+            parent, _, child = name.rpartition(".")
+            if parent in sys.modules:
+                setattr(sys.modules[parent], child, mod)
+
+
 def main() -> int:
     src, instrument, out, cache = sys.argv[1:5]
+    _stub_unused()
     import gin
     import librosa
     import soundfile as sf

@@ -50,9 +50,14 @@ class Settings(BaseSettings):
     hands_space: str = "Udeibom/frank-hands"
     freesound_api_key: str = ""
     jamendo_client_id: str = ""
+    jamendo_client_secret: str = ""          # accepted but unused: searching and streaming need only the client id
     exa_api_key: str = ""
     firecrawl_api_key: str = ""
     datamuse_api_key: str = ""               # needed from 1 Feb 2027; keyless before then
+    # Monthly caps, set well under the free allowances (services/budget.py). One named song costs at most
+    # 1 Exa search and 3 Firecrawl page reads, and each song is researched once for everyone.
+    exa_monthly_limit: int = 150
+    firecrawl_monthly_limit: int = 120
 
     @property
     def allowed_origins_list(self) -> list[str]:

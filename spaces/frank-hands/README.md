@@ -8,7 +8,7 @@ sdk_version: 5.50.0
 python_version: "3.10"
 app_file: app.py
 pinned: false
-license: agpl-3.0
+license: mit
 short_description: Models Frank makes music with (API for Frank)
 suggested_hardware: zero-a10g
 ---
