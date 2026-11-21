@@ -284,6 +284,28 @@ def test_the_brief_describes_a_hummed_tune_in_words_not_note_numbers():
         assert leak not in brief
 
 
+def test_the_brief_describes_direction_beat_vocal_and_mix_in_words():
+    """Frankenstein task 57: the fingerprint and the beat, vocal and mix records are no longer dumped raw."""
+    record = SongRecord(
+        project_id="p1",
+        fingerprint={"tempo_bpm": 72, "key": "C minor", "mode": "minor", "energy_level": 0.2, "warmth": 0.8,
+                     "reference_texture_id": "tex-123", "instrumentation_hints": ["piano"]},
+        beat={"label": "Beat v2", "sections": [{"index": 1, "name": "verse", "bars": 8, "layers": ["drums", "keys"]}],
+              "lead": {"used": True, "sections": [3], "cut": False, "key": "C minor"}},
+        vocal={"takes_recorded": 2, "active": "a recorded take", "tuned": True,
+               "active_take": {"kind": "take", "on_the_notes": 0.93, "sits_behind_beat_ms": 40}},
+        mix={"label": "Mix v1", "params": {"vocal_gain_db": 0, "beat_gain_db": -6, "vocal_effects": ["warm", "reverb"],
+                                           "beat_effects": [], "harmony_enabled": True, "section_gain_db": {}}},
+    )
+    brief = build_brief(record, None, 100_000)
+    assert "unhurried" in brief and "darker, more wistful notes" in brief and "instruments: piano" in brief
+    assert "section 1 verse (medium length, drums, keys)" in brief
+    assert "their hummed tune plays in section 3" in brief
+    assert "sings a little behind the beat" in brief and "voice well above the music" in brief
+    for leak in ("tempo_bpm", "C minor", "72", "tex-123", "gain_db", "reverb", " ms", "0.93", "{"):
+        assert leak not in brief, leak
+
+
 # ─── Two writers racing for the first version (Integration Tester, Nov 12) ─
 
 import asyncio  # noqa: E402

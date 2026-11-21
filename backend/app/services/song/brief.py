@@ -11,7 +11,7 @@ its words to the user.
 
 from __future__ import annotations
 
-from app.services.team.plain import find_jargon
+from app.services.team.plain import find_jargon, guard
 
 import json
 from typing import Any, Optional
@@ -54,7 +54,7 @@ def _facet_text(record: SongRecord, facet: str) -> Optional[str]:
         return _references_text(content)
     if facet == "identity_brief":
         return _identity_text(content)
-    return _dump(content)
+    return guard(_dump(content))
 
 
 def _references_text(content: dict[str, Any]) -> Optional[str]:
@@ -92,17 +92,134 @@ def _required_header(record: SongRecord) -> str:
     lines = [
         "SONG BRIEF (internal context). Talk about the song in feelings and everyday words. "
         "Never repeat numbers, note names, key names, speeds, file addresses or technical sound terms (echo settings, "
-        "smoothing, tone settings, layers, loudness) from this brief; say them in everyday words."
+        "smoothing, tone settings, stems, loudness) from this brief; say them in everyday words."
     ]
     lines.append(f"Phase: {record.phase}")
     lines.append(f"What they said they want: {intent}" if intent else "What they said they want: (not said yet)")
     return "\n".join(lines)
 
 
+# ─── Records in everyday words (frankenstein spec 14, task 57) ──────────────────────────────────────────────
+# The fingerprint and the beat, vocal and mix records used to be dumped raw (tempo_bpm, key, gain_db). Each is
+# now described in words; section numbers stay, because the team's actions point at sections by number.
+
+def _scale(value: Any, low: str, mid: str, high: str) -> Optional[str]:
+    if not isinstance(value, (int, float)):
+        return None
+    return low if value < 0.35 else (high if value > 0.65 else mid)
+
+
+def _fingerprint_text(fp: dict[str, Any]) -> str:
+    bits: list[str] = []
+    bpm = fp.get("tempo_bpm")
+    if isinstance(bpm, (int, float)):
+        bits.append("unhurried" if bpm < 80 else ("quick" if bpm > 115 else "a walking pace"))
+    if isinstance(fp.get("tempo_feel"), str):
+        bits.append(f"feels {fp['tempo_feel']}")
+    mode = fp.get("mode") or ""
+    if mode == "minor" or "minor" in str(fp.get("key", "")).lower():
+        bits.append("darker, more wistful notes")
+    elif mode == "major" or "major" in str(fp.get("key", "")).lower():
+        bits.append("brighter, more open notes")
+    elif mode == "modal":
+        bits.append("notes with an unusual colour")
+    for key, words in (("energy_level", ("calm", "medium energy", "high energy")),
+                       ("density", ("sparse", "moderately full", "full and busy")),
+                       ("brightness", ("dark sounding", "neither dark nor bright", "bright sounding")),
+                       ("warmth", ("cool", "fairly warm", "warm"))):
+        word = _scale(fp.get(key), *words)
+        if word:
+            bits.append(word)
+    near = [w for w in fp.get("genre_proximity") or [] if isinstance(w, str)]
+    if near:
+        bits.append("leans toward " + ", ".join(near[:4]))
+    hints = [w for w in fp.get("instrumentation_hints") or [] if isinstance(w, str)]
+    if hints:
+        bits.append("instruments: " + ", ".join(hints[:5]))
+    return "; ".join(bits) or "set, nothing described yet"
+
+
+def _length_word(bars: Any) -> str:
+    if not isinstance(bars, (int, float)):
+        return ""
+    return "short" if bars <= 4 else ("long" if bars > 8 else "medium length")
+
+
+def _beat_text(beat: dict[str, Any]) -> str:
+    out = [str(beat.get("label") or "a beat")]
+    for s in beat.get("sections") or []:
+        layers = ", ".join(str(x) for x in (s.get("layers") or [])) or "nothing playing"
+        length = _length_word(s.get("bars"))
+        out.append(f"section {s.get('index')} {s.get('name') or ''} ({', '.join(x for x in (length, layers) if x)})")
+    lead = beat.get("lead") or {}
+    if lead.get("used"):
+        where = ", ".join(str(i) for i in lead.get("sections") or [])
+        out.append(f"their hummed tune plays in section {where}" + (", shortened to fit" if lead.get("cut") else ""))
+    elif lead:
+        out.append("their hummed tune is not playing in this beat")
+    return "; ".join(out)
+
+
+def _vocal_text(vocal: dict[str, Any]) -> str:
+    n = vocal.get("takes_recorded") or 0
+    out = [f"{n} take{'s' if n != 1 else ''} recorded", f"playing: {vocal.get('active', 'none chosen')}"]
+    if vocal.get("tuned"):
+        out.append("tuned")
+    t = vocal.get("active_take") or {}
+    if t.get("kind") and t["kind"] != "take":
+        out.append(f"made by {str(t['kind']).replace('_', ' ')}")
+    if t.get("sections"):
+        out.append("covers " + ", ".join(str(x) for x in t["sections"]))
+    on = t.get("on_the_notes")
+    if isinstance(on, (int, float)):
+        out.append("almost every note lands on the song's notes" if on >= 0.9 else
+                   ("most notes land on the song's notes" if on >= 0.7 else "quite a few notes drift off the song's notes"))
+    ms = t.get("sits_behind_beat_ms")
+    if isinstance(ms, (int, float)):
+        out.append("sings right with the beat" if abs(ms) < 15 else
+                   ("sings a little behind the beat" if ms > 0 else "sings a little ahead of the beat"))
+    if t.get("beat_taken_out"):
+        out.append("the beat that got into the mic was taken out")
+    elif t.get("beat_in_the_mic"):
+        out.append("the beat got into the mic")
+    return "; ".join(out)
+
+
+def _mix_text(mix: dict[str, Any]) -> str:
+    p = mix.get("params") or {}
+    out = [str(mix.get("label") or "a mix")]
+    v, b = p.get("vocal_gain_db"), p.get("beat_gain_db")
+    if isinstance(v, (int, float)) and isinstance(b, (int, float)):
+        gap = v - b
+        out.append("voice well above the music" if gap > 4 else
+                   ("voice under the music" if gap < -1 else "voice sitting just above the music"))
+    for who, key in (("voice", "vocal_effects"), ("music", "beat_effects")):
+        fx = [str(e).replace("_", " ") for e in p.get(key) or []]
+        if fx:
+            out.append(f"{who} made: " + ", ".join(fx))
+    if p.get("harmony_enabled"):
+        out.append("harmony voice on")
+    changed = p.get("section_gain_db") or {}
+    if changed:
+        louder = [k for k, v in changed.items() if isinstance(v, (int, float)) and v > 0]
+        quieter = [k for k, v in changed.items() if isinstance(v, (int, float)) and v < 0]
+        if louder:
+            out.append("made louder: " + ", ".join(louder))
+        if quieter:
+            out.append("made quieter: " + ", ".join(quieter))
+    return "; ".join(out)
+
+
+_RECORD_TEXT = {"beat": _beat_text, "vocal": _vocal_text, "mix": _mix_text}
+
+
 def _summary_line(label: str, value: Optional[dict[str, Any]], full: bool) -> Optional[str]:
     if not value:
         return None
-    return f"{label}: {_dump(value)}" if full else f"{label}: present"
+    if not full:
+        return f"{label}: present"
+    text = guard(_RECORD_TEXT[label.lower()](value))   # data words (layer, effect, kind names) pass the filter
+    return f"{label}: {text}"
 
 
 def _decision_line(d: Decision) -> str:
@@ -149,7 +266,7 @@ def _render(
         parts.append("Lyrics: none yet")
 
     if record.fingerprint:
-        parts.append(f"Musical direction (fingerprint): {_dump(record.fingerprint)}")
+        parts.append(f"Musical direction: {guard(_fingerprint_text(record.fingerprint))}")
 
     for label, key, value in (
         ("Beat", "beat", record.beat),
