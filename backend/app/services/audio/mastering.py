@@ -54,7 +54,7 @@ def _process_in_place(board: Pedalboard, audio: np.ndarray) -> np.ndarray:
     return audio
 
 
-def _master_chain() -> Pedalboard:
+def _master_chain(push_db: float = 0.0) -> Pedalboard:
     """
     A restrained mastering chain. The goal is polish, not loudness-war crushing:
     - a touch of low and high shelf for warmth and air
@@ -65,7 +65,7 @@ def _master_chain() -> Pedalboard:
         LowShelfFilter(cutoff_frequency_hz=120, gain_db=1.0),
         HighShelfFilter(cutoff_frequency_hz=8000, gain_db=1.5),
         Compressor(threshold_db=-16, ratio=2.0, attack_ms=10, release_ms=120),
-        Gain(gain_db=2.0),
+        Gain(gain_db=2.0 + push_db),
         BrickwallLimiter(ceiling_db=-1.0, release_ms=100),
     ])
 
@@ -243,22 +243,37 @@ def finish(audio: np.ndarray) -> tuple[bytes, dict]:
     silent = audio.size == 0 or float(np.abs(audio).max()) < 1e-6
     if silent:
         return encode_plain(audio), {"loudness": None, "clipping": 0.0, "passes": 0, "on_target": False}
-    work = np.ascontiguousarray(audio.T, dtype=np.float32)          # (samples, channels), this module's shape
-    _process_in_place(_master_chain(), work)
-    path = _wav_file(work)
-    del work
+    def chained(push_db: float) -> str:
+        work = np.ascontiguousarray(audio.T, dtype=np.float32)      # (samples, channels), this module's shape
+        _process_in_place(_master_chain(push_db), work)
+        p = _wav_file(work)
+        del work
+        return p
+
+    path = chained(0.0)
     try:
         measured = measure_loudness(path)
         mp3 = encode_finished(path, measured)
         report = check_finished(mp3)
         passes = 1
         miss = None if report["loudness"] is None else TARGET_LUFS - report["loudness"]
-        if (miss is not None and abs(miss) > LOUDNESS_TOLERANCE) or (report["clipping"] or 0) > cfg.CLIPPING_SHARE:
+        if miss is not None and miss > LOUDNESS_TOLERANCE:
+            # Too quiet: the peaks are already at the ceiling, so more volume alone cannot help (the loudness pass
+            # holds the peak limit). Drive the limiter by the missing amount instead, then measure again.
+            os.remove(path)
+            # Overshooting is safe (the loudness pass brings a loud song back down); capped so nothing is crushed.
+            path = chained(round(min(6.0, 1.5 * miss + 0.5), 2))
+            measured = measure_loudness(path)
+            mp3 = encode_finished(path, measured)
+            report = check_finished(mp3)
+            passes = 2
+        elif (miss is not None and abs(miss) > LOUDNESS_TOLERANCE) or (report["clipping"] or 0) > cfg.CLIPPING_SHARE:
             mp3 = encode_finished(path, measured, extra_gain_db=round(miss or -0.5, 2))
             report = check_finished(mp3)
             passes = 2
     finally:
-        os.remove(path)
+        if os.path.exists(path):
+            os.remove(path)
     lu = report["loudness"]
     report.update(passes=passes, on_target=lu is not None and abs(TARGET_LUFS - lu) <= LOUDNESS_TOLERANCE
                   and (report["clipping"] or 0) <= cfg.CLIPPING_SHARE)
