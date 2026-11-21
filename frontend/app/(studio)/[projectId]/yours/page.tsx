@@ -10,6 +10,7 @@ import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api/client"
 import { Loader2, RefreshCw } from "lucide-react"
+import { SongTree } from "@/components/studio/SongTree"
 
 interface Identity {
   own_words?: string[]
@@ -90,6 +91,7 @@ export default function YoursPage() {
       <Button variant="outline" size="sm" className="mt-6" onClick={refresh} disabled={working}>
         {working ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Look again
       </Button>
+      <SongTree projectId={projectId} />
     </div>
   )
 }

@@ -18,7 +18,8 @@ import { getRoomHistory, type StoredTurn } from "@/lib/api/conversation"
 import { useSongStore } from "@/store/song"
 import { useDirections } from "@/store/directions"
 import { buildStripModel } from "@/lib/songShape"
-import type { Material } from "@/store/audio"
+import { useAudio, type Material } from "@/store/audio"
+import { speakNote } from "@/lib/api/organs"
 
 export interface ChatTurn {
   id: string
@@ -69,6 +70,25 @@ export function ConversationPanel({
   const [open, setOpen] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
   const rule = RULE[material ?? (room ? ROOM_MATERIAL[room] : "words")]
+
+  // Frank reads its notes aloud (frankenstein spec 14, 4.5): off by default, remembered on this computer, and only
+  // when nothing else is playing, so it never talks over the song.
+  const [speaks, setSpeaks] = useState(false)
+  const spoken = useRef<string | null>(null)
+  useEffect(() => setSpeaks(window.localStorage.getItem("frank.speaks") === "yes"), [])
+  useEffect(() => {
+    const last = [...turns].reverse().find((t) => t.role === "assistant" && typeof t.content === "string" && t.content.trim())
+    if (!speaks || !projectId || !last || spoken.current === last.id) return
+    spoken.current = last.id
+    if (useAudio.getState().playing) return
+    speakNote(projectId, String(last.content).slice(0, 1200))
+      .then((r) => {
+        if (r.audio_url && !useAudio.getState().playing) {
+          void useAudio.getState().play({ id: `frank-says:${last.id}`, url: r.audio_url, label: "Frank reading its note", material: "words" })
+        }
+      })
+      .catch(() => {})
+  }, [turns, speaks, projectId])
 
   // What Frank knows: the same plain line the Song Strip shows, so the person can see Frank has the song.
   const record = useSongStore((s) => s.record)
@@ -136,6 +156,17 @@ export function ConversationPanel({
             <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">What Frank knows</h2>
             <p className="text-sm text-ink-2">{record && (!projectId || record.project_id === projectId) ? knows.summary : "Reading your song…"}</p>
           </div>
+          <button
+            onClick={() => {
+              const next = !speaks
+              setSpeaks(next)
+              window.localStorage.setItem("frank.speaks", next ? "yes" : "no")
+            }}
+            aria-pressed={speaks}
+            className="shrink-0 rounded-sm px-1.5 py-1 text-xs text-ink-3 hover:text-ink"
+          >
+            {speaks ? "Reading aloud" : "Read aloud"}
+          </button>
           <button
             onClick={() => setOpen(false)}
             aria-label="Hide the conversation with Frank"

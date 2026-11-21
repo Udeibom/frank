@@ -15,7 +15,7 @@ import { PART_NAMES } from "@/lib/api/finish"
 import type { BeatOperation, BeatSection } from "@/lib/api/beat"
 
 /** The order parts are listed in (backend generation/ops.py PARTS). */
-const PART_ORDER = ["drums", "bass", "keys", "melody", "pad", "strings", "arp"] as const
+const PART_ORDER = ["drums", "bass", "keys", "melody", "accompaniment", "pad", "strings", "arp"] as const
 
 const PLAYS_PLURAL = new Set(["drums", "keys", "strings"])
 
@@ -79,6 +79,20 @@ export function Arrangement({ sections, progress, busy, working, onPlayFrom, onC
         hint: "More space around it",
         onSelect: () => onChange([{ op: "sparser", part, section: i }], { section: i, part }, `Making ${name.toLowerCase()} simpler in ${where}…`),
       },
+      ...(part === "drums"
+        ? [
+            {
+              label: "Looser",
+              hint: "Leans and pushes, like a person playing",
+              onSelect: () => onChange([{ op: "looser", section: i }], { section: i, part }, `Loosening the drums in ${where}…`),
+            },
+            {
+              label: "Tighter",
+              hint: "Right on the beat",
+              onSelect: () => onChange([{ op: "tighter", section: i }], { section: i, part }, `Tightening the drums in ${where}…`),
+            },
+          ]
+        : []),
       {
         label: "Try another idea",
         hint: `A different way it ${verb}`,

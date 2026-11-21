@@ -28,6 +28,7 @@ import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
 import { formatTime, useAudio, usePlayback, type Track } from "@/store/audio"
 import { Download } from "lucide-react"
+import { MatchedFinish, NotesAndCredits } from "@/components/studio/FinishOrgans"
 import { cn } from "@/lib/utils"
 
 type Which = "finished" | "as_mixed"
@@ -345,6 +346,13 @@ export default function ExportRoomPage() {
           <FrankNote problem>
             {error}
           </FrankNote>
+        )}
+
+        {step === "download" && (
+          <div className="grid max-w-[1000px] gap-4 xl:grid-cols-2">
+            <NotesAndCredits projectId={projectId} onDownload={clickDownload} />
+            <MatchedFinish projectId={projectId} mixVersionId={activeMix.id} frankUrl={finished?.url ?? null} />
+          </div>
         )}
 
         {surpriseState === "offer" && (

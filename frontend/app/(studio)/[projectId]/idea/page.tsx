@@ -10,6 +10,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useParams } from "next/navigation"
+import { WordsFeel } from "@/components/studio/WordsFeel"
 import { LyricsEditor } from "@/components/studio/LyricsEditor"
 import { LyricsVersionHistory } from "@/components/studio/LyricsVersionHistory"
 import { VoiceMemoButton } from "@/components/studio/VoiceMemoButton"
@@ -236,6 +237,9 @@ export default function WordsPage() {
                 }
                 onError={(message) => sayAsFrank(message)}
               />
+            </div>
+            <div className="mt-5">
+              <WordsFeel projectId={projectId} getWords={() => currentLyricsRef.current} onSay={(m) => sayAsFrank(m)} />
             </div>
           </div>
 

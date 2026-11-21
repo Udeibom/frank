@@ -15,6 +15,7 @@ import { ConversationPanel, type ChatTurn } from "@/components/conversation/Conv
 import { ChangeLine } from "@/components/conversation/ChangeLine"
 import { FrankNote } from "@/components/conversation/FrankNote"
 import { DirectionCard, directionTrack } from "@/components/studio/DirectionCard"
+import { rankedDirections } from "@/lib/api/organs"
 import { HumIntake } from "@/components/studio/HumIntake"
 import { RhythmIntake } from "@/components/studio/RhythmIntake"
 import { sendFeelMessage, generateTexture, saveFingerprint, getFingerprint, getTextureWaveform } from "@/lib/api/feel"
@@ -60,6 +61,14 @@ export default function FeelingPage() {
   const summaryRef = useRef<string>("")
   const lastTextureIdRef = useRef<string | null>(null)
 
+  const [closestId, setClosestId] = useState<string | null>(null)
+  const readyCount = directions.filter((x) => x.status === "ready").length
+  useEffect(() => {
+    if (readyCount < 2) return
+    rankedDirections(projectId)
+      .then((r) => setClosestId(r.words.length ? r.ranked[0]?.texture_id ?? null : null))
+      .catch(() => setClosestId(null))
+  }, [projectId, readyCount])
   const keptId = keptHere ?? ((record?.fingerprint as { reference_texture_id?: string } | null)?.reference_texture_id ?? null)
   const making = directions.some((d) => d.status === "making")
   const ready = directions.filter((d) => d.status === "ready")
@@ -352,6 +361,7 @@ export default function FeelingPage() {
                     onKeep={keepDirection}
                     onNotThis={notThis}
                     onRetry={retry}
+                    closest={d.id === closestId}
                   />
                 </li>
               ))}

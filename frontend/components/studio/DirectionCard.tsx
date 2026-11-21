@@ -22,6 +22,8 @@ interface DirectionCardProps {
   onKeep: (d: Direction) => void
   onNotThis: (d: Direction) => void
   onRetry: (d: Direction) => void
+  /** Frank's ears found this one sounds closest to the person's own words (frankenstein spec 14, 2.1). */
+  closest?: boolean
 }
 
 export function directionTrack(d: Direction): Track {
@@ -35,7 +37,7 @@ function madeAt(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
 }
 
-export function DirectionCard({ direction: d, kept, primary, onKeep, onNotThis, onRetry }: DirectionCardProps) {
+export function DirectionCard({ direction: d, kept, primary, onKeep, onNotThis, onRetry, closest }: DirectionCardProps) {
   const track = directionTrack(d)
   const { isCurrent, playing, progress, position, duration } = usePlayback(d.status === "ready" ? d.id : null)
   const seekFraction = useAudio((s) => s.seekFraction)
@@ -85,6 +87,7 @@ export function DirectionCard({ direction: d, kept, primary, onKeep, onNotThis, 
       <div>
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="font-written text-xl text-ink">Direction {d.number}</h3>
+          {closest && <span className="ml-2 rounded-full border border-feel/60 px-2 py-0.5 text-xs text-ink-2">Closest to your words</span>}
           {kept && (
             <span className="flex items-center gap-1 text-sm text-feel">
               <Check className="h-3.5 w-3.5" aria-hidden="true" /> Kept for your song

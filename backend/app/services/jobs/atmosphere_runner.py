@@ -70,7 +70,7 @@ async def run_atmosphere_job(job_id: str, project_id: str, source: str, words: O
         url = await asyncio.to_thread(upload_audio, "mixes", audio, "mp3", "atmosphere")
         state = await projects_db.get_project_active_state(project_id) or {}
         current = await mix_db.get_mix_version(state["active_mix_id"]) if state.get("active_mix_id") else None
-        params = dict((current or {}).get("params") or {})
+        params = {k: v for k, v in ((current or {}).get("mix_params") or {}).items() if k != "sources"}
         params["atmosphere"] = {"url": url, "enabled": True, "level_db": level_db, "plain": plain,
                                 "organ": organ, "attribution": attribution}
         await mix_runner.run_mix_job(job_id, project_id, params, "preview")

@@ -13,6 +13,7 @@ import {
   type ChatTurn,
 } from "@/components/conversation/ConversationPanel"
 import { StemBalance } from "@/components/studio/StemBalance"
+import { AtmospherePanel, ConductPanel, ListenPanel } from "@/components/studio/BlendOrgans"
 import { MixVersions, mixTrack, summarize } from "@/components/studio/MixVersions"
 import { FrankNote } from "@/components/conversation/FrankNote"
 import { PlayButton } from "@/components/audio/PlayButton"
@@ -384,6 +385,20 @@ export default function MixRoomPage() {
             }}
             onClose={() => setCandidates(null)}
           />
+        )}
+
+        {hasMix && (
+          <div className="grid max-w-[1000px] gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <ListenPanel projectId={projectId} onFix={(concern) => startRefine(concern)} />
+            <AtmospherePanel
+              projectId={projectId}
+              current={(activeVersion?.mix_params as { atmosphere?: { enabled?: boolean; plain?: string } } | undefined)?.atmosphere ?? null}
+              onDone={() => void loadVersions()}
+            />
+            {songParts?.parts && songParts.parts.length > 0 && (
+              <ConductPanel parts={songParts.parts} onSet={(part, d) => void changePart(part, { level_delta_db: d })} />
+            )}
+          </div>
         )}
 
         <div className="grid max-w-[1000px] gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

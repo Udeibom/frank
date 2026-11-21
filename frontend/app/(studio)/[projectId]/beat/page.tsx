@@ -34,6 +34,7 @@ import {
   type BeatSection,
 } from "@/lib/api/beat"
 import { getFingerprint } from "@/lib/api/feel"
+import { accompanyTune } from "@/lib/api/organs"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
 import { useSongStore } from "@/store/song"
@@ -287,6 +288,12 @@ export default function MusicPage() {
     answers = [
       { label: "Something feels off", onClick: () => startRefine(null) },
       ...(hasVoice ? [{ label: previewing ? "Getting your voice…" : "Hear it with my voice", onClick: handlePreviewWithVocal, disabled: previewing }] : []),
+      ...(activeVersion?.params.lead_info?.used
+        ? [{
+            label: "Write a part around my tune",
+            onClick: () => void runJob(() => accompanyTune(projectId), "Writing a part to go with your tune. This takes a minute or two.", null),
+          }]
+        : []),
     ]
   } else if (fingerprint) {
     note = "Your feeling is kept. Ready for Frank to build the music from it?"

@@ -316,7 +316,7 @@ async def switch_atmosphere(project_id: str, body: AtmosphereSwitch, background:
     """Take the atmosphere out (or put it back, or change how loud it is): a new mix version, the old one kept."""
     state = await projects_db.get_project_active_state(project_id) or {}
     current = await mix_db.get_mix_version(state["active_mix_id"]) if state.get("active_mix_id") else None
-    params = dict((current or {}).get("params") or {})
+    params = {k: v for k, v in ((current or {}).get("mix_params") or {}).items() if k != "sources"}
     if not params.get("atmosphere"):
         raise HTTPException(status_code=404, detail="There's no atmosphere in this mix yet.")
     params["atmosphere"] = {**params["atmosphere"], "enabled": body.enabled,

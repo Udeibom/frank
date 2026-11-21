@@ -36,6 +36,7 @@ export const PART_NAMES: Record<string, string> = {
   bass: "Bass",
   keys: "Keys",
   melody: "The tune",
+  accompaniment: "Around your tune",
   pad: "Soft background",
   strings: "Strings",
   arp: "Running pattern",

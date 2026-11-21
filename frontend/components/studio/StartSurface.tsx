@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { RhythmIntake } from "@/components/studio/RhythmIntake"
+import { WorldStarts } from "@/components/studio/WorldStarts"
 import { useRecorder } from "@/hooks/useRecorder"
 import { saveLyrics } from "@/lib/api/lyrics"
 import { getFingerprint, saveFingerprint } from "@/lib/api/feel"
@@ -191,6 +192,8 @@ export function StartSurface({ projectId, onSay }: StartSurfaceProps) {
       )}
 
       <RhythmIntake projectId={projectId} onConfirmed={(hints) => fillGaps(hints).then(() => say("Got your rhythm. The drums will follow it."))} onSay={say} />
+
+      <WorldStarts projectId={projectId} onSay={say} onChanged={refresh} />
 
       {working && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
