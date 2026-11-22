@@ -307,11 +307,11 @@ export default function MusicPage() {
 
   return (
     <div className="flex h-full">
-      <div className="flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--music)]">
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-music" />
-          <h1 className="text-base font-medium text-ink">Music</h1>
-          <span className="text-sm text-ink-2">Shape the music behind your song</span>
+      <div className="room-music flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--music)]">
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className="h-3 w-3 rounded-full bg-music" />
+          <h1 className="font-written italic text-3xl" style={{ color: "rgb(var(--music))" }}>Music</h1>
+          <span className="text-sm text-ink-3">Shape the music behind your song</span>
         </div>
 
         <FrankNote aside={aside} answers={answers} material="music" problem={work.kind === "failed"} busy={busy}>

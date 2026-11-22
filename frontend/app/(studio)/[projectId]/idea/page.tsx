@@ -200,11 +200,11 @@ export default function WordsPage() {
 
   return (
     <div className="flex h-full">
-      <div className="flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-words" />
-          <h1 className="text-base font-medium text-ink">Words</h1>
-          <span className="text-sm text-ink-2">Write your song</span>
+      <div className="room-words flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className="h-3 w-3 rounded-full bg-words" />
+          <h1 className="font-written italic text-3xl" style={{ color: "rgb(var(--words))" }}>Words</h1>
+          <span className="text-sm text-ink-3">Write your song</span>
         </div>
 
         <FrankNote answers={answers} material="words">
@@ -215,13 +215,15 @@ export default function WordsPage() {
           {/* The page */}
           <div className="min-w-0 max-w-[640px] flex-1">
             {loaded ? (
-              <LyricsEditor
-                projectId={projectId}
-                initialContent={editorContent}
-                onContentChange={handleContentChange}
-                onSelectionChange={(text) => (selectedTextRef.current = text)}
-                onVersionSaved={handleVersionSaved}
-              />
+              <div className="rounded-xl border border-line/60 bg-raised/40 px-8 py-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]">
+                <LyricsEditor
+                  projectId={projectId}
+                  initialContent={editorContent}
+                  onContentChange={handleContentChange}
+                  onSelectionChange={(text) => (selectedTextRef.current = text)}
+                  onVersionSaved={handleVersionSaved}
+                />
+              </div>
             ) : (
               <p className="text-base text-ink-2" role="status">
                 Opening your words…
@@ -245,22 +247,22 @@ export default function WordsPage() {
 
           {/* The margin */}
           <aside aria-label="About your words" className="hidden w-[260px] shrink-0 flex-col gap-8 lg:flex">
-            <section aria-labelledby="sections-heading" className="flex flex-col gap-2">
+            <section aria-labelledby="sections-heading" className="flex flex-col gap-3">
               <h2 id="sections-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
                 Sections
               </h2>
               {sections.length ? (
-                <ol className="flex flex-col gap-1">
+                <ol className="flex flex-col gap-2">
                   {sections.map((s, i) => (
-                    <li key={`${s}-${i}`} className="flex items-center gap-2 text-base text-ink">
-                      <span aria-hidden="true" className="h-2 w-2 rounded-[2px] bg-words" />
-                      {capitalise(s === "prechorus" ? "pre-chorus" : s)}
+                    <li key={`${s}-${i}`} className="flex items-center gap-2.5">
+                      <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: "rgb(var(--words) / 0.7)" }} />
+                      <span className="font-written italic text-base text-ink">{capitalise(s === "prechorus" ? "pre-chorus" : s)}</span>
                     </li>
                   ))}
                 </ol>
               ) : (
                 <p className="text-sm text-ink-2">
-                  {hasWords ? "Give a section its own line (Verse, Chorus) and it shows up here and in the song bar above." : "Your sections will show up here."}
+                  {hasWords ? "Give a section its own line (Verse, Chorus) and it shows up here." : "Your sections will show up here."}
                 </p>
               )}
             </section>

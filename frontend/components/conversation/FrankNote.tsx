@@ -32,33 +32,51 @@ interface FrankNoteProps {
 }
 
 export function FrankNote({ children, aside, answers = [], material, problem, busy, className }: FrankNoteProps) {
+  const borderColor = problem ? "border-problem" : material ? RULE[material] : "border-frank/50"
   return (
     <section
       aria-label="Frank"
       aria-live="polite"
       aria-busy={busy}
       className={cn(
-        "flex items-center justify-between gap-5 rounded-r-md border-l-[3px] bg-surface px-5 py-4",
-        problem ? "border-problem" : material ? RULE[material] : "border-ink-3",
+        "flex items-start justify-between gap-5 rounded-r-lg border-l-[3px] bg-surface/80 px-5 py-4",
+        "shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]",
+        borderColor,
+        // Amber pulse only on non-error notes
+        !problem && "frank-note-border",
         className,
       )}
     >
-      <div className="min-w-0 max-w-xl">
+      <div className="flex min-w-0 flex-1 flex-col gap-1 max-w-xl">
+        {/* Frank avatar label */}
+        <div className="flex items-center gap-2 mb-1">
+          <span
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold italic select-none"
+            style={{
+              background: "rgb(var(--frank) / 0.15)",
+              color: "rgb(var(--frank))",
+            }}
+            aria-hidden="true"
+          >
+            f
+          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-3">Frank</span>
+        </div>
         <p className="text-base text-ink">{children}</p>
-        {aside && <p className="mt-0.5 text-sm text-ink-2">{aside}</p>}
+        {aside && <p className="mt-1 text-sm text-ink-2">{aside}</p>}
       </div>
       {answers.length > 0 && (
-        <div className="flex shrink-0 gap-2.5">
+        <div className="flex shrink-0 flex-wrap gap-2 pt-1">
           {answers.map((a) => (
             <button
               key={a.label}
               onClick={a.onClick}
               disabled={a.disabled}
               className={cn(
-                "whitespace-nowrap rounded-md border px-4 py-2 text-base transition-colors disabled:opacity-60",
+                "whitespace-nowrap rounded-full border px-5 py-2 text-sm font-medium transition-all duration-150 disabled:opacity-60",
                 a.primary
-                  ? "border-frank bg-frank font-medium text-ground hover:bg-frank/90"
-                  : "border-line bg-raised text-ink hover:border-ink-3",
+                  ? "border-frank bg-frank text-ground hover:bg-frank/90 hover:-translate-y-px"
+                  : "border-line bg-raised text-ink hover:border-ink-3 hover:bg-raised/70",
               )}
             >
               {a.label}

@@ -149,6 +149,41 @@
       animation: none;
     }
   }
+
+  /* ── Room atmosphere tints ──────────────────────────────────────────────────
+     Each studio room gets a barely-visible colour wash so the space feels
+     distinctive without competing with content. Add the class to the room root. */
+  .room-words { background-color: rgb(var(--words) / 0.03); }
+  .room-feel  { background-color: rgb(var(--feel)  / 0.03); }
+  .room-music { background-color: rgb(var(--music) / 0.03); }
+  .room-voice { background-color: rgb(var(--voice) / 0.04); }
+
+  /* ── Frank thinking: three amber dots ──────────────────────────────────────
+     Use <div class="dot-pulse"><span/><span/><span/></div> */
+  .dot-pulse span {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background-color: rgb(var(--frank));
+    animation: dotPulse 1.4s ease-in-out infinite;
+  }
+  .dot-pulse span:nth-child(2) { animation-delay: 0.2s; }
+  .dot-pulse span:nth-child(3) { animation-delay: 0.4s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dot-pulse span { animation: none; opacity: 0.6; }
+  }
+
+  /* ── Frank note border pulse ────────────────────────────────────────────────
+     Gentle amber pulse on the left border of Frank's stage note. */
+  .frank-note-border {
+    animation: frankBorderPulse 2.5s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .frank-note-border { animation: none; }
+  }
 }
 
 @keyframes sweep {
@@ -176,21 +211,21 @@
 .frank-lyrics p[data-rhyme="5"]::before { background: rgb(var(--caution)); }
 
 @keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes glowPulse {
-  0%, 100% {
-    box-shadow: 0 0 10px 2px rgb(var(--frank) / 0.15);
-  }
-  50% {
-    box-shadow: 0 0 22px 6px rgb(var(--frank) / 0.30);
-  }
+  0%, 100% { box-shadow: 0 0 10px 2px rgb(var(--frank) / 0.15); }
+  50%       { box-shadow: 0 0 22px 6px rgb(var(--frank) / 0.30); }
+}
+
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40%           { opacity: 1;   transform: scale(1.1); }
+}
+
+@keyframes frankBorderPulse {
+  0%, 100% { border-color: rgb(var(--frank) / 0.35); }
+  50%       { border-color: rgb(var(--frank) / 0.85); }
 }

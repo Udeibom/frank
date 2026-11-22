@@ -45,13 +45,17 @@ export function DirectionCard({ direction: d, kept, primary, onKeep, onNotThis, 
 
   if (d.status === "making") {
     return (
-      <article aria-label="A direction is being made" aria-busy="true" className="flex min-h-[236px] flex-col justify-between rounded-md border border-dashed border-ink-3/70 bg-surface p-4">
-        <div>
-          <h3 className="font-written text-xl text-ink">Finding a sound…</h3>
+      <article
+        aria-label="A direction is being made"
+        aria-busy="true"
+        className="relative flex min-h-[236px] flex-col justify-between overflow-hidden rounded-xl border border-frank/20 bg-raised p-5"
+      >
+        <div className="sweep absolute inset-0 opacity-50" aria-hidden="true" />
+        <div className="relative z-10">
+          <h3 className="font-written italic text-xl text-ink">Finding a sound…</h3>
           <p className="text-sm text-ink-2">This usually takes about 20 seconds. Keep talking to Frank while you wait.</p>
         </div>
-        <div className="sweep h-16 w-full rounded-sm" aria-hidden="true" />
-        <div className="flex items-center gap-2 text-sm text-ink-3" role="status">
+        <div className="relative z-10 flex items-center gap-2 text-sm text-ink-3" role="status">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           Making it from what you said
         </div>
@@ -80,17 +84,23 @@ export function DirectionCard({ direction: d, kept, primary, onKeep, onNotThis, 
     <article
       aria-label={`Direction ${d.number}`}
       className={cn(
-        "flex flex-col gap-3 rounded-md border bg-surface p-4 transition-colors",
-        isCurrent ? "border-feel" : kept ? "border-feel/60" : d.setAside ? "border-dashed border-ink-3/70" : "border-transparent",
+        "flex flex-col gap-3 rounded-xl border bg-raised p-5 transition-all duration-200",
+        isCurrent
+          ? "border-feel shadow-[0_0_0_1px_rgb(var(--feel)/0.3),0_4px_24px_rgb(var(--feel)/0.12)]"
+          : kept
+            ? "border-feel/50"
+            : d.setAside
+              ? "border-dashed border-ink-3/40 opacity-70"
+              : "border-line/60 hover:border-line",
       )}
     >
       <div>
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="font-written text-xl text-ink">Direction {d.number}</h3>
-          {closest && <span className="ml-2 rounded-full border border-feel/60 px-2 py-0.5 text-xs text-ink-2">Closest to your words</span>}
+          <h3 className="font-written italic text-xl text-ink">Direction {d.number}</h3>
+          {closest && <span className="ml-2 rounded-full bg-feel/10 border border-feel/40 px-2.5 py-0.5 text-xs text-ink-2">Closest to your words</span>}
           {kept && (
             <span className="flex items-center gap-1 text-sm text-feel">
-              <Check className="h-3.5 w-3.5" aria-hidden="true" /> Kept for your song
+              <Check className="h-3.5 w-3.5" aria-hidden="true" /> Kept
             </span>
           )}
           {!kept && d.setAside && <span className="text-sm text-ink-3">Set aside</span>}
@@ -122,10 +132,10 @@ export function DirectionCard({ direction: d, kept, primary, onKeep, onNotThis, 
           <button
             onClick={() => onKeep(d)}
             className={cn(
-              "flex-1 rounded-md border px-3 py-2 text-base transition-colors",
+              "flex-1 rounded-full border px-3 py-2 text-sm font-medium transition-all duration-150",
               primary
-                ? "border-frank bg-frank font-medium text-ground hover:bg-frank/90"
-                : "border-line bg-raised text-ink hover:border-ink-3",
+                ? "border-frank bg-frank text-ground hover:bg-frank/90 hover:-translate-y-px"
+                : "border-line bg-surface text-ink hover:border-ink-3",
             )}
           >
             This is it
@@ -133,7 +143,7 @@ export function DirectionCard({ direction: d, kept, primary, onKeep, onNotThis, 
           {!d.setAside && (
             <button
               onClick={() => onNotThis(d)}
-              className="flex-1 rounded-md border border-line bg-raised px-3 py-2 text-base text-ink hover:border-ink-3"
+              className="flex-1 rounded-full border border-line bg-surface px-3 py-2 text-sm text-ink hover:border-ink-3"
             >
               Not this
             </button>

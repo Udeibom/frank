@@ -280,11 +280,11 @@ export default function FeelingPage() {
 
   return (
     <div className="flex h-full">
-      <div className="flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-feel" />
-          <h1 className="text-base font-medium text-ink">Feeling</h1>
-          <span className="text-sm text-ink-2">Find how the song should feel</span>
+      <div className="room-feel flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className="h-3 w-3 rounded-full bg-feel" />
+          <h1 className="font-written italic text-3xl" style={{ color: "rgb(var(--feel))" }}>Feeling</h1>
+          <span className="text-sm text-ink-3">Find how the song should feel</span>
         </div>
 
         <FrankNote aside={aside} answers={answers} material="feel">
@@ -316,10 +316,10 @@ export default function FeelingPage() {
                     e.currentTarget.form?.requestSubmit()
                   }
                 }}
-                rows={2}
+                rows={3}
                 autoFocus
                 placeholder="Walking home alone after a party, slow and warm, a little lonely…"
-                className="min-h-[56px] max-w-xl flex-1 resize-none rounded-md bg-raised px-3 py-2.5 font-written text-[17px] leading-[25px] text-words placeholder:font-sans placeholder:text-base placeholder:text-ink-3"
+                className="min-h-[96px] max-w-xl flex-1 resize-none rounded-xl border border-line/60 bg-raised/40 px-5 py-4 font-written text-[17px] leading-[25px] text-words placeholder:font-sans placeholder:text-base placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-feel/40 transition-shadow"
               />
               <button
                 type="submit"
@@ -339,10 +339,14 @@ export default function FeelingPage() {
           {ordered.length === 0 ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
               {[0, 1, 2].map((i) => (
-                <div key={i} aria-hidden="true" className="flex min-h-[236px] flex-col justify-between rounded-md border border-dashed border-ink-3/70 p-4">
-                  <span className="font-written text-xl text-ink-3">Direction {i + 1}</span>
-                  <div className="h-16 w-full rounded-sm border border-dashed border-ink-3/40" />
-                  <span className="text-sm text-ink-3">{directionsLoaded ? "Frank will play it here" : "Looking for your directions…"}</span>
+                <div
+                  key={i}
+                  aria-hidden="true"
+                  className="relative flex min-h-[236px] flex-col justify-between overflow-hidden rounded-xl border border-frank/20 bg-raised p-4"
+                >
+                  <div className="sweep absolute inset-0" style={{ "--sweep": "var(--frank)" } as React.CSSProperties} />
+                  <span className="font-written italic text-xl text-ink-3 relative z-10">Direction {i + 1}</span>
+                  <span className="text-sm text-ink-3 relative z-10">{directionsLoaded ? "Frank will play it here" : "Looking for your directions…"}</span>
                 </div>
               ))}
             </div>

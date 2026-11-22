@@ -384,12 +384,12 @@ export default function VoiceRoomPage() {
 
   return (
     <div className="flex h-full">
-      <div className="flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
+      <div className="room-voice flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-voice" />
-            <h1 className="text-base font-medium text-ink">Voice</h1>
-            <span className="text-sm text-ink-2">Record your voice</span>
+          <div className="flex items-center gap-3">
+            <span aria-hidden="true" className="h-3 w-3 rounded-full bg-voice" />
+            <h1 className="font-written italic text-3xl" style={{ color: "rgb(var(--voice))" }}>Voice</h1>
+            <span className="text-sm text-ink-3">Record your voice</span>
           </div>
           <div className="flex items-center gap-4">
           {!showHeadphoneCheck && (

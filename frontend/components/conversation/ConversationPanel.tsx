@@ -140,8 +140,10 @@ export function ConversationPanel({
     )
   }
 
+  // User lines: written face + room colour rule
   const lineUser = cn("border-l-2 pl-3 font-written text-[17px] leading-[25px]", rule)
-  const lineFrank = "text-base text-ink"
+  // Frank lines: subtle amber tint left border
+  const lineFrank = "border-l-2 border-frank/40 pl-3 py-1.5 rounded-r-md bg-frank/[0.04] text-base text-ink"
 
   return (
     <>
@@ -149,34 +151,52 @@ export function ConversationPanel({
       <div aria-hidden="true" className="hidden w-14 shrink-0 max-[1100px]:block" />
       <aside
         aria-label="Frank"
-        className="flex w-[340px] shrink-0 flex-col border-l border-line bg-surface max-[1100px]:fixed max-[1100px]:bottom-0 max-[1100px]:right-0 max-[1100px]:top-24 max-[1100px]:z-30 max-[1100px]:shadow-2xl"
+        className="flex w-[340px] shrink-0 flex-col border-l border-line bg-surface max-[1100px]:fixed max-[1100px]:bottom-0 max-[1100px]:right-0 max-[1100px]:top-10 max-[1100px]:z-30 max-[1100px]:shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">What Frank knows</h2>
-            <p className="text-sm text-ink-2">{record && (!projectId || record.project_id === projectId) ? knows.summary : "Reading your song…"}</p>
+        {/* Panel header */}
+        <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
+          <div className="min-w-0 flex items-center gap-2">
+            {/* Frank avatar */}
+            <span
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold italic select-none"
+              style={{ background: "rgb(var(--frank) / 0.15)", color: "rgb(var(--frank))" }}
+              aria-hidden="true"
+            >
+              f
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">Frank</h2>
+              <p className="text-xs text-ink-3 truncate max-w-[180px]">
+                {record && (!projectId || record.project_id === projectId)
+                  ? knows.summary
+                  : "Reading your song…"}
+              </p>
+            </div>
           </div>
-          <button
-            onClick={() => {
-              const next = !speaks
-              setSpeaks(next)
-              window.localStorage.setItem("frank.speaks", next ? "yes" : "no")
-            }}
-            aria-pressed={speaks}
-            className="shrink-0 rounded-sm px-1.5 py-1 text-xs text-ink-3 hover:text-ink"
-          >
-            {speaks ? "Reading aloud" : "Read aloud"}
-          </button>
-          <button
-            onClick={() => setOpen(false)}
-            aria-label="Hide the conversation with Frank"
-            className="shrink-0 rounded-sm p-1 text-ink-3 hover:text-ink"
-          >
-            <ChevronsRight className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => {
+                const next = !speaks
+                setSpeaks(next)
+                window.localStorage.setItem("frank.speaks", next ? "yes" : "no")
+              }}
+              aria-pressed={speaks}
+              className="rounded-sm px-1.5 py-1 text-[10px] text-ink-3 hover:text-ink"
+            >
+              {speaks ? "Reading aloud" : "Read aloud"}
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Hide the conversation with Frank"
+              className="rounded-sm p-1 text-ink-3 hover:text-ink"
+            >
+              <ChevronsRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-5" aria-live="polite" aria-relevant="additions">
+        {/* Messages */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5" aria-live="polite" aria-relevant="additions">
           {earlier.length > 0 && (
             <div className="mb-5 flex flex-col gap-4" role="group" aria-label="Earlier conversation">
               <p className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">Earlier</p>
@@ -194,15 +214,48 @@ export function ConversationPanel({
             <div className="flex flex-col gap-5">
               {turns.map((turn) => (
                 <div key={turn.id} className="flex flex-col gap-2.5">
-                  {turn.content && <p className={turn.role === "user" ? lineUser : lineFrank}>{turn.content}</p>}
+                  {turn.content && (
+                    <div className={turn.role === "user" ? "" : "flex flex-col gap-0.5"}>
+                      {turn.role === "assistant" && (
+                        <span className="flex items-center gap-1.5 mb-0.5" aria-hidden="true">
+                          <span
+                            className="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold italic select-none"
+                            style={{ background: "rgb(var(--frank) / 0.15)", color: "rgb(var(--frank))" }}
+                          >
+                            f
+                          </span>
+                          <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-3">Frank</span>
+                        </span>
+                      )}
+                      <p className={turn.role === "user" ? lineUser : lineFrank}>{turn.content}</p>
+                    </div>
+                  )}
                   {turn.actionBlock}
                 </div>
               ))}
-              {isThinking && <p className="text-sm text-ink-3">Frank is thinking…</p>}
+              {isThinking && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="flex items-center gap-1.5 mb-0.5" aria-hidden="true">
+                    <span
+                      className="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold italic select-none"
+                      style={{ background: "rgb(var(--frank) / 0.15)", color: "rgb(var(--frank))" }}
+                    >
+                      f
+                    </span>
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-3">Frank</span>
+                  </span>
+                  <div className="dot-pulse flex gap-1.5 py-2 pl-3" role="status" aria-label="Frank is thinking">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
+        {/* Input */}
         <form onSubmit={handleSubmit} className="border-t border-line p-4">
           {inputAccessory && <div className="mb-3">{inputAccessory}</div>}
           <div className="flex items-end gap-2">
@@ -216,15 +269,15 @@ export function ConversationPanel({
                 }
               }}
               placeholder={placeholder}
-              rows={1}
-              className="max-h-32 min-h-[40px] flex-1 resize-none rounded-md bg-raised px-3 py-2.5 text-base text-ink placeholder:text-ink-3"
+              rows={2}
+              className="max-h-32 min-h-[56px] flex-1 resize-none rounded-xl bg-raised px-3 py-3 text-base text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-frank/40 transition-shadow"
               aria-label="Message to Frank"
             />
             <button
               type="submit"
               disabled={!input.trim() || isThinking}
               aria-label="Send message"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-raised text-ink transition-colors hover:bg-line disabled:text-ink-3"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-frank text-ground transition-all hover:bg-frank/90 hover:scale-105 disabled:bg-raised disabled:text-ink-3 disabled:scale-100"
             >
               <Send className="h-4 w-4" aria-hidden="true" />
             </button>
