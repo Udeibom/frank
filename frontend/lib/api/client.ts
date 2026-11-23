@@ -99,11 +99,18 @@ async function request<T>(
     clearTimeout(timeoutId)
   }
 
+  if (res.status < 500) serverAnswered()     // a 5xx from the proxy may mean the server is still asleep
   if (!res.ok) {
     return fail(res, "Something went wrong — want to try again?")
   }
 
   return res.json() as Promise<T>
+}
+
+/** Any answer from the server means it is awake: the waking banner listens for this (core-path spec 15, 6.1). */
+export const SERVER_ANSWERED = "frank-server-answered"
+function serverAnswered(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SERVER_ANSWERED))
 }
 
 export async function uploadFile<T>(

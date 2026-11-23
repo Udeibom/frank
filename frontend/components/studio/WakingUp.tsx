@@ -8,10 +8,14 @@
 
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { SERVER_ANSWERED } from "@/lib/api/client"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const PATIENCE_MS = 3000
 const RETRY_MS = 3000
+// A check that hangs (the server busy or restarting) is given up on and tried again, so the banner can never
+// stay up after the server is back (core-path spec 15, 6.1: on 22 Nov it stayed up through a whole session).
+const CHECK_TIMEOUT_MS = 8000
 
 export function WakingUp() {
   const [waking, setWaking] = useState(false)
@@ -19,17 +23,25 @@ export function WakingUp() {
   useEffect(() => {
     let done = false
     const slow = setTimeout(() => !done && setWaking(true), PATIENCE_MS)
+    function answered() {
+      done = true
+      setWaking(false)
+    }
+    window.addEventListener(SERVER_ANSWERED, answered)
     async function ping() {
       while (!done) {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS)
         try {
-          const r = await fetch(`${API_URL}/health`, { cache: "no-store" })
+          const r = await fetch(`${API_URL}/health`, { cache: "no-store", signal: controller.signal })
           if (r.ok) {
-            done = true
-            setWaking(false)
+            answered()
             return
           }
         } catch {
-          // still asleep: try again
+          // still asleep, or the check hung: try again
+        } finally {
+          clearTimeout(timer)
         }
         await new Promise((res) => setTimeout(res, RETRY_MS))
       }
@@ -38,6 +50,7 @@ export function WakingUp() {
     return () => {
       done = true
       clearTimeout(slow)
+      window.removeEventListener(SERVER_ANSWERED, answered)
     }
   }, [])
 

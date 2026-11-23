@@ -172,3 +172,25 @@ def test_asking_for_different_again_and_again_goes_through_every_sound_before_re
 @pytest.mark.parametrize("said", ["Try something quite different.", "That one isn't quite it.", "try again", "something else"])
 def test_the_founders_reactions_ask_for_a_different_direction(said):
     assert texture.wants_different(said)
+
+
+# ─── Requirement 6.2: a reaction is never kept as the song's description ─
+
+from app.services.finish import intent  # noqa: E402
+
+
+@pytest.mark.parametrize("said", [
+    "That one isn't quite it.", "It is too fast and random.",
+    "That you made the drum feel bit a relaxed does not reduce the speed. It's a worship song and the beat is too fast for it.",
+    "Those things you did does not reduce the speed of the beat. It's still the same speed with the first beat.",
+])
+def test_the_founders_reactions_are_not_the_songs_description(said):
+    assert not intent.looks_like_description("feel", said) and not intent.looks_like_description("beat", said)
+
+
+@pytest.mark.parametrize("said", [
+    "A worship song about being in awe of God, slow and full of wonder",
+    "standing alone in the rain after losing someone",
+])
+def test_real_descriptions_are_still_kept(said):
+    assert intent.looks_like_description("feel", said)

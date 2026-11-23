@@ -17,13 +17,25 @@ DESCRIBING_ROOMS = {"idea", "feel", "beat"}
 MIN_WORDS = 5
 # Messages that are instructions about the tool, not a description of the song.
 NOT_A_DESCRIPTION = re.compile(r"^\s*(make|build|change|turn|add|remove|can you|could you|play|stop|undo|go back|give me|try)\b", re.I)
+# Reactions to what Frank just played (core-path spec 15, 6.2): "That one isn't quite it." was kept as the song's
+# description on 22 Nov, so the Finish room would have asked "You said 'That one isn't quite it'. Does this feel
+# like that?"
+REACTION = re.compile(
+    r"^\s*(that|this|the) (one|sound|direction|texture|beat|music|version|last one)\b"
+    r"|^\s*(it'?s|it is|its|that'?s|that is|this is) (too|not|a bit|kind of|kinda|still|better|worse|close|nice|great|good|bad)\b"
+    r"|\bnot (quite )?(it|right|there)\b|\bisn'?t (quite )?(it|right)\b|\bdoes(n'?t| not) (sound|feel|work|reduce)\b"
+    r"|^\s*(yes|no|nope|yeah|nah|ok|okay|love it|perfect)\b|^\s*i (like|love|hate|don'?t like|prefer) (it|that|this)\b"
+    r"|^\s*those (things|changes)\b",
+    re.I,
+)
 
 
 def looks_like_description(room: str, text: str) -> bool:
     from app.services.taste.rules import from_self
 
     words = re.findall(r"[A-Za-z']+", text)
-    if room not in DESCRIBING_ROOMS or len(words) < MIN_WORDS or NOT_A_DESCRIPTION.match(text) or "?" in text[-2:]:
+    if (room not in DESCRIBING_ROOMS or len(words) < MIN_WORDS or NOT_A_DESCRIPTION.match(text) or "?" in text[-2:]
+            or REACTION.search(text)):
         return False
     taste = from_self(text)
     return taste is None or taste[0] == "other"        # "I hate autotune" is about taste, not what the song is
