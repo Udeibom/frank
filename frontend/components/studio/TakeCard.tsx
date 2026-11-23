@@ -6,6 +6,7 @@
  * row of seven buttons; the harmony asks its two questions only when chosen. Plays through the shared AudioEngine.
  */
 
+import { recordingName } from "@/lib/recordingName"
 import { useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 import { PitchDisplay } from "@/components/audio/PitchDisplay"
@@ -49,6 +50,8 @@ interface TakeCardProps {
   busy: boolean
   picked: boolean
   canUseAsMelody: boolean
+  /** How many recordings the song has: a best-of version needs at least two. */
+  recordings: number
   onUse: (take: VocalTake) => void
   onPick: (takeId: string) => void
   onAction: (take: VocalTake, action: TakeAction) => void
@@ -71,7 +74,7 @@ export function takeTrack(v: VocalTake, name: string): Track {
   return { id: `take:${v.id}`, url: v.audio_url, label: name, material: "voice" }
 }
 
-export function TakeCard({ projectId, take, versions, activeId, busy, picked, canUseAsMelody, onUse, onPick, onAction }: TakeCardProps) {
+export function TakeCard({ projectId, take, versions, activeId, busy, picked, canUseAsMelody, recordings, onUse, onPick, onAction }: TakeCardProps) {
   const [harmonyType, setHarmonyType] = useState<"above" | "below" | "both">("above")
   const [harmonyPlace, setHarmonyPlace] = useState(0)
   const [showHarmony, setShowHarmony] = useState(false)
@@ -80,7 +83,7 @@ export function TakeCard({ projectId, take, versions, activeId, busy, picked, ca
   const all = [take, ...versions]
   const target = versions.find((v) => v.id === activeId) ?? take // actions work on the version in use
   const inSong = all.some((v) => v.id === activeId)
-  const takeName = take.label ?? "This take"
+  const takeName = recordingName(take.label)
 
   const choices: Choice[] = [
     { label: "Fix the obvious notes", hint: "Only the ones that are well off", onSelect: () => onAction(target, { kind: "tune", mode: "light" }) },
@@ -100,7 +103,7 @@ export function TakeCard({ projectId, take, versions, activeId, busy, picked, ca
       hint: "Keeps the way you sang it",
       onSelect: () => onAction(target, { kind: "instrument", instrument: ins.id }),
     })),
-    { label: "Add a second voice…", hint: "A harmony made from this take", onSelect: () => setShowHarmony(true) },
+    { label: "Add a second voice…", hint: "A harmony made from this recording", onSelect: () => setShowHarmony(true) },
     ...(canUseAsMelody ? [{ label: "Make this the song's tune", onSelect: () => onAction(target, { kind: "use_as_melody" }) }] : []),
   ]
 
@@ -119,7 +122,7 @@ export function TakeCard({ projectId, take, versions, activeId, busy, picked, ca
                 <p className={cn("truncate", i === 0 ? "font-written text-xl text-ink" : "text-base text-ink")}>{name}</p>
                 {i === 0 && (
                   <p className="text-sm text-ink-2">
-                    {facts.seconds ? `${Math.round(facts.seconds)} seconds` : "Listening to it…"}
+                    {facts.seconds ? `${Math.round(facts.seconds)} seconds` : "Frank is checking this recording…"}
                     {take.params?.song_time ? " · sung with the music" : ""}
                   </p>
                 )}
@@ -161,15 +164,23 @@ export function TakeCard({ projectId, take, versions, activeId, busy, picked, ca
               disabled={busy}
               className="flex items-center gap-1.5 rounded-md border border-line bg-raised px-3 py-1.5 text-base text-ink hover:border-ink-3 disabled:text-ink-3"
             >
-              Make it sound… <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              Change this recording… <ChevronDown className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         />
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-2">
-          <input type="checkbox" checked={picked} onChange={() => onPick(take.id)} className="h-4 w-4 accent-[rgb(var(--voice))]" />
-          Use in a best-of version
-        </label>
+        {recordings >= 2 ? (
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-2">
+            <input type="checkbox" checked={picked} onChange={() => onPick(take.id)} className="h-4 w-4 accent-[rgb(var(--voice))]" />
+            Pick for a best-of version
+          </label>
+        ) : null}
       </div>
+      <p className="mt-1.5 text-xs text-ink-3">
+        Tune it, clean it up, add a second voice or play it on an instrument. Your original is always kept.
+        {recordings >= 2
+          ? " Pick two or more recordings and Frank joins the best line from each into one version."
+          : " Record it again any time: with two recordings, Frank can join the best line from each."}
+      </p>
 
       {showHarmony && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-raised p-3 text-sm text-ink-2" role="group" aria-label="A second voice">

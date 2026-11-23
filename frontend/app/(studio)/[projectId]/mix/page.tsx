@@ -313,10 +313,10 @@ export default function MixRoomPage() {
         : { label: "Build the music", onClick: () => router.push(`/${projectId}/beat`), primary: true },
     ]
   } else if (hasMix) {
-    note = "Listen, then say what you'd change: the voice buried, too much going on, the drop not hitting. Or change a lane below."
+    note = "This is your voice and the music together. Listen, then tell Frank what you'd change, like \"my voice is too quiet\" or \"too much going on\". When it sounds right, finish it."
     answers = [
+      { label: "It sounds right: finish it", onClick: () => router.push(`/${projectId}/export`), primary: true },
       { label: "Something feels off", onClick: () => startRefine(null) },
-      { label: "Make the full-quality version", onClick: () => void doRender(mixParamsRef.current, "full") },
     ]
   } else {
     note = "Putting your voice and the music together for the first time."
@@ -387,6 +387,9 @@ export default function MixRoomPage() {
           />
         )}
 
+        {hasMix && (
+          <h2 className="-mb-3 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">More ways to shape it (all optional)</h2>
+        )}
         {hasMix && (
           <div className="grid max-w-[1000px] gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <ListenPanel projectId={projectId} onFix={(concern) => startRefine(concern)} />

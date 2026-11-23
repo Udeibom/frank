@@ -6,6 +6,7 @@
  * take. A swap makes a new version. Plays through the shared AudioEngine.
  */
 
+import { recordingName } from "@/lib/recordingName"
 import { useState } from "react"
 import { Check } from "lucide-react"
 import { PlayButton } from "@/components/audio/PlayButton"
@@ -28,7 +29,7 @@ export function CompView({ comp, takes, busy, inUse, onUse, onSwap }: CompViewPr
   const [open, setOpen] = useState<number | null>(null)
   const used = Array.from(new Set(comp.segments.map((s) => s.take_id)))
   const candidates = Array.from(new Set([...used, ...Object.keys(comp.segments[0]?.scores ?? {})]))
-  const name = (id: string) => takes.find((t) => t.id === id)?.label ?? "a take"
+  const name = (id: string) => recordingName(takes.find((t) => t.id === id)?.label, "a recording")
   const number = (id: string) => Math.max(0, candidates.indexOf(id)) + 1
   const shade = (id: string) => SHADES[(number(id) - 1) % SHADES.length]
   const total = comp.segments.at(-1)?.end_time ?? 1
@@ -51,12 +52,12 @@ export function CompView({ comp, takes, busy, inUse, onUse, onSwap }: CompViewPr
           </button>
         )}
       </div>
-      <div className="flex h-7 w-full gap-px overflow-hidden rounded-sm" role="list" aria-label="Which take each line comes from">
+      <div className="flex h-7 w-full gap-px overflow-hidden rounded-sm" role="list" aria-label="Which recording each line comes from">
         {comp.segments.map((s, i) => (
           <button
             key={i}
             role="listitem"
-            aria-label={`Line ${i + 1}, from ${name(s.take_id)}. Choose another take for this line.`}
+            aria-label={`Line ${i + 1}, from ${name(s.take_id)}. Choose another recording for this line.`}
             aria-expanded={open === i}
             onClick={() => setOpen(open === i ? null : i)}
             style={{ width: `${((s.end_time - s.start_time) / total) * 100}%` }}
@@ -77,7 +78,7 @@ export function CompView({ comp, takes, busy, inUse, onUse, onSwap }: CompViewPr
         ))}
       </ul>
       {open !== null && comp.segments[open] && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-2" role="group" aria-label={`Line ${open + 1} from which take`}>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-2" role="group" aria-label={`Line ${open + 1} from which recording`}>
           <span>Line {open + 1} from:</span>
           {candidates.map((id) => {
             const current = comp.segments[open].take_id === id

@@ -29,7 +29,7 @@ export function beatTrack(v: BeatVersion): Track {
 function whatChanged(v: BeatVersion, isFirst: boolean): string {
   const changes = v.params.changes ?? []
   if (changes.length) return changes.join(" ")
-  return isFirst ? "Built from the feeling" : "A new take"
+  return isFirst ? "Built from the feeling" : "A new version"
 }
 
 export function BeatVersions({ versions, activeVersionId, onSetActive, onRename }: BeatVersionsProps) {

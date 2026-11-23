@@ -7,6 +7,7 @@
  * the chords, or turn what you sang into the song's tune. The original of every take is always kept.
  */
 
+import { recordingName } from "@/lib/recordingName"
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ConversationPanel, type ChatTurn } from "@/components/conversation/ConversationPanel"
@@ -125,7 +126,7 @@ export default function VoiceRoomPage() {
         id: crypto.randomUUID(),
         role: "assistant",
         content:
-          "Whenever you're ready, record your take. Pick where to start, and I'll count you in. Want to hear the tune while you sing? Turn on \"Sing along with the tune\". Sing it as many times as you like: I keep every one.",
+          "Whenever you're ready, record yourself. Pick where to start, and I'll count you in. Want to hear the tune while you sing? Turn on \"Sing along with the tune\". Sing it as many times as you like: I keep every one.",
       },
     ])
     getVoiceSettings(projectId)
@@ -205,7 +206,7 @@ export default function VoiceRoomPage() {
         })
         .catch(() => {})
     } catch {
-      say("Something went wrong saving that take. Want to try again?")
+      say("Something went wrong saving that recording. Want to try again?")
     } finally {
       setUploading(false)
     }
@@ -242,7 +243,7 @@ export default function VoiceRoomPage() {
       case "harmony":
         return runJob(() => generateHarmony(projectId, take.id, action.type, action.sections), "Building a harmony from your voice…", "Your harmony is ready.")
       case "quiet":
-        return runJob(() => quietTake(projectId, take.id), "Taking the room noise out of your take…", "Done. Your original is kept, so you can compare.")
+        return runJob(() => quietTake(projectId, take.id), "Taking the room noise out of your recording…", "Done. Your original is kept, so you can compare.")
       case "instrument":
         return runJob(
           () => takeAsInstrument(projectId, take.id, action.instrument),
@@ -364,18 +365,18 @@ export default function VoiceRoomPage() {
       },
     ]
   } else if (busy) {
-    note = "Working on your voice. Your original take is always kept."
+    note = "Working on your voice. Your original recording is always kept."
   } else if (!beat) {
     note = "There's no music yet. You can record just your voice now, or build the music first and sing along with it."
     answers = [{ label: "Build the music", onClick: () => router.push(`/${projectId}/beat`) }]
   } else if (roots.length === 0) {
-    note = "Pick where to start and press Record. I'll count you in. Sing it as many times as you like: I keep every take."
+    note = "Pick where to start and press Record. I'll count you in. Sing it as many times as you like: I keep every recording."
   } else {
-    note = `${inSong?.label ?? "A take"} is in the song. Record again any time; every take is kept.`
+    note = `${recordingName(inSong?.label, "A recording")} is in the song. Record again any time; every recording is kept.`
     if (canBlend) {
       answers = [
         {
-          label: picked.length >= 2 ? `Best of ${picked.length} takes` : "Best of all my takes",
+          label: picked.length >= 2 ? `Best of ${picked.length} recordings` : "Best of all my recordings",
           onClick: () => void blend(picked.length >= 2 ? picked : roots.map((t) => t.id)),
         },
       ]
@@ -474,7 +475,7 @@ export default function VoiceRoomPage() {
         {/* Takes */}
         <section aria-labelledby="takes-heading" className="flex max-w-[920px] flex-col gap-3">
           <h2 id="takes-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
-            {roots.length ? `Your takes (${roots.length})` : "Your takes"}
+            {roots.length ? `Your recordings (${roots.length})` : "Your recordings"}
           </h2>
           {comp && (
             <CompView
@@ -488,7 +489,7 @@ export default function VoiceRoomPage() {
           )}
           {roots.length === 0 ? (
             <div aria-hidden="true" className="flex h-24 items-center rounded-md border border-dashed border-ink-3/60 px-5">
-              <span className="text-base text-ink-3">Each take you record appears here, with how steady it was.</span>
+              <span className="text-base text-ink-3">Each recording you make appears here, with how steady it was.</span>
             </div>
           ) : (
             roots.map((take) => (
@@ -501,6 +502,7 @@ export default function VoiceRoomPage() {
                 busy={busy}
                 picked={picked.includes(take.id)}
                 canUseAsMelody={!hasOwnTune}
+                recordings={roots.length}
                 onUse={chooseActive}
                 onPick={(id) => setPicked((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]))}
                 onAction={act}
@@ -525,11 +527,11 @@ export default function VoiceRoomPage() {
         projectId={projectId}
         room="voice"
         material="voice"
-        emptyText="Getting your takes ready…"
+        emptyText="Getting your recordings ready…"
         turns={turns}
         onSend={handleSend}
         isThinking={isThinking}
-        placeholder="Ask about your voice…"
+        placeholder="Ask about your singing…"
       />
     </div>
   )

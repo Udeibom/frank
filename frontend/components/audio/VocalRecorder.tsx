@@ -234,7 +234,7 @@ export function VocalRecorder({
       ) : (
         <p className="max-w-xs text-center text-base text-ink-2" role="status">
           {uploading
-            ? "Saving your take…"
+            ? "Saving your recording…"
             : recorder.status === "requesting"
               ? "Waiting for your microphone. If your browser asks, choose Allow."
               : "Press to record"}

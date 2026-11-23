@@ -35,7 +35,7 @@ export function PitchDisplay({ pitchData }: PitchDisplayProps) {
   if (!pitchData || pitchData.length === 0) {
     return (
       <div className="sweep flex h-10 items-center justify-center rounded-sm [--sweep:var(--voice)]">
-        <span className="text-sm text-ink-2">Listening to your take…</span>
+        <span className="text-sm text-ink-2">Frank is checking your notes…</span>
       </div>
     )
   }
@@ -56,7 +56,7 @@ export function PitchDisplay({ pitchData }: PitchDisplayProps) {
 
   return (
     <div>
-      <div role="img" aria-label={`How steady this take is: ${summary}`} className="flex h-10 items-end gap-[1px] overflow-hidden rounded-sm px-0.5 py-1">
+      <div role="img" aria-label={`How steady this recording is: ${summary}`} className="flex h-10 items-end gap-[1px] overflow-hidden rounded-sm px-0.5 py-1">
         {points.map((p, i) => {
           const heightPct = 20 + ((p.note - min) / range) * 80
           return <div key={i} className={cn("flex-1 rounded-[1px]", BAR_STYLE[pitchAccuracy(p.confidence)])} style={{ height: `${heightPct}%` }} />

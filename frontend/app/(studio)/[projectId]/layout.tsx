@@ -17,6 +17,10 @@ import { useProjectStore } from "@/store/project"
 import { SongStrip } from "@/components/shell/SongStrip"
 import { Rail } from "@/components/shell/Rail"
 import { StartDrawer } from "@/components/shell/StartDrawer"
+import { NextStepBar } from "@/components/shell/NextStepBar"
+import type { Room } from "@/lib/nextStep"
+
+const ROOMS: Room[] = ["idea", "feel", "beat", "voice", "mix", "export", "yours"]
 
 export default function ProjectLayout({
   children,
@@ -64,6 +68,9 @@ export default function ProjectLayout({
         Skip to the room
       </a>
       <SongStrip projectId={projectId} onStart={() => setShowStart(true)} />
+      {!loading && !error && (
+        <NextStepBar projectId={projectId} room={ROOMS.find((r) => pathname?.endsWith(`/${r}`)) ?? "feel"} />
+      )}
       <div className="flex min-h-0 flex-1">
         <Rail projectId={projectId} onStart={() => setShowStart(true)} />
         <main id="stage" tabIndex={-1} className="min-h-0 min-w-0 flex-1 overflow-auto outline-none">

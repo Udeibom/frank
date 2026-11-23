@@ -124,7 +124,7 @@ async def upload_take(
 
     audio_url = upload_audio("vocals", wav, extension="wav", name_prefix="take")
     count = voice_db.count_takes_sync(project_id)
-    take = await voice_db.create_take(project_id, audio_url, label=f"Take {count + 1}", params=params)
+    take = await voice_db.create_take(project_id, audio_url, label=f"Recording {count + 1}", params=params)
 
     # A freshly recorded take becomes the active vocal (cross-room rule, voice-to-export-flow R2): the most
     # recently chosen vocal wins, so recording clears any older comp pointer. The comp itself is kept.

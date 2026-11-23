@@ -49,6 +49,7 @@ export function ListenPanel({ projectId, onFix }: { projectId: string; onFix: (c
           {working ? "Listening…" : heard || plain.length ? "Listen again" : "Listen"}
         </button>
       </div>
+      <p className="text-sm text-ink-2">Frank listens to the whole song and tells you, in plain words, the few things he would change.</p>
       <GeminiNotice what="a short clip of your song" />
       {problem && <p className="text-sm text-problem">{problem}</p>}
       {heard?.heard && <p className="font-written text-lg text-ink">{heard.heard}</p>}
