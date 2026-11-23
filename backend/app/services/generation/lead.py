@@ -250,12 +250,18 @@ def harmonize(lead: Lead, key: str, extension: float = 0.0) -> dict:
 
     degrees = [candidates[i][0] for i in path]
     sevenths = [candidates[i][1] for i in path]
+    return progression_from_degrees(key, degrees, sevenths)
+
+
+def progression_from_degrees(key: str, degrees: list[int], sevenths: list[bool], family: str = "from_tune") -> dict:
+    """The composer's progression format from one chord (scale step, seventh or not) per bar."""
+    root, mode = theory.parse_key(key)
     raw = [theory.chord_for_degree(root, mode, d, 3, s) for d, s in zip(degrees, sevenths)]
     chords = theory.voice_lead(raw)
     return {
         "root": root,
         "mode": mode,
-        "family": "from_tune",
+        "family": family,
         "degrees": degrees,
         "chords": chords,
         "chord_pcs": [sorted({n % 12 for n in c}) for c in chords],

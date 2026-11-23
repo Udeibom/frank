@@ -344,6 +344,9 @@ def apply_speed(fp: dict, raw: list[dict]) -> tuple[dict, list[dict], list[str]]
     rest = [r for r, o in zip(raw, ops) if not isinstance(o, (Slower, Faster))]
     if not speed:
         return fp, raw, []
+    if fp.get("follows_voice"):
+        raise OpError("This music follows your singing, so its speed is your speed. Sing it slower (or faster) and "
+                      "I'll build the music around the new recording.")
     out = dict(fp)
     bpm = float(out.get("tempo_bpm") or 90)
     start = bpm

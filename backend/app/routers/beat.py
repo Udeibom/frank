@@ -288,3 +288,14 @@ async def accompany(project_id: str, background: BackgroundTasks) -> JobResponse
     job = await jobs_db.create_job(project_id, job_type="beat_accompany")
     await dispatch.start(background, job, run_accompany_job, project_id)
     return JobResponse(job_id=job["id"])
+
+
+@router.post("/follow-voice", response_model=JobResponse)
+async def follow_voice(project_id: str, background: BackgroundTasks) -> JobResponse:
+    """The music rebuilt around the song's recording: their speed, chords that fit what they sing, their sections
+    (core-path spec 15, requirement 8). A new version; the music they sang over is kept."""
+    from app.services.jobs.beat_runner import run_follow_voice_job
+
+    job = await jobs_db.create_job(project_id, job_type="follow_voice")
+    await dispatch.start(background, job, run_follow_voice_job, project_id)
+    return JobResponse(job_id=job["id"])

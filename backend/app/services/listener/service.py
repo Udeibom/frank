@@ -7,6 +7,7 @@ except the cache row (requirement 4.1). Specialists call these functions directl
 `measure_song` in a job.
 """
 from __future__ import annotations
+from app.services.generation.beat import progression_for as beat_engine_progression_for
 
 import io
 import logging
@@ -35,7 +36,7 @@ def score_facts(sections: list[beat_engine.SectionPlan], fp: dict, seed: int, le
     _, contexts, progressions = beat_engine.plan_contexts(sections, fp, seed, lead)
     facts: dict[int, dict[str, Any]] = {}
     for s, ctx in zip(sections, contexts):
-        prog = progressions[s.name]
+        prog = beat_engine_progression_for(progressions, s)
         parts = composer.compose_section(s.name, prog, s.bars, s.energy, s.density, layers=s.layers, ctx=ctx)
         notes_per_bar = {p.name: round(len(p.events) / max(1, s.bars), 2) for p in parts if p.events}
         info: dict[str, Any] = {"parts": sorted(notes_per_bar), "notes_per_bar": notes_per_bar}

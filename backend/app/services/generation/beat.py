@@ -298,6 +298,13 @@ def section_spans(sections: list[SectionPlan], bpm: float) -> list[tuple[int, in
     return spans
 
 
+def progression_for(progressions: dict[str, dict], s: "SectionPlan") -> dict:
+    """The chords a section plays: its own, when it was given chords that fit what was sung there (core-path spec
+    15, requirement 8), otherwise those of its kind of section."""
+    own = progressions.get(f"{s.name}#{s.uid if s.uid is not None else s.index}")
+    return own if own is not None else progressions[s.name]
+
+
 def plan_contexts(
     sections: list[SectionPlan], fp: dict, seed: int, lead: Optional[lead_mod.Lead] = None
 ) -> tuple[StyleChoice, list[composer.SectionContext], dict[str, dict]]:
@@ -345,6 +352,17 @@ def plan_contexts(
                 extension=style.extension,
                 seed=derive_seed(seed, "voicing", s.name),
             )
+    for s in sections:
+        harmony = (s.parts or {}).get("harmony")
+        if isinstance(harmony, dict) and harmony.get("degrees"):
+            try:
+                deg = [int(d) % 7 for d in harmony["degrees"]]
+                sev = [bool(x) for x in (harmony.get("sevenths") or [False] * len(deg))][: len(deg)]
+                sev += [False] * (len(deg) - len(sev))
+                progressions[f"{s.name}#{s.uid if s.uid is not None else s.index}"] = lead_mod.progression_from_degrees(
+                    key, deg, sev, family="from_singing")
+            except (TypeError, ValueError):
+                pass
     planned = moments_mod.plan_moments(moments_mod.facts_from(sections), seed, fp["warmth"], fp["brightness"])
     contexts: list[composer.SectionContext] = []
     for i, s in enumerate(sections):
@@ -458,7 +476,7 @@ def render_song(
     gains: list[float] = []
     with SynthSession() as synth:
         for s, ctx, (start, end) in zip(sections, contexts, spans):
-            acc, gain = _render_section(synth, s, ctx, progressions[s.name], bpm, end - start, mix_chain)
+            acc, gain = _render_section(synth, s, ctx, progression_for(progressions, s), bpm, end - start, mix_chain)
             gains.append(gain)
             song[start : start + acc.shape[0]] += acc            # the tail rings over the next section
             del acc
@@ -479,7 +497,7 @@ def score_of(sections: list[SectionPlan], fp: dict, seed: int, lead: Optional[le
     out: dict[tuple, tuple] = {}
     for s, ctx in zip(sections, contexts):
         parts = composer.compose_section(
-            section=s.name, progression=progressions[s.name], bars=s.bars, energy=s.energy, density=s.density, layers=s.layers, ctx=ctx,
+            section=s.name, progression=progression_for(progressions, s), bars=s.bars, energy=s.energy, density=s.density, layers=s.layers, ctx=ctx,
         )
         uid = s.uid if s.uid is not None else s.index
         for p in parts:
@@ -522,7 +540,7 @@ def render_excerpt(
             origin = spans[r[0]][0]
             for i in r:
                 start, end = spans[i]
-                acc, _ = _render_section(synth, sections[i], contexts[i], progressions[sections[i].name], bpm, end - start, mix_chain)
+                acc, _ = _render_section(synth, sections[i], contexts[i], progression_for(progressions, sections[i]), bpm, end - start, mix_chain)
                 at = pos + start - origin
                 n = min(acc.shape[0], out.shape[0] - at)
                 out[at : at + n] += acc[:n]
@@ -626,7 +644,7 @@ def families_in(sections: list[SectionPlan], fp: dict, seed: int, lead: Optional
     _, contexts, progressions = plan_contexts(sections, fp, seed, lead)
     found: set[str] = set()
     for s, ctx in zip(sections, contexts):
-        for p in composer.compose_section(s.name, progressions[s.name], s.bars, s.energy, s.density, layers=s.layers, ctx=ctx):
+        for p in composer.compose_section(s.name, progression_for(progressions, s), s.bars, s.energy, s.density, layers=s.layers, ctx=ctx):
             if p.events:
                 found.add(part_family(p.name))
     return [f for f in FAMILIES if f in found]
@@ -653,7 +671,7 @@ def render_parts(
             song = np.zeros((spans[-1][1] + tail, 2), dtype=np.float32)
             for s, ctx, (start, end), gain in zip(sections, contexts, spans, section_gains):
                 parts = composer.compose_section(
-                    section=s.name, progression=progressions[s.name], bars=s.bars, energy=s.energy, density=s.density,
+                    section=s.name, progression=progression_for(progressions, s), bars=s.bars, energy=s.energy, density=s.density,
                     layers=s.layers, ctx=ctx,
                 )
                 for part in parts:

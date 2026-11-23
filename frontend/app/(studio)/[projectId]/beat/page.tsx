@@ -34,7 +34,7 @@ import {
   type BeatSection,
 } from "@/lib/api/beat"
 import { getFingerprint } from "@/lib/api/feel"
-import { accompanyTune } from "@/lib/api/organs"
+import { accompanyTune, followVoice } from "@/lib/api/organs"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
 import { useSongStore } from "@/store/song"
@@ -283,9 +283,19 @@ export default function MusicPage() {
     aside = hasBeat ? "The music you had is untouched." : undefined
     answers = [{ label: "Try again", onClick: work.retry }]
   } else if (hasBeat) {
-    note = "Play it, then change anything. Press a part in a section to make it busier, simpler or leave it out."
+    const follows = Boolean((activeVersion?.params.fingerprint as { follows_voice?: boolean } | undefined)?.follows_voice)
+    note = follows
+      ? "This music is built around your singing: your speed, chords that fit your notes, and your verses and choruses. Play it, then change anything."
+      : "Play it, then change anything. Press a part in a section to make it busier, simpler or leave it out."
     aside = lead ?? undefined
     answers = [
+      ...(hasVoice && !follows
+        ? [{
+            label: "Build the music around my singing",
+            primary: true,
+            onClick: () => void runJob(() => followVoice(projectId), "Listening to how you sang it, then building the music around you. This takes a minute or two.", null),
+          }]
+        : []),
       { label: "Something feels off", onClick: () => startRefine(null) },
       ...(hasVoice ? [{ label: previewing ? "Getting your voice…" : "Hear it with my voice", onClick: handlePreviewWithVocal, disabled: previewing }] : []),
       ...(activeVersion?.params.lead_info?.used

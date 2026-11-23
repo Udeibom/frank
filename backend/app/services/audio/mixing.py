@@ -175,8 +175,9 @@ def render_mix(
     harmony_wav: bytes | None,
     mix_params: dict,
     beat_sections: list[dict] | None = None,
-    beat_bpm: int = 90,
+    beat_bpm: float = 90,
     parts: list[tuple[str, Callable[[], bytes]]] | None = None,
+    beat_start_s: float = 0.0,
 ) -> np.ndarray:
     """
     Combine the layers into one stereo float32 mix (channels-first), applying
@@ -186,6 +187,14 @@ def render_mix(
     released before the next, so we don't hold vocal+beat+harmony all at once.
     """
     mix: np.ndarray | None = None
+    # Music built from the singing starts where its first bar falls in the recording (core-path spec 15, 8):
+    # a moment of silence before the music, never a shift of the voice.
+    lead_in = max(0, int(round(float(beat_start_s or 0.0) * SR)))
+
+    def _late(layer: np.ndarray) -> np.ndarray:
+        if lead_in <= 0:
+            return layer
+        return np.concatenate([np.zeros((layer.shape[0], lead_in), dtype=layer.dtype), layer], axis=1)
 
     def _add(layer: np.ndarray) -> None:
         nonlocal mix
@@ -212,7 +221,7 @@ def render_mix(
             part = _apply(beat_board, part)
             part = _apply_section_gains(part, mix_params.get("section_gain_db", {}), beat_sections or [], beat_bpm)
             part *= _db_to_linear(float(st.get("level_db", 0.0)) + float(mix_params.get("beat_gain_db", -6.0)))
-            _add(part)
+            _add(_late(part))
             del part
     elif beat_wav:
         beat = _load_stereo(beat_wav)
@@ -221,7 +230,7 @@ def render_mix(
             beat, mix_params.get("section_gain_db", {}), beat_sections or [], beat_bpm
         )
         beat *= _db_to_linear(mix_params.get("beat_gain_db", -6.0))
-        _add(beat)
+        _add(_late(beat))
         del beat
 
     if vocal_wav:

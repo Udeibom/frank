@@ -39,7 +39,12 @@ def normalize(fingerprint: dict) -> dict:
 
     # Tempo sanity
     try:
-        fp["tempo_bpm"] = int(fp["tempo_bpm"])
+        # Whole numbers stay whole; a speed measured from someone's singing keeps its fraction, because 69.4
+        # rounded to 69 drifts by more than a second over four minutes (core-path spec 15, requirement 8).
+        v = round(float(fp["tempo_bpm"]), 2)
+        if not (v == v) or v in (float("inf"), float("-inf")):
+            raise ValueError
+        fp["tempo_bpm"] = int(v) if v == int(v) else v
     except (TypeError, ValueError, OverflowError):
         # OverflowError: int(float("inf")) — found by property-based testing.
         fp["tempo_bpm"] = DEFAULTS["tempo_bpm"]

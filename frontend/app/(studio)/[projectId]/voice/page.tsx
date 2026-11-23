@@ -82,7 +82,7 @@ export default function VoiceRoomPage() {
   const params = useParams()
   const router = useRouter()
   const projectId = params.projectId as string
-  const { activeState, updateActiveState, revision } = useProjectStore()
+  const { activeState, updateActiveState, revision, refresh } = useProjectStore()
   const record = useSongStore((s) => s.record)
   const engine = useAudio()
 
@@ -199,10 +199,22 @@ export default function VoiceRoomPage() {
       setTakes((t) => [take, ...t])
       updateActiveState({ active_vocal_id: take.id, active_comp_id: null })
       pollJob(analysis_job_id)
-        .then((done) => {
-          const engineer = (done.result as { engineer?: string | null } | null)?.engineer
-          if (engineer) say(engineer)                          // the recording engineer: at most one thing
-          return refreshTakes()
+        .then(async (done) => {
+          const r = done.result as { engineer?: string | null; music_job_id?: string } | null
+          if (r?.engineer) say(r.engineer)                     // the recording engineer: at most one thing
+          await refreshTakes()
+          if (r?.music_job_id) {
+            // Frank builds the music around how they sang it, without being asked (core-path spec 15, requirement 8)
+            say("Now I'm building the music around how you sang it: your speed, chords that fit your notes, and your verses and choruses. This takes a minute or two…")
+            try {
+              const built = await pollJob(r.music_job_id)
+              const msg = (built.result as { message?: string } | null)?.message
+              if (msg) say(msg)
+              await refresh(projectId)
+            } catch (err) {
+              if (err instanceof Error && err.message) say(err.message)
+            }
+          }
         })
         .catch(() => {})
     } catch {

@@ -59,7 +59,8 @@ def render_array(layers: dict, mix_params: dict):
     harmony = _fetch(layers["harmony_url"])
     parts = [(name, (lambda u=url: _fetch(u))) for name, url in sorted((layers.get("parts") or {}).items())]
     return mixing.render_mix(vocal, beat, harmony, mix_params, beat_sections=layers.get("beat_sections"),
-                             beat_bpm=layers.get("beat_bpm", 90), parts=parts or None)
+                             beat_bpm=layers.get("beat_bpm", 90), parts=parts or None,
+                             beat_start_s=layers.get("beat_start_s", 0.0))
 
 
 async def layers_for(project_id: str, mix_version: dict | None) -> dict:
@@ -81,7 +82,8 @@ async def layers_for(project_id: str, mix_version: dict | None) -> dict:
 
             params = bv.get("params") or {}
             layers.update(beat_url=bv.get("render_url"), beat_sections=params.get("sections", []),
-                          beat_bpm=int((params.get("fingerprint") or {}).get("tempo_bpm", 90) or 90), beat_version_id=bvid,
+                          beat_bpm=float((params.get("fingerprint") or {}).get("tempo_bpm", 90) or 90), beat_version_id=bvid,
+                          beat_start_s=float(params.get("start_s") or 0.0),
                           parts=await asyncio.to_thread(cached_parts, project_id, bvid))
     return layers
 
@@ -105,6 +107,7 @@ def _render_sync(
         beat_sections=layers.get("beat_sections"),
         beat_bpm=layers.get("beat_bpm", 90),
         parts=parts or None,
+        beat_start_s=layers.get("beat_start_s", 0.0),
     )
     # Preview is light (spec R4: 64kbps); full export quality is 320kbps.
     bitrate = "320k" if quality == "full" else "64k"
@@ -153,7 +156,8 @@ async def _resolve_layers(project_id: str) -> dict:
     state = await projects_db.get_project_active_state(project_id)
     vocal_url = beat_url = harmony_url = None
     beat_sections: list[dict] = []
-    beat_bpm = 90
+    beat_bpm = 90.0
+    beat_start_s = 0.0
 
     if state:
         # Active vocal: the pointers decide (see vocal_resolution.py), and the
@@ -172,7 +176,8 @@ async def _resolve_layers(project_id: str) -> dict:
                 params = bv.get("params") or {}
                 beat_sections = params.get("sections", [])
                 fp = params.get("fingerprint") or {}
-                beat_bpm = int(fp.get("tempo_bpm", 90) or 90)
+                beat_bpm = float(fp.get("tempo_bpm", 90) or 90)
+                beat_start_s = float(params.get("start_s") or 0.0)
 
     # Harmony: the most recent take labeled as a harmony, if any
     takes = await voice_db.list_takes(project_id)
@@ -192,6 +197,7 @@ async def _resolve_layers(project_id: str) -> dict:
         "harmony_url": harmony_url,
         "beat_sections": beat_sections,
         "beat_bpm": beat_bpm,
+        "beat_start_s": beat_start_s,
         "parts": parts,
         "beat_version_id": state.get("active_beat_version_id") if state else None,
     }

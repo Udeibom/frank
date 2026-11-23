@@ -103,6 +103,15 @@ async def measure_song(project_id: str, scope: Optional[list[str]] = None, progr
     if mix and mix.get("render_url"):
         mix_audio = service.decode(await asyncio.to_thread(fetch_audio_bytes, mix["render_url"]))
 
+    shift = float(fp.get("music_start_s") or 0.0) if fp else 0.0
+    if shift > 0:
+        # Music built from the singing starts a moment into the recording (core-path spec 15, 8): the voice and the
+        # blend are read from that moment, so every section is measured where it really is.
+        cut = int(round(shift * service.LISTEN_SR))
+        vocal_audio = vocal_audio[cut:] if vocal_audio is not None else None
+        mix_audio = mix_audio[cut:] if mix_audio is not None else None
+        if contour:
+            contour = [{**c, "time": round(c["time"] - shift, 3)} for c in contour if c.get("time", 0) >= shift]
     await _say(progress, "Comparing the parts...")
     report = await asyncio.to_thread(
         service.measure_audio, sections, bpm,

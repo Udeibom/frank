@@ -55,6 +55,8 @@ export const rankedDirections = (projectId: string) =>
 
 // music and blend
 export const accompanyTune = (projectId: string) => api.post<JobResponse>(`${p(projectId)}/beat/accompany`, {})
+/** The music rebuilt around the song's recording (core-path spec 15, requirement 8). */
+export const followVoice = (projectId: string) => api.post<JobResponse>(`${p(projectId)}/beat/follow-voice`, {})
 export const addAtmosphere = (projectId: string, source: "recorded" | "generated" = "recorded", words?: string[]) =>
   api.post<JobResponse>(`${p(projectId)}/mix/atmosphere`, { source, words })
 export const switchAtmosphere = (projectId: string, enabled: boolean, level_db?: number) =>

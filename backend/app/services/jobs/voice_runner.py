@@ -229,7 +229,33 @@ async def run_after_take_job(job_id: str, project_id: str, take: dict, wav_bytes
     if bvid:
         bv = await beat_db.get_beat_version(bvid)
         beat_url = (bv or {}).get("render_url")
-    await _job(job_id, "Couldn't listen to that take.", _after_take_sync, take, wav_bytes, song, beat_url, lyrics)
+    # A recording long enough to be a song gets music built around it, without being asked (core-path spec 15,
+    # requirement 8). The job id rides on this one's result, so the Voice room can follow it.
+    music_job = None
+    try:
+        import soundfile as _sf
+
+        seconds = _sf.info(io.BytesIO(wav_bytes)).duration
+        if seconds >= 15.0:
+            music_job = await jobs_db.create_job(project_id, job_type="follow_voice")
+    except Exception:  # noqa: BLE001
+        music_job = None
+    result = await _job(job_id, "Couldn't listen to that recording.", _after_take_tagged, take, wav_bytes, song, beat_url,
+                        lyrics, music_job["id"] if music_job else None)
+    if music_job:
+        from app.services.jobs.beat_runner import run_follow_voice_job
+
+        if result is None:
+            await jobs_db.mark_failed(music_job["id"], "I couldn't hear that recording clearly enough to build around it.")
+        else:
+            await run_follow_voice_job(music_job["id"], project_id)
+
+
+def _after_take_tagged(take: dict, wav_bytes: bytes, song, beat_url, lyrics, music_job_id):
+    out = _after_take_sync(take, wav_bytes, song, beat_url, lyrics)
+    if music_job_id:
+        out["music_job_id"] = music_job_id
+    return out
 
 
 # ── tuning to the song ───────────────────────────────────────────────────

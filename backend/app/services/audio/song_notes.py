@@ -7,6 +7,7 @@ read from this, so the singer is measured against THEIR song, not against all tw
 Times are seconds from the start of the song (takes are placed in song time when they are uploaded).
 """
 from __future__ import annotations
+from app.services.generation.beat import progression_for as beat_engine_progression_for
 
 from bisect import bisect_right
 from dataclasses import dataclass, field
@@ -88,10 +89,13 @@ def from_plan(sections: list[beat_engine.SectionPlan], fp: dict, seed: int, lead
     _, contexts, progressions = beat_engine.plan_contexts(sections, fp, seed, lead)
     spans = beat_engine.section_spans(sections, bpm)
     out = SongNotes(scale=scale_of(fp.get("key")), bpm=bpm)
+    # Music built from the singing starts where its first bar falls in the recording (core-path spec 15, 8):
+    # everything here is in the recording's time, so the music's moments move by that much.
+    shift = float(fp.get("music_start_s") or 0.0)
     for s, ctx, (a, b) in zip(sections, contexts, spans):
-        start, end = a / SAMPLE_RATE, b / SAMPLE_RATE
+        start, end = a / SAMPLE_RATE + shift, b / SAMPLE_RATE + shift
         out.sections.append(Span(start, end, (s.index, s.name)))
-        prog = progressions[s.name]
+        prog = beat_engine_progression_for(progressions, s)
         chords = prog["chords"]
         for bar in range(s.bars):
             pcs = frozenset(n % 12 for n in chords[bar % len(chords)])

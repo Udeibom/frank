@@ -54,6 +54,8 @@ def _arrangement_params(
     style = pick_style(fp)
     return {
         "fingerprint": fp,
+        # Where bar 1 falls in the singer's recording, for music built from their singing (core-path spec 15, 8)
+        "start_s": float(fp.get("music_start_s") or 0.0),
         "engine": beat_engine.ENGINE_VERSION,
         "mix_chain": True,
         "seed": seed,
@@ -511,4 +513,99 @@ async def run_accompany_job(job_id: str, project_id: str) -> None:
                                              "label": label, "changes": changes})
     except Exception as exc:  # noqa: BLE001
         await jobs_db.mark_failed(job_id, "I couldn't write that part just now. Your beat is unchanged. Want to try again?")
+        raise exc
+
+
+# ── Music that plays to the singer (core-path spec 15, requirement 8) ──────────────────────────────────
+
+FOLLOW_MIN_SECONDS = 15.0       # shorter than this is a sketch, not a song to build around
+FOLLOWED = ("I listened to how you sang it and built the music around you: it moves at your speed, the chords fit "
+            "the notes you sing, and it changes where your verses and choruses change. The music you sang over is kept.")
+
+
+def _follow_sync(project_id: str, take: dict | None, vocal_url: str, lyrics: str, structure: dict | None,
+                 intent: str, fp_base: dict, sung_over: dict | None, label: str, seed: int) -> dict | None:
+    from app.services.audio import pitch as pitch_svc
+    from app.services.audio import vocal_notes
+    from app.services.generation import accompany
+    from app.services.generation import fingerprint as fp_utils
+    from app.services.jobs.voice_runner import _fetch, _read_mono
+
+    mono = _read_mono(_fetch(vocal_url))
+    sung = [accompany.Note(n.start, n.end, float(n.centre)) for n in vocal_notes.sung_notes(mono, pitch_svc.SR)
+            if n.length > 0.12 and n.centre == n.centre]
+    del mono
+    if len(sung) < accompany.MIN_NOTES or (max(n.end for n in sung) - sung[0].start) < FOLLOW_MIN_SECONDS:
+        return None
+    lines = ((take or {}).get("words") or {}).get("lines") or []
+    params = (take or {}).get("params") or {}
+    if params.get("song_time") and sung_over:
+        # They sang over Frank's music: its pulse is already theirs, and the take is in its time.
+        bp = sung_over.get("params") or {}
+        grid = accompany.Grid(float((bp.get("fingerprint") or {}).get("tempo_bpm") or 90), float(bp.get("start_s") or 0.0))
+    else:
+        starts = [l["start"] for l in lines if l.get("start") is not None]
+        grid = accompany.grid_from_notes(sung, f"{intent} {lyrics}", starts)
+    sections = accompany.sections_from_words(lines, structure, lyrics)
+    how = "words"
+    if not sections:
+        sections, how = accompany.sections_from_phrases(sung, grid), "phrases"
+    fp = fp_utils.normalize({**fp_base, "tempo_bpm": grid.bpm})
+    acc = accompany.plan(sung, grid, sections, fp, how)
+    if acc is None:
+        return None
+    key_name, mode = acc.key.split(" ", 1)
+    fp = {**fp, "key": acc.key, "mode": mode, "music_start_s": round(grid.start_s, 4), "follows_voice": True}
+    fp.pop("key_from_tune", None)
+    version = _rerender_and_persist_sync(project_id, acc.sections, fp, label, seed, None, [FOLLOWED],
+                                         [{"op": "follow_voice", "how": how}])
+    return {"version": version, "how": how, "bpm": grid.bpm, "sections": [s.name for s in acc.sections],
+            "start_s": grid.start_s}
+
+
+async def run_follow_voice_job(job_id: str, project_id: str) -> None:
+    """Build the music around the song's current recording (a NEW beat version; the old one is kept)."""
+    from app.db import feel as feel_db
+    from app.db import lyrics as lyrics_db
+    from app.db import voice as voice_db
+    from app.services.audio.vocal_resolution import resolve_vocal_url
+
+    try:
+        await jobs_db.mark_processing(job_id)
+        state = await projects_db.get_project_active_state(project_id) or {}
+        take = await voice_db.get_take(state["active_vocal_id"]) if state.get("active_vocal_id") else None
+        comp = await voice_db.get_comp(state["active_comp_id"]) if state.get("active_comp_id") else None
+        vocal_url = resolve_vocal_url(comp, take)
+        if not vocal_url:
+            await jobs_db.mark_failed(job_id, "Record yourself singing first, then I'll build the music around you.")
+            return
+        lyrics = ((await lyrics_db.get_version(state["active_lyrics_id"])) or {}).get("content", "") if state.get("active_lyrics_id") else ""
+        structure = await song_record.active_facet(project_id, "structure")
+        intent = (await song_record.active_facet(project_id, "intent") or {}).get("text") or ""
+        latest = await feel_db.get_latest_fingerprint(project_id)
+        sung_over = None
+        bvid = ((take or {}).get("params") or {}).get("beat_version_id")
+        if bvid:
+            sung_over = await beat_db.get_beat_version(bvid)
+        base = dict((latest or {}).get("fingerprint") or ((sung_over or {}).get("params") or {}).get("fingerprint") or {})
+        count = await beat_db.count_beat_versions(project_id)
+        label = f"Beat v{count + 1}"
+        seed = derive_seed(project_id, "follow", count)
+        async with _one_at_a_time:
+            out = await asyncio.to_thread(_follow_sync, project_id, take, vocal_url, lyrics, structure, intent, base,
+                                          sung_over, label, seed)
+        if out is None:
+            await jobs_db.mark_failed(job_id, "I need a little more singing to build the music around you: a verse or "
+                                              "more works best.")
+            return
+        version = out["version"]
+        await projects_db.update_project_active_state(project_id, {"active_beat_version_id": version["id"]})
+        await jobs_db.mark_complete(job_id, {"beat_version_id": version["id"], "render_url": version["render_url"],
+                                             "label": label, "changes": [FOLLOWED], "message": FOLLOWED,
+                                             "how": out["how"], "sections": out["sections"]})
+    except Exception as exc:  # noqa: BLE001
+        try:
+            await jobs_db.mark_failed(job_id, "I couldn't build the music around your singing just now. Want to try again?")
+        except Exception:  # noqa: BLE001
+            pass
         raise exc
