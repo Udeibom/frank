@@ -33,7 +33,10 @@ class _HeavyGate:
     """One heavy job at a time; memory is released and logged when each one ends."""
 
     def __init__(self) -> None:
-        self._sem = asyncio.Semaphore(1)
+        # One at a time on the 512 MB API; the worker, with far more memory, sets HEAVY_JOBS higher.
+        import os
+
+        self._sem = asyncio.Semaphore(max(1, int(os.environ.get("HEAVY_JOBS", "1"))))
 
     async def __aenter__(self) -> "_HeavyGate":
         await self._sem.acquire()

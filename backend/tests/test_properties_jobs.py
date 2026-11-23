@@ -92,3 +92,15 @@ def test_retries_succeed_iff_failures_fewer_than_attempts(attempts, failures):
     except ConnectionError:
         assert failures >= attempts
         assert calls["n"] == attempts              # never tries more than allowed
+
+
+# ─── Queued jobs wait their turn (core-path spec 15, requirement 1.2) ─
+
+from app.services.jobs.staleness import QUEUED_STALE_AFTER  # noqa: E402
+
+
+@settings(deadline=None)
+@given(ages)
+def test_a_job_waiting_in_the_queue_is_only_given_up_on_after_the_longer_limit(age):
+    queued = {**job("pending", age), "payload": {"runner": "m:f", "args": []}}
+    assert is_stale(queued, NOW) is (age > QUEUED_STALE_AFTER)

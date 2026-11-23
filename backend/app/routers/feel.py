@@ -1,3 +1,4 @@
+from app.services.jobs import dispatch
 from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks
 from typing import Optional
 import asyncio
@@ -79,8 +80,7 @@ async def generate_texture(
     never run inline in this handler.
     """
     job = await jobs_db.create_job(project_id, job_type="generate_texture")
-    background.add_task(
-        run_texture_job, job["id"], project_id, body.fingerprint, body.fingerprint_id
+    await dispatch.start(background, job, run_texture_job, project_id, body.fingerprint, body.fingerprint_id
     )
     return JobResponse(job_id=job["id"])
 

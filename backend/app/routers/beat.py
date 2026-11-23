@@ -1,3 +1,4 @@
+from app.services.jobs import dispatch
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
@@ -45,7 +46,7 @@ async def generate_beat(
 ) -> JobResponse:
     """Start full beat generation as a background job."""
     job = await jobs_db.create_job(project_id, job_type="generate_beat")
-    background.add_task(run_full_beat_job, job["id"], project_id, body.fingerprint)
+    await dispatch.start(background, job, run_full_beat_job, project_id, body.fingerprint)
     return JobResponse(job_id=job["id"])
 
 
@@ -60,7 +61,7 @@ async def _start_operations(project_id: str, operations: list[dict], background:
     except ops_mod.OpError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     job = await jobs_db.create_job(project_id, job_type="beat_operations")
-    background.add_task(run_operations_job, job["id"], project_id, operations)
+    await dispatch.start(background, job, run_operations_job, project_id, operations)
     return JobResponse(job_id=job["id"])
 
 
@@ -194,7 +195,7 @@ async def preview_with_vocal(
         "section_gain_db": {},
     }
     job = await jobs_db.create_job(project_id, job_type="vocal_preview")
-    background.add_task(run_vocal_preview_job, job["id"], project_id, preview_params)
+    await dispatch.start(background, job, run_vocal_preview_job, project_id, preview_params)
     return JobResponse(job_id=job["id"])
 
 
@@ -275,5 +276,5 @@ async def accompany(project_id: str, background: BackgroundTasks) -> JobResponse
     from app.services.jobs.beat_runner import run_accompany_job
 
     job = await jobs_db.create_job(project_id, job_type="beat_accompany")
-    background.add_task(run_accompany_job, job["id"], project_id)
+    await dispatch.start(background, job, run_accompany_job, project_id)
     return JobResponse(job_id=job["id"])

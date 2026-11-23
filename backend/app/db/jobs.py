@@ -81,9 +81,21 @@ async def fail_jobs_active_before(error: str, changed_before: datetime) -> int:
             .update({"status": "failed", "error": error})
             .in_("status", list(ACTIVE_STATUSES))
             .lt("updated_at", changed_before.isoformat())
+            # Only this API's own jobs: queued jobs and the worker's jobs live on (core-path spec 15, 1.4).
+            .is_("payload", "null")
             .execute()
         )
-        return len(result.data or [])
+        n = len(result.data or [])
+        rescued = (
+            get_supabase()
+            .table("async_jobs")
+            .update({"status": "failed", "error": error})
+            .in_("status", list(ACTIVE_STATUSES))
+            .lt("updated_at", changed_before.isoformat())
+            .eq("claimed_by", "api")
+            .execute()
+        )
+        return n + len(rescued.data or [])
 
     return await asyncio.to_thread(_run)
 

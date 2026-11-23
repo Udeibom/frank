@@ -1,2 +1,7 @@
 ffmpeg
 libsndfile1
+fluidsynth
+libfluidsynth3
+librubberband2
+libsndfile1-dev
+pkg-config

@@ -55,3 +55,4 @@ class JobStatusResponse(BaseModel):
     status: str
     result: Optional[dict[str, Any]] = None
     error: Optional[str] = None
+    waiting: Optional[str] = None        # "Two songs are ahead of yours…" while it waits its turn

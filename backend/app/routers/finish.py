@@ -9,6 +9,7 @@ POST /projects/{id}/finish/parts         separate the beat into its parts for mi
 POST /projects/{id}/finish/parts.zip     "Download separate parts" (job; the result holds the zip's link)
 """
 from __future__ import annotations
+from app.services.jobs import dispatch
 
 from typing import Optional
 
@@ -67,7 +68,7 @@ async def make_surprise(project_id: str, background: BackgroundTasks) -> JobResp
     if await surprise_svc.offered_before(project_id):
         raise HTTPException(status_code=409, detail="I've already shown you my one idea for this song.")
     job = await jobs_db.create_job(project_id, job_type="surprise")
-    background.add_task(surprise_svc.run_surprise_job, job["id"], project_id)
+    await dispatch.start(background, job, surprise_svc.run_surprise_job, project_id)
     return JobResponse(job_id=job["id"])
 
 
@@ -105,14 +106,14 @@ async def make_parts(project_id: str, background: BackgroundTasks) -> JobRespons
     if not state.get("active_beat_version_id"):
         raise HTTPException(status_code=409, detail="There's no beat to separate yet.")
     job = await jobs_db.create_job(project_id, job_type="beat_parts")
-    background.add_task(run_parts_job, job["id"], project_id, state["active_beat_version_id"])
+    await dispatch.start(background, job, run_parts_job, project_id, state["active_beat_version_id"])
     return JobResponse(job_id=job["id"])
 
 
 @router.post("/parts.zip", response_model=JobResponse)
 async def parts_zip(project_id: str, background: BackgroundTasks) -> JobResponse:
     job = await jobs_db.create_job(project_id, job_type="parts_zip")
-    background.add_task(run_parts_zip_job, job["id"], project_id)
+    await dispatch.start(background, job, run_parts_zip_job, project_id)
     return JobResponse(job_id=job["id"])
 
 

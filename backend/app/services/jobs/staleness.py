@@ -16,6 +16,8 @@ T = TypeVar("T")
 ACTIVE_STATUSES = ("pending", "processing")
 # Slowest normal job measured is ~3 min (a beat on a slow uplink). Wide margin.
 STALE_AFTER = timedelta(minutes=10)
+# A job still waiting its turn in the queue has not started; it is only given up on much later.
+QUEUED_STALE_AFTER = timedelta(minutes=30)
 
 STALE_MESSAGE = "This took too long and stopped partway — want to try again?"
 RESTART_MESSAGE = "Frank restarted while working on this — want to try again?"
@@ -47,6 +49,8 @@ def is_stale(
     changed = parse_timestamp(job.get("updated_at"))
     if changed is None:
         return False
+    if job.get("status") == "pending" and job.get("payload"):
+        stale_after = max(stale_after, QUEUED_STALE_AFTER)
     return now - changed > stale_after
 
 

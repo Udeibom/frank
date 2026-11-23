@@ -1,3 +1,4 @@
+from app.services.jobs import dispatch
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 
 from app.models.mix import (
@@ -131,7 +132,7 @@ async def render_mix(
     """Render a mix version (preview or full) as a background job."""
     params = {**DEFAULT_MIX_PARAMS, **body.mix_params}
     job = await jobs_db.create_job(project_id, job_type="mix_render")
-    background.add_task(run_mix_job, job["id"], project_id, params, body.quality)
+    await dispatch.start(background, job, run_mix_job, project_id, params, body.quality)
     return JobResponse(job_id=job["id"])
 
 
@@ -302,7 +303,7 @@ async def add_atmosphere(project_id: str, body: AtmosphereRequest, background: B
     from app.services.jobs.atmosphere_runner import run_atmosphere_job
 
     job = await jobs_db.create_job(project_id, job_type="atmosphere")
-    background.add_task(run_atmosphere_job, job["id"], project_id, body.source, body.words, body.level_db)
+    await dispatch.start(background, job, run_atmosphere_job, project_id, body.source, body.words, body.level_db)
     return JobResponse(job_id=job["id"])
 
 
@@ -322,5 +323,5 @@ async def switch_atmosphere(project_id: str, body: AtmosphereSwitch, background:
     params["atmosphere"] = {**params["atmosphere"], "enabled": body.enabled,
                             **({"level_db": body.level_db} if body.level_db is not None else {})}
     job = await jobs_db.create_job(project_id, job_type="mix_render")
-    background.add_task(run_mix_job, job["id"], project_id, {**DEFAULT_MIX_PARAMS, **params}, "preview")
+    await dispatch.start(background, job, run_mix_job, project_id, {**DEFAULT_MIX_PARAMS, **params}, "preview")
     return JobResponse(job_id=job["id"])

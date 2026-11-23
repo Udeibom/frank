@@ -379,6 +379,53 @@ def _component(kind: str):
     return gr.File(visible=False) if kind == "file" else gr.Textbox(visible=False)
 
 
+# ── Frank's job worker (core-path spec 15): heavy work from the 512 MB API runs here ───────────────────────
+
+def _worker_forever() -> None:
+    """Set up once, then keep the worker running; it is a separate process with no GPU visible."""
+    import threading  # noqa: F401
+    import time as _t
+
+    base = os.environ.get("FRANK_WORKER_HOME", "/tmp/frank-worker")
+    log_path = os.path.join(tempfile.gettempdir(), "frank-worker.log")
+    with open(log_path, "a") as log_f:
+        r = subprocess.run(["bash", str(Path(__file__).resolve().parent / "worker_setup.sh")],
+                           stdout=log_f, stderr=subprocess.STDOUT)
+    print("frank worker setup finished with code", r.returncode, flush=True)
+    if r.returncode != 0:
+        print(open(log_path).read()[-3000:], flush=True)
+        return
+    env = {**os.environ, "CUDA_VISIBLE_DEVICES": "", "HEAVY_JOBS": os.environ.get("HEAVY_JOBS", "2"),
+           "ENVIRONMENT": os.environ.get("ENVIRONMENT", "production"),
+           "PATH": os.path.expanduser("~/.local/bin") + ":" + os.environ.get("PATH", ""),
+           "MALLOC_ARENA_MAX": "2", "PYTHONUNBUFFERED": "1"}
+    wdir = str(Path(__file__).resolve().parent / "worker")
+    delay = 5
+    while True:
+        started = _t.time()
+        p = subprocess.run([f"{base}/env/bin/python", "-m", "app.worker"], cwd=wdir, env=env)
+        print("frank worker stopped with code", p.returncode, flush=True)
+        delay = 5 if _t.time() - started > 300 else min(300, delay * 2)
+        _t.sleep(delay)
+
+
+if os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+    import threading as _threading
+
+    _threading.Thread(target=_worker_forever, daemon=True).start()
+
+
+def worker_log() -> str:
+    """The worker's set-up log, for debugging (the run log of a Space is not always readable)."""
+    try:
+        return open(os.path.join(tempfile.gettempdir(), "frank-worker.log")).read()[-6000:]
+    except OSError:
+        return "no worker log yet"
+
+
+ENDPOINTS.append((worker_log, [], ["text"]))
+
+
 with gr.Blocks(title="frank-ears") as demo:
     gr.Markdown("**frank-ears**: the models Frank listens with. An API for Frank's backend, "
                 "[github.com/Udeibom/frank](https://github.com/Udeibom/frank). Not a user interface.")

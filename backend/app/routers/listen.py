@@ -1,5 +1,6 @@
 """Listener route (listener spec 03). Mounted under the project ownership check. Read-only."""
 from __future__ import annotations
+from app.services.jobs import dispatch
 
 from typing import Optional
 
@@ -22,5 +23,5 @@ class ListenRequest(BaseModel):
 async def listen(project_id: str, body: ListenRequest, background: BackgroundTasks) -> JobResponse:
     """Start listening. Poll /jobs/{id}/status: result holds `measurements` and `findings`."""
     job = await jobs_db.create_job(project_id, job_type="listen")
-    background.add_task(run_listen_job, job["id"], project_id, body.scope, body.concern)
+    await dispatch.start(background, job, run_listen_job, project_id, body.scope, body.concern)
     return JobResponse(job_id=job["id"])

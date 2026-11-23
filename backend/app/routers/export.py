@@ -1,3 +1,4 @@
+from app.services.jobs import dispatch
 import re
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 
@@ -29,8 +30,7 @@ async def create_export(
 ) -> JobResponse:
     """Render the final export (optionally mastered) as a background job."""
     job = await jobs_db.create_job(project_id, job_type="export")
-    background.add_task(
-        run_export_job, job["id"], project_id, body.mix_version_id, body.apply_mastering
+    await dispatch.start(background, job, run_export_job, project_id, body.mix_version_id, body.apply_mastering
     )
     return JobResponse(job_id=job["id"])
 
@@ -115,5 +115,5 @@ async def match_to_reference(project_id: str, background: BackgroundTasks, mix_v
     else:
         raise HTTPException(status_code=400, detail="Pick a song to match first.")
     job = await jobs_db.create_job(project_id, job_type="export_matched")
-    background.add_task(run_matched_job, job["id"], project_id, mix_version_id, data, ext)
+    await dispatch.start(background, job, run_matched_job, project_id, mix_version_id, data, ext)
     return JobResponse(job_id=job["id"])

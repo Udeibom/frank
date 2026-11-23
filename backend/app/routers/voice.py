@@ -1,3 +1,4 @@
+from app.services.jobs import dispatch
 import asyncio
 import json
 from typing import Optional
@@ -66,7 +67,7 @@ async def _owned_take(project_id: str, take_id: str) -> dict:
 
 async def _job(project_id: str, kind: str, background: BackgroundTasks, fn, *args) -> JobResponse:
     job = await jobs_db.create_job(project_id, job_type=kind)
-    background.add_task(fn, job["id"], *args)
+    await dispatch.start(background, job, fn, *args)
     return JobResponse(job_id=job["id"])
 
 
@@ -130,7 +131,7 @@ async def upload_take(
     await projects_db.update_project_active_state(project_id, {"active_vocal_id": take["id"], "active_comp_id": None})
 
     job = await jobs_db.create_job(project_id, job_type="pitch_analysis")
-    background.add_task(vr.run_after_take_job, job["id"], project_id, take, wav)
+    await dispatch.start(background, job, vr.run_after_take_job, project_id, take, wav)
     return UploadTakeResponse(take=_take_to_response(take), analysis_job_id=job["id"])
 
 

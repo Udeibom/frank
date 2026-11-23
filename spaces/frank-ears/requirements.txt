@@ -17,3 +17,5 @@ audio-separator[cpu]==0.30.2
 cython
 git+https://github.com/CPJKU/madmom.git
 all-in-one-infer
+# Frank's job worker (core-path spec 15) makes its own Python 3.12 environment with uv
+uv

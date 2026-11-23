@@ -1,6 +1,7 @@
 """Intake routes (start-from-any-input spec 02). Mounted under the project ownership check."""
 
 from __future__ import annotations
+from app.services.jobs import dispatch
 
 import asyncio
 import logging
@@ -71,7 +72,7 @@ async def start_hum_intake(
     if not raw:
         raise HTTPException(status_code=400, detail="I didn't get any sound from that recording. Could you try once more?")
     job = await jobs_db.create_job(project_id, job_type="hum_intake")
-    background.add_task(run_hum_intake_job, job["id"], project_id, raw, safe_extension(file.filename))
+    await dispatch.start(background, job, run_hum_intake_job, project_id, raw, safe_extension(file.filename))
     return JobResponse(job_id=job["id"])
 
 
@@ -84,7 +85,7 @@ async def start_rhythm_intake(
     if not raw:
         raise HTTPException(status_code=400, detail="I didn't get any sound from that recording. Could you try once more?")
     job = await jobs_db.create_job(project_id, job_type="rhythm_intake")
-    background.add_task(run_rhythm_intake_job, job["id"], project_id, raw, safe_extension(file.filename))
+    await dispatch.start(background, job, run_rhythm_intake_job, project_id, raw, safe_extension(file.filename))
     return JobResponse(job_id=job["id"])
 
 
@@ -413,7 +414,7 @@ async def start_from_recording(project_id: str, background: BackgroundTasks, fil
         audio_url = upload_audio("voice-memos", wav, extension="wav", name_prefix="described")
         return RecordingResponse(kind="description", description=await _from_description(project_id, text, "voice_memo", audio_url))
     job = await jobs_db.create_job(project_id, job_type="hum_intake")
-    background.add_task(run_hum_intake_job, job["id"], project_id, raw, ext)
+    await dispatch.start(background, job, run_hum_intake_job, project_id, raw, ext)
     return RecordingResponse(kind="hum", job_id=job["id"])
 
 

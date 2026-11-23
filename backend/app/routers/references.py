@@ -9,6 +9,7 @@ Songs the person points at (frankenstein spec 14, requirement 6).
 The name of a song or artist is kept for the person to see, never put in a prompt (founder's rule).
 """
 from __future__ import annotations
+from app.services.jobs import dispatch
 
 import asyncio
 import logging
@@ -49,7 +50,7 @@ async def upload_reference(project_id: str, background: BackgroundTasks, file: U
         raise HTTPException(status_code=413, detail="That file is too big for me. A song under 50 MB works.")
     title = (file.filename or "Your song").rsplit(".", 1)[0][:120]
     job = await jobs_db.create_job(project_id, "reference")
-    background.add_task(reference_runner.run_reference_job, job["id"], project_id, "upload", data, ext,
+    await dispatch.start(background, job, reference_runner.run_reference_job, project_id, "upload", data, ext,
                         {"title": title, "artist": None, "license": "used with your permission", "attribution": None})
     return JobResponse(job_id=job["id"])
 
@@ -80,7 +81,7 @@ async def use_jamendo(project_id: str, body: JamendoPick, background: Background
     if not track:
         raise HTTPException(status_code=404, detail="I couldn't find that song any more.")
     job = await jobs_db.create_job(project_id, "reference")
-    background.add_task(reference_runner.run_reference_job, job["id"], project_id, "jamendo", None, "mp3",
+    await dispatch.start(background, job, reference_runner.run_reference_job, project_id, "jamendo", None, "mp3",
                         {"title": track["title"], "artist": track["artist"], "license": track["license"],
                          "attribution": track["attribution"], "external_id": track["id"], "track": track})
     return JobResponse(job_id=job["id"])
@@ -93,7 +94,7 @@ class NamedReference(BaseModel):
 @router.post("/named", response_model=JobResponse)
 async def named_reference(project_id: str, body: NamedReference, background: BackgroundTasks) -> JobResponse:
     job = await jobs_db.create_job(project_id, "reference")
-    background.add_task(reference_runner.run_named_job, job["id"], project_id, body.text)
+    await dispatch.start(background, job, reference_runner.run_named_job, project_id, body.text)
     return JobResponse(job_id=job["id"])
 
 

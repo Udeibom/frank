@@ -10,6 +10,7 @@ POST /projects/{id}/versions/resolve                "give me the second version 
 PATCH /projects/{id}/versions/{layer}/{version}     rename a version
 """
 from __future__ import annotations
+from app.services.jobs import dispatch
 
 import asyncio
 from typing import Any, Literal, Optional
@@ -69,7 +70,7 @@ async def _proposal(project_id: str, proposal_id: str) -> dict:
 @router.post("/refine", response_model=JobResponse)
 async def refine(project_id: str, body: RefineRequest, background: BackgroundTasks) -> JobResponse:
     job = await jobs_db.create_job(project_id, job_type="refine")
-    background.add_task(run_propose_job, job["id"], project_id, body.concern)
+    await dispatch.start(background, job, run_propose_job, project_id, body.concern)
     return JobResponse(job_id=job["id"])
 
 
@@ -83,7 +84,7 @@ async def latest(project_id: str) -> dict[str, Any]:
 async def preview(project_id: str, proposal_id: str, n: int, background: BackgroundTasks) -> JobResponse:
     await _proposal(project_id, proposal_id)
     job = await jobs_db.create_job(project_id, job_type="refine_preview")
-    background.add_task(run_preview_job, job["id"], project_id, proposal_id, n)
+    await dispatch.start(background, job, run_preview_job, project_id, proposal_id, n)
     return JobResponse(job_id=job["id"])
 
 
@@ -121,11 +122,11 @@ async def choose(project_id: str, proposal_id: str, n: int, background: Backgrou
         if basis["beat_id"] != (row.get("based_on") or {}).get("beat"):
             raise HTTPException(status_code=409, detail="The song has changed since I suggested these. Ask me again and I'll listen fresh.")
         job = await jobs_db.create_job(project_id, job_type="beat_operations")
-        background.add_task(run_operations_job, job["id"], project_id, d.actions)
+        await dispatch.start(background, job, run_operations_job, project_id, d.actions)
     else:
         params, _ = apply_actions(basis["mix_params"] or {}, d.actions)
         job = await jobs_db.create_job(project_id, job_type="mix_render")
-        background.add_task(run_mix_job, job["id"], project_id, params, "preview")
+        await dispatch.start(background, job, run_mix_job, project_id, params, "preview")
     await song_db.insert_decision(project_id, _decision(row, n))
     await asyncio.to_thread(refine_db.set_chosen, proposal_id, n)
     from app.services.taste.signals import record_choice

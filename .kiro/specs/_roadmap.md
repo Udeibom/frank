@@ -24,6 +24,7 @@ Status key: OUTLINE (intent captured) / SPEC (requirements+design+tasks written)
 | 12 | kiro-craft | STARTED Nov 12 (hooks that run real checks, 3 new agents, mcp example, spec checker; see KIRO_USAGE.md). Still to do: role steering that doubles as runtime prompts, hooks that fire, per-role agents, an audio-analysis MCP so Kiro can check its own renders, PBT on the new invariants, CI, mcp.json.example, README/KIRO_USAGE honesty | all | BUILDING |
 | 13 | ship-it | Public deployment (incl. any GPU host), all three demo stories passing end to end, license, demo video, write-up, bonus posts | all | BUILDING |
 | 14 | frankenstein | The technologies from docs/research/FRANK-KIRO-AND-TECHNOLOGY-REVIEW.md stitched into one body: ears (CLAP, EffNet, Gemini listening, Audiobox, allin1, Chordino), hands (grooves, chord tables, accompaniment, CC0 samples, plugins), voice (DDSP, DiffSinger, DeepFilterNet, word timings, Kokoro), words (CMU, Datamuse, emotions), the world (references, photo, weather), memory (pgvector, Realtime) | 03, 05, 08, 09 | BUILDING |
+| 15 | core-path | The main path works for a real person (founder's run, 22 Nov): no crashes on 4-minute takes (heavy jobs on a worker with memory), speed they control, beat as long as the voice, directions that differ, one next step per room, honest status, tested their way | 03, 04, 06, 11, 13 | BUILDING |
 
 Existing specs (foundation, idea-room, feel-lab, beat-room, voice-room, mix-room, export-room, auth,
 private-audio, job-reliability, voice-to-export-flow) stay as the record of what was built. New specs
