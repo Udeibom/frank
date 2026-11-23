@@ -204,6 +204,15 @@ async def run_mix_job(
         await jobs_db.mark_processing(job_id)
 
         layers = await _resolve_layers(project_id)
+        lengthened = None
+        if layers["vocal_url"] and layers["beat_url"]:
+            # Never leave the voice alone at the end (core-path spec 15, requirement 3.2)
+            from app.services.jobs.beat_runner import lengthen_to_voice
+
+            await _say(job_id, "Making the music as long as your singing first…")
+            lengthened = await lengthen_to_voice(project_id)
+            if lengthened:
+                layers = await _resolve_layers(project_id)
         if not layers["vocal_url"] and not layers["beat_url"]:
             await jobs_db.mark_failed(
                 job_id, "There's nothing to mix yet — record a vocal or build a beat first."
@@ -223,6 +232,8 @@ async def run_mix_job(
         await projects_db.update_project_active_state(
             project_id, {"active_mix_id": result["mix_version_id"]}
         )
+        if lengthened:
+            result = {**result, "changes": [*(result.get("changes") or []), lengthened]}
         await jobs_db.mark_complete(job_id, result)
     except Exception as exc:  # noqa: BLE001
         try:

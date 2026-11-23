@@ -95,3 +95,44 @@ def test_a_reply_never_claims_speed_when_nothing_changes_speed(reply, ops_in):
     out, ops_out = claims.fix_speed("make the chorus bigger", reply, ops_in)
     if not any(o.get("op") in ("slower", "faster") for o in ops_out):
         assert "the speed is still the same" in out.lower() or "haven't changed the speed" in out.lower()
+
+
+# ─── Requirement 3: the music lasts as long as the singing ─
+
+from app.services.generation import beat as beat_engine  # noqa: E402
+
+
+def _capacity(bpm: float) -> float:
+    """The longest song Frank will make: 16 sections, the last at 32 bars."""
+    return beat_engine.seconds_of_bars(15 * 8 + beat_engine.MAX_SECTION_BARS, bpm)
+
+
+@settings(deadline=None, max_examples=200)
+@given(st.integers(55, 165), st.floats(0, 600, allow_nan=False))
+def test_a_new_beat_is_at_least_as_long_as_the_singing(bpm, voice_s):
+    arr = beat_engine.fit_arrangement(beat_engine.DEFAULT_ARRANGEMENT, bpm, voice_s)
+    seconds = beat_engine.seconds_of_bars(sum(e[1] for e in arr), bpm)
+    if voice_s + beat_engine.LENGTH_MARGIN_S <= _capacity(bpm) * 0.9:
+        assert seconds >= voice_s
+    assert arr[0][0] == "intro" and arr[-1][0] == "outro"           # it still starts and ends like a song
+    assert len(arr) <= beat_engine.MAX_SECTIONS_FOR_LENGTH
+
+
+def test_the_founders_four_minutes_at_138_gets_music_to_the_end():
+    plan, _ = beat_engine.build_beat_plan({"tempo_bpm": 138, "energy_level": 0.5}, min_seconds=240)
+    assert beat_engine.seconds_of_bars(sum(s.bars for s in plan), 138) >= 240
+
+
+@settings(deadline=None, max_examples=100)
+@given(st.integers(55, 165), st.floats(0, 400, allow_nan=False))
+def test_lengthening_a_beat_keeps_every_section_it_had(bpm, voice_s):
+    plan, _ = beat_engine.build_beat_plan({"tempo_bpm": bpm, "energy_level": 0.5})
+    for s in plan:
+        s.uid = s.index
+    out, changed = beat_engine.extend_sections(plan, bpm, voice_s)
+    before = [s.uid for s in plan]
+    kept = [s.uid for s in out if s.uid in before]
+    assert kept == before                                             # same sections, same order, same notes
+    assert len({s.uid for s in out}) == len(out)                      # every copy has its own identity
+    if changed:
+        assert beat_engine.seconds_of_bars(sum(s.bars for s in out), bpm) > beat_engine.seconds_of_bars(sum(s.bars for s in plan), bpm)

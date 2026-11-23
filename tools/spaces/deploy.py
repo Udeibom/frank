@@ -70,7 +70,7 @@ def main() -> int:
 
 # The job worker (core-path spec 15) runs the backend's own code on frank-ears. Only code goes up: never .env,
 # tests, local assets or environments. Secrets are set as Space secrets, read from backend/.env here.
-WORKER_FILES = ["app/**/*.py", "app/services/generation/styles/*.json", "requirements.txt",
+WORKER_FILES = ["app/*.py", "app/**/*.py", "app/services/generation/styles/*.json", "requirements.txt",
                 "scripts/fetch_soundfont.sh", "scripts/fetch_samples.sh", "scripts/build_words_db.py"]
 WORKER_SECRETS = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "GROQ_API_KEY", "GEMINI_API_KEY", "FREESOUND_API_KEY",
                   "JAMENDO_CLIENT_ID", "EXA_API_KEY", "FIRECRAWL_API_KEY"]

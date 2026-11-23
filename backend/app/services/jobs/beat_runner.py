@@ -80,7 +80,7 @@ def _arrangement_params(
 
 def _render_and_persist_sync(
     project_id: str, fingerprint: dict, label: str, seed: int, lead: lead_mod.Lead | None = None,
-    structure: dict | None = None,
+    structure: dict | None = None, min_seconds: float = 0.0,
 ) -> dict:
     """
     The entire heavy job, run in ONE worker thread: render the beat, encode MP3,
@@ -92,7 +92,8 @@ def _render_and_persist_sync(
     """
     log_memory("beat: start render")
     report: dict = {}
-    sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed, lead, structure, report=report)
+    sections, mixes, full = beat_engine.render_full_beat(fingerprint, seed, lead, structure, report=report,
+                                                         min_seconds=min_seconds)
     log_memory("beat: rendered")
     fp = beat_engine.fp_utils.normalize(fingerprint)
     return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead, song_gain=report.get("song_gain"),
@@ -229,10 +230,14 @@ async def run_full_beat_job(
         except Exception:  # noqa: BLE001  a missing record never stops a beat
             structure = None
 
+        # As long as their singing, when they have recorded (core-path spec 15, requirement 3.1)
+        from app.services.audio.duration import active_voice_seconds
+
+        voice_s = await active_voice_seconds(project_id)
         # Entire heavy job (render + encode + upload + records) in one thread
         async with _one_at_a_time:
             version = await asyncio.to_thread(
-                _render_and_persist_sync, project_id, fingerprint, label, seed, lead, structure
+                _render_and_persist_sync, project_id, fingerprint, label, seed, lead, structure, voice_s
             )
 
         await projects_db.update_project_active_state(
@@ -286,6 +291,33 @@ async def _follow_newest_tune(
     if stored is not None and stored.source == newest.source:
         return fp, stored
     return new_fp, newest
+
+
+async def lengthen_to_voice(project_id: str) -> str | None:
+    """
+    Before a mix: when the singing goes on after the music ends, the active beat is lengthened with more of its own
+    verse and chorus (a NEW version; the shorter one is kept). Returns a plain line when it changed, else None.
+    """
+    from app.services.audio.duration import active_voice_seconds
+
+    voice_s = await active_voice_seconds(project_id)
+    if voice_s <= 0:
+        return None
+    try:
+        sections, fp, seed, lead = await _load_active_arrangement(project_id)
+    except ValueError:
+        return None
+    bpm = float(fp.get("tempo_bpm") or 90)
+    longer, changed = beat_engine.extend_sections(sections, bpm, voice_s)
+    if not changed:
+        return None
+    line = "Your singing went on after the music ended, so I made the music longer to carry you to the end."
+    count = await beat_db.count_beat_versions(project_id)
+    async with _one_at_a_time:
+        version = await asyncio.to_thread(_rerender_and_persist_sync, project_id, longer, fp, f"Beat v{count + 1}",
+                                          seed, lead, [line], [{"op": "lengthen_to_voice"}])
+    await projects_db.update_project_active_state(project_id, {"active_beat_version_id": version["id"]})
+    return line
 
 
 async def _remember_speed(project_id: str, fp: dict) -> None:

@@ -113,13 +113,86 @@ def _stamp_repeats(sections: list[SectionPlan]) -> None:
         s.final = s.repeat + 1 == totals[s.name]
 
 
+# ── The music lasts as long as the singing (core-path spec 15, requirement 3) ──
+
+MAX_SECTIONS_FOR_LENGTH = 16
+MAX_SECTION_BARS = 32
+LENGTH_MARGIN_S = 2.0          # the music ends a moment after the last sung note, never before it
+
+
+def seconds_of_bars(bars: int, bpm: float) -> float:
+    return bars * 4 * 60.0 / bpm
+
+
+def fit_arrangement(arrangement: list, bpm: float, min_seconds: float) -> list:
+    """
+    The arrangement made long enough for `min_seconds` of singing: another verse and chorus go in before the
+    ending (the song simply has more of itself), and once the song has as many sections as it may, the ending
+    grows. A song that is already long enough is returned as it is.
+    """
+    arr = [tuple(e) for e in arrangement]
+    need = min_seconds + LENGTH_MARGIN_S
+    total = lambda a: seconds_of_bars(sum(int(e[1]) for e in a), bpm)  # noqa: E731
+    if min_seconds <= 0 or total(arr) >= need:
+        return arr
+    verse = next((e for e in arr if e[0] == "verse"), ("verse", 8))
+    chorus = next((e for e in arr if e[0] == "chorus"), ("chorus", 8))
+    nxt = [verse, chorus]
+    turn = 0
+    while total(arr) < need and len(arr) < MAX_SECTIONS_FOR_LENGTH:
+        at = max((i for i, e in enumerate(arr) if e[0] == "outro"), default=len(arr))
+        arr.insert(at, nxt[turn % 2])
+        turn += 1
+    if total(arr) < need and arr:
+        last = list(arr[-1])
+        short_bars = int(-(-(need - total(arr)) * bpm // 240))
+        last[1] = min(MAX_SECTION_BARS, int(last[1]) + max(1, short_bars))
+        arr[-1] = tuple(last)
+    return arr
+
+
+def extend_sections(sections: list[SectionPlan], bpm: float, min_seconds: float) -> tuple[list[SectionPlan], bool]:
+    """The same for a beat that already exists: copies of its own verse and chorus, then a longer ending.
+    Sections already there keep their notes; each copy gets its own identity. Returns (sections, changed)."""
+    import copy
+
+    out = copy.deepcopy(sections)
+    need = min_seconds + LENGTH_MARGIN_S
+    total = lambda: seconds_of_bars(sum(x.bars for x in out), bpm)  # noqa: E731
+    if min_seconds <= 0 or total() >= need:
+        return out, False
+    for x in out:
+        if x.uid is None:
+            x.uid = x.index
+    next_uid = max(x.uid for x in out) + 1000
+    templates = [t for t in (next((x for x in out if x.name == "verse"), None),
+                             next((x for x in reversed(out) if x.name == "chorus"), None)) if t is not None]
+    turn = 0
+    while templates and total() < need and len(out) < MAX_SECTIONS_FOR_LENGTH:
+        at = max((i for i, x in enumerate(out) if x.name == "outro"), default=len(out))
+        twin = copy.deepcopy(templates[turn % len(templates)])
+        twin.uid, twin.stems = next_uid, {}
+        next_uid += 1000
+        out.insert(at, twin)
+        turn += 1
+    if total() < need and out:
+        short_bars = int(-(-(need - total()) * bpm // 240))
+        out[-1].bars = min(MAX_SECTION_BARS, out[-1].bars + max(1, short_bars))
+        out[-1].stems = {}
+    for i, x in enumerate(out):
+        x.index = i
+    _stamp_repeats(out)
+    return out, True
+
+
 def default_seed(fp: dict) -> int:
     """A seed that depends only on the fingerprint, so the same feeling gives the same first song."""
     return derive_seed(json.dumps(fp, sort_keys=True, default=str))
 
 
 def build_beat_plan(
-    fingerprint: dict, arrangement=None, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None
+    fingerprint: dict, arrangement=None, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None,
+    min_seconds: float = 0.0,
 ) -> tuple[list[SectionPlan], dict]:
     """
     Build the section plan (no audio yet) from a fingerprint.
@@ -128,7 +201,7 @@ def build_beat_plan(
     """
     fp = fp_utils.normalize(fingerprint)
     style = pick_style(fp)
-    arrangement = arrangement or DEFAULT_ARRANGEMENT
+    arrangement = fit_arrangement(arrangement or DEFAULT_ARRANGEMENT, float(fp["tempo_bpm"]), min_seconds)
     base_energy = fp["energy_level"]
     base_density = fp["density"]
 
@@ -451,13 +524,13 @@ def render_excerpt(
 
 def render_full_beat(
     fingerprint: dict, seed: Optional[int] = None, lead: Optional[lead_mod.Lead] = None,
-    structure: Optional[dict] = None, report: Optional[dict] = None,
+    structure: Optional[dict] = None, report: Optional[dict] = None, min_seconds: float = 0.0,
 ) -> tuple[list[SectionPlan], list[np.ndarray], np.ndarray]:
     """
     Full pipeline: plan the arrangement (from the words' structure when there is one), render the song.
     Returns (sections, per_section_audio, full_beat_audio). CPU-bound: call from a background job.
     """
-    sections, fp = build_beat_plan(fingerprint, arrangement_from_structure(structure), lead=lead)
+    sections, fp = build_beat_plan(fingerprint, arrangement_from_structure(structure), lead=lead, min_seconds=min_seconds)
     mixes, full = render_song(sections, fp, seed, lead=lead, report=report)
     return sections, mixes, full
 
