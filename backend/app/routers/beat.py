@@ -159,6 +159,16 @@ async def beat_conversation(
         actions = [a for a in actions if a.type != "beat_operations"] + [
             ConversationAction(type="beat_operations", params={"operations": run_instead})]
         result["message"] = "Doing that now. Have a listen when it's ready and tell me how it feels."
+    if not say_instead and not any(a.type == "refine" for a in actions):
+        # Speed is honest (core-path spec 15, 2.3): asked for, it is done; not done, it is not claimed.
+        from app.services.team import claims
+
+        ops_now = [o for a in actions if a.type == "beat_operations" for o in (a.params.get("operations") or [])]
+        msg, fixed = claims.fix_speed(body.message, result.get("message", ""), ops_now)
+        if fixed != ops_now:
+            actions = [a for a in actions if a.type != "beat_operations"] + [
+                ConversationAction(type="beat_operations", params={"operations": fixed})]
+        result["message"] = msg
     result["message"] = await convo.enforce_reply(project_id, "beat", result.get("message", ""))
     await convo.record(project_id, "beat", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return BeatConversationResponse(message=result.get("message", ""), actions=actions)

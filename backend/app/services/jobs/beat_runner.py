@@ -15,6 +15,7 @@ sections can be addressed individually later.
 from __future__ import annotations
 import asyncio
 import json
+import logging
 from dataclasses import replace
 
 import numpy as np
@@ -32,6 +33,8 @@ from app.services.generation.rng import derive_seed
 from app.services.intake.melody import CONFIDENT
 from app.services.song import record as song_record
 from app.services.generation.styles import pick_style
+
+log = logging.getLogger("frank.beat")
 
 
 # One beat is built at a time. A render holds a large SoundFont and several minutes of audio in memory,
@@ -285,6 +288,29 @@ async def _follow_newest_tune(
     return new_fp, newest
 
 
+async def _remember_speed(project_id: str, fp: dict) -> None:
+    """The song's new speed is the song's speed from now on: a new beat later keeps it."""
+    from app.db import feel as feel_db
+
+    try:
+        latest = await feel_db.get_latest_fingerprint(project_id)
+        base = dict((latest or {}).get("fingerprint") or {})
+        base["tempo_bpm"] = fp["tempo_bpm"]
+        saved = await feel_db.save_fingerprint(project_id, base, (latest or {}).get("conversation_summary"))
+        await projects_db.update_project_active_state(project_id, {"active_fingerprint_id": saved["id"]})
+    except Exception:  # noqa: BLE001 - the beat itself is already at the new speed
+        log.warning("could not save the new speed to the feeling", exc_info=True)
+
+
+def _has_takes(project_id: str) -> bool:
+    from app.db import voice as voice_db
+
+    try:
+        return voice_db.count_takes_sync(project_id) > 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
 async def run_operations_job(job_id: str, project_id: str, operations: list[dict]) -> None:
     """
     Apply typed edit operations (generation/ops.py) to the active beat and render the result as a NEW version.
@@ -297,10 +323,18 @@ async def run_operations_job(job_id: str, project_id: str, operations: list[dict
         await jobs_db.mark_processing(job_id)
         sections, fp, seed, lead = await _load_active_arrangement(project_id)
         try:
-            sections, seed, changes, _ = ops_mod.apply_audible(sections, seed, operations, fp, lead)
+            # Speed first (core-path spec 15, 2.2): it changes the whole song, not one part.
+            fp, rest, changes = ops_mod.apply_speed(fp, operations)
+            if rest:
+                sections, seed, more, _ = ops_mod.apply_audible(sections, seed, rest, fp, lead)
+                changes += more
         except ops_mod.OpError as exc:
             await jobs_db.mark_failed(job_id, str(exc))
             return
+        if len(rest) < len(operations):
+            await _remember_speed(project_id, fp)
+            if await asyncio.to_thread(_has_takes, project_id):
+                changes.append("Your recording was sung at the old speed, so sing it again over this one when it feels right.")
         count = await beat_db.count_beat_versions(project_id)
         label = f"Beat v{count + 1}"
         async with _one_at_a_time:

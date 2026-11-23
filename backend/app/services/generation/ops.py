@@ -132,9 +132,20 @@ class RemoveSection(_Op):
     section: int
 
 
+class Slower(_Op):
+    """The whole song slower (core-path spec 15, requirement 2.2). Changes the speed, not only the drums."""
+    op: Literal["slower"]
+    amount: Literal["a_little", "a_lot"] = "a_little"
+
+
+class Faster(_Op):
+    op: Literal["faster"]
+    amount: Literal["a_little", "a_lot"] = "a_little"
+
+
 Operation = Annotated[
     Union[Busier, Sparser, Looser, Tighter, Bigger, Smaller, AddPart, RemovePart, SwapSound, AddFill, Reseed, AnotherSong, Resize, Move,
-          Repeat, RemoveSection],
+          Repeat, RemoveSection, Slower, Faster],
     Field(discriminator="op"),
 ]
 _ADAPTER = TypeAdapter(list[Operation])
@@ -313,7 +324,41 @@ def _apply(op, sections: list[SectionPlan], seed: int) -> tuple[int, str]:
         sections.remove(s)
         _renumber(sections)
         return seed, f"I took {label} out of the song."
+    if isinstance(op, (Slower, Faster)):
+        raise OpError("I can only change the speed of the whole beat, from the Music room.")
     raise OpError("I don't know how to make that change yet.")
+
+
+SPEED_MIN, SPEED_MAX = 55, 165
+SPEED_STEP = {"a_little": 0.88, "a_lot": 0.75}          # slower; faster is the inverse
+
+
+def apply_speed(fp: dict, raw: list[dict]) -> tuple[dict, list[dict], list[str]]:
+    """
+    Take the speed changes out of `raw` and apply them to the song's speed. Returns (new fingerprint, the other
+    operations, plain change sentences). The tune and every part follow the new speed, because they are written
+    in beats. Raises OpError (changing nothing) when the song is already as slow or fast as Frank will make it.
+    """
+    ops = parse(raw) if raw else []
+    speed = [o for o in ops if isinstance(o, (Slower, Faster))]
+    rest = [r for r, o in zip(raw, ops) if not isinstance(o, (Slower, Faster))]
+    if not speed:
+        return fp, raw, []
+    out = dict(fp)
+    bpm = float(out.get("tempo_bpm") or 90)
+    start = bpm
+    for o in speed:
+        f = SPEED_STEP[o.amount]
+        bpm = bpm * f if isinstance(o, Slower) else bpm / f
+    new = int(round(max(SPEED_MIN, min(SPEED_MAX, bpm))))
+    if new == int(round(start)):
+        slower = isinstance(speed[0], Slower)
+        raise OpError(f"It's already as {'slow' if slower else 'fast'} as I can make it while it still holds together.")
+    out["tempo_bpm"] = new
+    change = (start - new) / start
+    size = "a lot" if abs(change) >= 0.2 else "a little"
+    word = "slower" if new < start else "faster"
+    return out, rest, [f"I made the whole song {size} {word}: every part and your tune now move at the new speed."]
 
 
 def apply_operations(sections: list[SectionPlan], seed: int, raw: list[dict]) -> tuple[list[SectionPlan], int, list[str]]:
@@ -358,6 +403,10 @@ part is one of: drums, bass, keys, melody, pad, strings, arp.
 - {"op": "move", "section": N, "to": M}
 - {"op": "repeat", "section": N}                   play it one more time right after
 - {"op": "remove_section", "section": N}
+- {"op": "slower", "amount": "a_little" or "a_lot"}   the WHOLE SONG at a slower speed (the only way to slow it)
+- {"op": "faster", "amount": "a_little" or "a_lot"}   the whole song at a faster speed
+When the person talks about speed, pace, "too fast", "too slow", "rushed" or "dragging", use slower or faster.
+Loosening the drums or making parts simpler does NOT change the speed; never say it does.
 """
 
 

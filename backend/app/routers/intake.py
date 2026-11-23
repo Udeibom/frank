@@ -97,14 +97,37 @@ async def _find_melody(project_id: str, version_id: str):
     return found
 
 
+async def _counted_for_the_song(project_id: str, content: dict) -> dict:
+    """
+    The tune counted at the speed that fits the song (core-path spec 15, 2.1): a slow worship hum read at 138 is
+    the same pulse as 69, and the song should be built at 69. The notes are rescaled, so the tune sounds the same.
+    """
+    from app.services.intake import pace
+    from app.services.song import record as song_record
+
+    try:
+        bpm = float(content.get("tempo_bpm") or 0)
+        if bpm <= 0:
+            return content
+        lyrics = (await lyrics_db.get_latest_version(project_id) or {}).get("content") or ""
+        intent = (await song_record.active_facet(project_id, "intent") or {}).get("text") or ""
+        latest = await feel_db.get_latest_fingerprint(project_id)
+        factor = pace.choose_factor(bpm, pace.centre(f"{intent} {lyrics}", (latest or {}).get("fingerprint")))
+        return pace.recount(content, factor)
+    except Exception:  # noqa: BLE001 - the tune as heard is still a fine tune
+        log.warning("could not choose the tune's count", exc_info=True)
+        return content
+
+
 @router.post("/melody/{version_id}/confirm", response_model=ConfirmMelodyResponse)
 async def confirm_melody(project_id: str, version_id: str) -> ConfirmMelodyResponse:
     """The person said "yes, that's my tune". Only now does it become the song's tune."""
     found = await _find_melody(project_id, version_id)
+    content = found.content if found.content.get("confirmed") else await _counted_for_the_song(project_id, found.content)
     # Check the content is a real tune BEFORE writing anything, so a bad version cannot leave a
     # half-saved step behind.
     try:
-        sketch = MelodySketch(**{**found.content, "confirmed": True})
+        sketch = MelodySketch(**{**content, "confirmed": True})
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail="That tune can't be saved right now.") from exc
 

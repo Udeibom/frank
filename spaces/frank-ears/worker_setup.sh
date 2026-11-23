@@ -14,8 +14,8 @@ export PATH="$HOME/.local/bin:$PATH"
 if [ ! -x "$BASE/env/bin/python" ]; then
   python -m uv venv --python 3.12 "$BASE/env"
 fi
-VIRTUAL_ENV="$BASE/env" python -m uv pip install -q -r "$W/requirements.txt"
-VIRTUAL_ENV="$BASE/env" python -m uv pip install -q --no-deps basic-pitch==0.4.0
+python -m uv pip install -q --python "$BASE/env/bin/python" -r "$W/requirements.txt"
+python -m uv pip install -q --python "$BASE/env/bin/python" --no-deps basic-pitch==0.4.0
 
 # Studio reverbs: Dragonfly's official Linux build (GPL-3.0); bookworm has no VST3 package for it
 if [ ! -d "$HOME/.vst3/DragonflyPlateReverb.vst3" ]; then
