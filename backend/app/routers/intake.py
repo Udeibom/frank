@@ -106,13 +106,13 @@ async def _counted_for_the_song(project_id: str, content: dict) -> dict:
     from app.services.song import record as song_record
 
     try:
-        bpm = float(content.get("tempo_bpm") or 0)
-        if bpm <= 0:
+        speed = float(content.get("tempo_bpm") or 0)
+        if speed <= 0:
             return content
         lyrics = (await lyrics_db.get_latest_version(project_id) or {}).get("content") or ""
         intent = (await song_record.active_facet(project_id, "intent") or {}).get("text") or ""
         latest = await feel_db.get_latest_fingerprint(project_id)
-        factor = pace.choose_factor(bpm, pace.centre(f"{intent} {lyrics}", (latest or {}).get("fingerprint")))
+        factor = pace.choose_factor(speed, pace.centre(f"{intent} {lyrics}", (latest or {}).get("fingerprint")))
         return pace.recount(content, factor)
     except Exception:  # noqa: BLE001 - the tune as heard is still a fine tune
         log.warning("could not choose the tune's count", exc_info=True)
