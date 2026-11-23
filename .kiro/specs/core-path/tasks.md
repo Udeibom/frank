@@ -43,3 +43,11 @@ Ticked only with evidence. Order agreed with the founder (23 Nov): steps 1 to 7.
 ## Step 7. Proof
 - [x] 14. Live run of the founder's path, recorded in `docs/demo-runs/` — _Evidence: docs/demo-runs/2026-11-23-core-path.md: 16 of 16 PASS on production, 395 s_
   - _Requirements: 7.1_
+
+## Step 8. The music plays to the singer
+- [x] 15. `accompany.py`: pulse and bar line, sections in time, chords per bar, size, ending — _Evidence: tests/test_properties_accompany.py (4 properties over speeds 60-128, start points, four song shapes); scripts/follow_check.py on sung audio: speed 69.0 of 69, bar line 3.12 s of 3.10 s, every section within 0.02 s, choruses 2.5 and 4.5 dB bigger, ends two bars after the last note; 70% of the singing inside the chord under it_
+  - _Requirements: 8.2, 8.3, 8.4, 8.5_
+- [x] 16. Per-section chords, fractional speed, music start point in the mix, song notes and the Listener — _Evidence: `beat.progression_for`, `fingerprint.normalize`, `mixing.render_mix(beat_start_s)`, `song_notes.from_plan`, `backend/app/services/listener/project.py`; 261 related tests pass_
+  - _Requirements: 8.2_
+- [x] 17. Follow job, started after a recording, Music room action, speed refused plainly; live run — _Evidence: `beat_runner.run_follow_voice_job`, `voice_runner.run_after_take_job` (music_job_id), `POST /beat/follow-voice`, Music room 'Build the music around my singing', `ops.apply_speed` refusal; docs/demo-runs/2026-11-23-follow-the-singer.md: 9 of 9 PASS on production; Voice and Music screens type-checked and built, not seen in a browser by me_
+  - _Requirements: 8.1, 8.6_

@@ -39,3 +39,15 @@
 ## 7. Proof
 - `scripts/ops/e2e_core.py` runs the founder's path with a 4-minute take, from Kaggle (this machine's network
   drops large requests to Render), and writes `docs/demo-runs/`.
+
+## 8. Music that plays to the singer (requirement 8)
+- `services/generation/accompany.py` (pure): `grid_from_notes` (the slowest pulse that explains every note start,
+  counted to fit the feeling; the bar line where lines and long notes land), `sections_from_words` (lyric sections
+  placed by their lines' word timings, matched by text), `sections_from_phrases` (four-bar phrases; higher phrases
+  are the chorus; repetition as fallback), `plan` (sections in time, one chord per bar by the hummed tune's
+  best-path harmony, energy from height and busyness, no melody part, IV-I ending).
+- `beat_runner.run_follow_voice_job`: the active recording, its grid (the beat it was sung over when in song
+  time), and a new beat version with `fingerprint.follows_voice` and `music_start_s`. Started automatically by
+  `run_after_take_job` for recordings of 15 s or more; also `POST /beat/follow-voice`.
+- Per-section chords: `SectionPlan.parts["harmony"]` (degrees, sevenths) and `beat.progression_for`. Fractional
+  speeds are kept. The mix starts the music at `start_s`; song_notes and the Listener shift by it.

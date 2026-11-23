@@ -51,3 +51,17 @@ founder: the seven steps below, in this order.
 ### Requirement 7 - Tested the way the founder used it
 1. A live run on the deployed site SHALL cover: a slow song from a hum, "make it slower", a 4-minute
    recording, the mix, listening, atmosphere and finish, and SHALL be recorded in `docs/demo-runs/`.
+
+### Requirement 8 - The music plays to the singer
+The founder, 23 Nov: "Frank needs to understand what the person sang, the same way a human sitting on a piano would
+understand and play to them. That's the whole essence of Frank."
+1. WHEN the song has a recording of the person singing THEN Frank SHALL build the music around it without being
+   asked, as a new version (the music they sang over is kept).
+2. The music SHALL move at the singer's speed and put its bar lines where theirs fall: the speed of the music they
+   sang over when they sang over Frank's music, otherwise the pulse of their singing.
+3. The music SHALL change where the singer changes: their verses and choruses placed where they sang them (by the
+   words when Frank heard them, otherwise by where their melody changes).
+4. Each bar's chord SHALL be chosen to fit the notes sung in that bar.
+5. The music SHALL be bigger where they sing bigger (higher, busier), SHALL never play a competing tune, and SHALL
+   end on the home chord shortly after their last note.
+6. Speed changes on music that follows the singing SHALL be refused plainly: its speed is theirs.
