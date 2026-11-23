@@ -310,6 +310,9 @@ async def lengthen_to_voice(project_id: str) -> str | None:
     except ValueError:
         return None
     bpm = float(fp.get("tempo_bpm") or 90)
+    # The music may start a moment into the recording (music built from the singing): it has to reach the end of the
+    # singing from there, not from the first second.
+    voice_s -= float(fp.get("music_start_s") or 0.0)
     longer, changed = beat_engine.extend_sections(sections, bpm, voice_s)
     if not changed:
         return None

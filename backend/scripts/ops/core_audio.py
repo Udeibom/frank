@@ -47,3 +47,32 @@ def long_take(seconds: float = 240.0, bpm: float = 69.0) -> bytes:
     buf = io.BytesIO()
     sf.write(buf, np.concatenate(out)[: int(seconds * SR)], SR, format="WAV", subtype="PCM_16")
     return buf.getvalue()
+
+
+VERSE = [59, 61, 62, 61, 59, 57, 59, 59, 62, 64, 62, 61, 59, 61, 59, 57]
+CHORUS = [66, 66, 64, 66, 69, 67, 66, 64, 66, 64, 62, 64, 66, 64, 62, 61]
+
+
+def sung_song(bpm: float = 69.0, start_s: float = 3.1, form: str = "VCVC", bars: int = 8) -> tuple[bytes, list[tuple[str, float]]]:
+    """A recording of a song sung without music: verses low, choruses higher and coming back (the same song as
+    tests/accompany_songs.py). Returns (WAV bytes, [(section, start second)])."""
+    beat = 60.0 / bpm
+    notes, starts, bar = [], [], 0
+    for letter in form:
+        line = VERSE if letter == "V" else CHORUS
+        starts.append(("verse" if letter == "V" else "chorus", start_s + bar * 4 * beat))
+        for b in range(bars):
+            for half in range(2):
+                t = start_s + (bar + b) * 4 * beat + half * 2 * beat
+                held = 1.8 * beat if (b % 2 == 1 and half == 1) else 1.6 * beat
+                notes.append((t, held, line[(b * 2 + half) % len(line)]))
+        bar += bars
+    total = notes[-1][0] + notes[-1][1] + 3
+    y = np.zeros(int(total * SR), dtype=np.float32)
+    for t, held, pitch in notes:
+        seg = _voice(pitch, held)
+        a = int(t * SR)
+        y[a:a + seg.size] += seg[: max(0, y.size - a)]
+    buf = io.BytesIO()
+    sf.write(buf, y, SR, format="WAV", subtype="PCM_16")
+    return buf.getvalue(), starts

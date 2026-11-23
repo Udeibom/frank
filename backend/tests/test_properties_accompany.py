@@ -94,3 +94,17 @@ def test_most_of_what_they_sing_sits_in_the_chord_under_it(bpm, start):
             total += n.end - n.start
             inside += (n.end - n.start) * (int(round(n.pitch)) % 12 in chord)
     assert total > 0 and inside / total >= 0.5, inside / total
+
+
+@settings(deadline=None, max_examples=40)
+@given(speeds, starts, forms)
+def test_music_built_from_the_singing_is_never_lengthened_again_before_a_blend(bpm, start, form):
+    """Found live 23 Nov: the length check measured the music from 0 s, not from where it starts in the recording,
+    and added a verse the singing did not have."""
+    notes, _ = song(bpm=bpm, start_s=start, form=form)
+    grid = accompany.Grid(bpm, start % (240.0 / bpm))
+    fp = fp_utils.normalize({"tempo_bpm": bpm, "energy_level": 0.5, "density": 0.5})
+    acc = accompany.plan(notes, grid, accompany.sections_from_phrases(notes, grid), fp)
+    voice_s = acc.last_note_s + 1.0                    # the recording ends a second after the last note
+    _, changed = beat_engine.extend_sections(acc.sections, bpm, voice_s - grid.start_s)
+    assert not changed

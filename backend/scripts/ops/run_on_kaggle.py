@@ -50,7 +50,8 @@ def main(scripts: list[str]) -> int:
     uid = r.json()["id"]
     print("throwaway account", email)
     try:
-        sources = {"e2e.py": (OPS / "e2e.py").read_text(), "core_audio.py": (OPS / "core_audio.py").read_text()}
+        sources = {"e2e.py": (OPS / "e2e.py").read_text(), "core_audio.py": (OPS / "core_audio.py").read_text(),
+                   "e2e_core.py": (OPS / "e2e_core.py").read_text()}
         sources.update({s: (OPS / s).read_text() for s in scripts})
         env = {"SUPABASE_URL": SB, "SUPABASE_ANON_KEY": ANON, "FRANK_EMAIL": email, "FRANK_PASSWORD": pw,
                "E2E_SING": os.environ.get("E2E_SING", "1")}
