@@ -74,9 +74,13 @@ def test_cache_key_is_deterministic(fp):
 def test_cache_key_ignores_fields_that_do_not_shape_the_texture(fp, genres):
     """genre_proximity doesn't change the generated texture, so it mustn't
     change the cache key (otherwise identical textures re-render)."""
+    from app.services.generation.texture import palette_for
+
     a = texture_cache_key(fp)
-    b = texture_cache_key({**fp, "genre_proximity": genres})
-    assert a == b
+    other = {**fp, "genre_proximity": genres}
+    b = texture_cache_key(other)
+    # Genres shape a texture only by choosing its sound family (core-path spec 15): same family, same key.
+    assert (a == b) is (palette_for(fp) == palette_for(other))
 
 
 @settings(deadline=None)   # the first calls warm caches; timing is not what is tested

@@ -220,6 +220,15 @@ def build_beat_plan(
         # Density tracks energy a bit so bigger sections feel fuller
         s.density = _clamp(base_density * (0.8 + 0.4 * mult))
         s.layers = composer.layers_for_section(s.name, s.energy, s.density, s.repeat, s.final, style)
+    if isinstance(fp.get("texture_palette"), int):
+        # The beat keeps the sound of the direction they said yes to (core-path spec 15, 4.1)
+        from app.services.generation.texture import PALETTES
+
+        if 0 <= fp["texture_palette"] < len(PALETTES):
+            _, keys, pad, _ = PALETTES[fp["texture_palette"]]
+            for s in sections:
+                s.parts.setdefault("keys", {}).setdefault("preset", keys)
+                s.parts.setdefault("pad", {}).setdefault("preset", pad)
     return sections, fp
 
 

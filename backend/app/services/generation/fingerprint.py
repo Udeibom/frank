@@ -52,6 +52,12 @@ def normalize(fingerprint: dict) -> dict:
     return fp
 
 
+def _palette(fp: dict) -> int:
+    from app.services.generation.texture import palette_for
+
+    return palette_for(fp)
+
+
 def texture_cache_key(fingerprint: dict) -> str:
     """
     A deterministic hash of the musical parameters that affect a texture.
@@ -64,6 +70,8 @@ def texture_cache_key(fingerprint: dict) -> str:
         "tempo_feel": fp["tempo_feel"],
         "energy_level": round(fp["energy_level"], 2),
         "density": round(fp["density"], 2),
+        # The sound family it plays on (core-path spec 15, 4.1): a different direction is a different file.
+        "palette": _palette(fp),
     }
     blob = json.dumps(relevant, sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]

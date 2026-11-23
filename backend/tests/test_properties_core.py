@@ -136,3 +136,39 @@ def test_lengthening_a_beat_keeps_every_section_it_had(bpm, voice_s):
     assert len({s.uid for s in out}) == len(out)                      # every copy has its own identity
     if changed:
         assert beat_engine.seconds_of_bars(sum(s.bars for s in out), bpm) > beat_engine.seconds_of_bars(sum(s.bars for s in plan), bpm)
+
+
+# ─── Requirement 4: "Try something different" is different ─
+
+from app.services.generation import texture  # noqa: E402
+from app.services.generation import fingerprint as fp_utils  # noqa: E402
+
+fingerprints = st.fixed_dictionaries({
+    "energy_level": st.floats(0, 1), "tempo_feel": st.sampled_from(["floating", "steady", "building", "driving"]),
+    "instrumentation_hints": st.lists(st.sampled_from(["piano", "organ", "guitar", "strings", "synth"]), max_size=2),
+})
+
+
+@settings(deadline=None)
+@given(fingerprints)
+def test_a_different_direction_changes_sound_energy_and_movement_and_is_never_the_stored_copy(fp):
+    nxt = {**fp, **texture.contrast(fp)}
+    assert texture.palette_for(nxt) != texture.palette_for(fp)
+    assert abs(nxt["energy_level"] - fp_utils.normalize(fp)["energy_level"]) >= 0.2 or nxt["energy_level"] in (0.1, 0.9)
+    assert nxt["tempo_feel"] != fp["tempo_feel"]
+    assert fp_utils.texture_cache_key(nxt) != fp_utils.texture_cache_key(fp)
+
+
+@settings(deadline=None)
+@given(fingerprints)
+def test_asking_for_different_again_and_again_goes_through_every_sound_before_repeating(fp):
+    seen, cur = [], dict(fp)
+    for _ in range(len(texture.PALETTES)):
+        seen.append(texture.palette_for(cur))
+        cur = {**cur, **texture.contrast(cur)}
+    assert sorted(seen) == list(range(len(texture.PALETTES)))
+
+
+@pytest.mark.parametrize("said", ["Try something quite different.", "That one isn't quite it.", "try again", "something else"])
+def test_the_founders_reactions_ask_for_a_different_direction(said):
+    assert texture.wants_different(said)

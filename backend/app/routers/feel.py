@@ -61,6 +61,16 @@ async def feel_conversation(
         if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS
     ]
 
+    update = result.get("fingerprint_update", {}) or {}
+    from app.services.generation import texture as texture_svc
+
+    if texture_svc.wants_different(body.message):
+        # "Try something different" really is different (core-path spec 15, 4.1): another sound family, the other
+        # side of the energy, another way of moving, and a new direction is played.
+        update = {**update, **texture_svc.contrast({**(body.fingerprint or {}), **update})}
+        if not any(a.type == "generate_texture" for a in actions):
+            actions.append(ConversationAction(type="generate_texture", params={}))
+    result["fingerprint_update"] = update
     result["message"] = await convo.enforce_reply(project_id, "feel", result.get("message", ""))
     await convo.record(project_id, "feel", body.message, result.get("message", ""), [a.model_dump() for a in actions])
     return FeelConversationResponse(
