@@ -64,6 +64,14 @@ async def feel_conversation(
     update = result.get("fingerprint_update", {}) or {}
     from app.services.generation import texture as texture_svc
 
+    # Belt-and-suspenders: if the key was measured from the person's actual
+    # singing or humming, the LLM must not overwrite it with a mood-inferred
+    # guess. The prompt already tells the model not to do this, but we enforce
+    # it here too so a misbehaving model reply can't break the musical coherence.
+    if (body.fingerprint or {}).get("key_from_hum") or (body.fingerprint or {}).get("key_from_tune"):
+        update.pop("key", None)
+        update.pop("mode", None)
+
     if texture_svc.wants_different(body.message):
         # "Try something different" really is different (core-path spec 15, 4.1): another sound family, the other
         # side of the energy, another way of moving, and a new direction is played.
@@ -126,6 +134,11 @@ async def analyze_hum_route(
     """
     Analyze a hum. Hums are short, so analysis is fast enough to run inline.
     Converts to WAV, stores the hum (reusable later), and returns fingerprint hints.
+
+    The key detected from the hum audio is applied directly to the project's
+    active fingerprint here — it does not go through the LLM conversation. This
+    is intentional: the key comes from what the person sang, not from how they
+    described it. The LLM still owns mood, energy, density, and style.
     """
     raw = await file.read()
     ext = "webm"
@@ -145,6 +158,34 @@ async def analyze_hum_route(
             status_code=502,
             detail="Couldn't quite catch that hum — want to try again?",
         ) from exc
+
+    # If the hum gave us a confident key, write it into the active fingerprint
+    # immediately so any texture generated after this hum plays in the right key.
+    # We do this directly (not via the LLM) because the key is a musical fact
+    # measured from audio, not an interpretation of words.
+    hum_key = analysis.get("key")
+    hum_key_confidence = float(analysis.get("key_confidence") or 0.0)
+    if hum_key and hum_key_confidence >= 0.4:
+        try:
+            from app.db import feel as feel_db
+
+            latest = await feel_db.get_latest_fingerprint(project_id)
+            base = dict((latest or {}).get("fingerprint") or {})
+            # Only overwrite if the key isn't already from a confirmed melody
+            # sketch (which is more authoritative than a hum).
+            if not base.get("key_from_tune"):
+                parts = hum_key.split()
+                base["key"] = hum_key
+                base["mode"] = parts[1] if len(parts) >= 2 else base.get("mode", "minor")
+                base["key_from_hum"] = True
+                saved = await feel_db.save_fingerprint(
+                    project_id, base, (latest or {}).get("conversation_summary")
+                )
+                await projects_db.update_project_active_state(
+                    project_id, {"active_fingerprint_id": saved["id"]}
+                )
+        except Exception:  # noqa: BLE001 — a fingerprint write failure never fails the hum
+            pass
 
     return HumAnalysisResponse(analysis=analysis, audio_url=audio_url)
 
