@@ -9,9 +9,9 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 type Mode = "login" | "signup"
 
@@ -36,7 +36,7 @@ function friendlySignupError(message: string): string {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+  "w-full rounded-lg border border-line bg-raised px-3.5 py-3 text-sm text-ink placeholder:text-ink-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-frank/40 focus-visible:border-frank/50"
 
 export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter()
@@ -107,20 +107,42 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
+      {/* Ambient amber bloom behind the card */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 50% at 50% 60%, rgb(var(--frank) / 0.07) 0%, transparent 70%)",
+        }}
+      />
+
       <div className="w-full max-w-sm">
+        {/* Frank wordmark */}
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold text-foreground">
+          <span
+            className="font-written italic text-5xl leading-none select-none"
+            style={{ color: "rgb(var(--frank))" }}
+            aria-label="Frank"
+          >
+            f
+          </span>
+          <h1 className="mt-4 font-written italic text-2xl text-ink">
             {isSignup ? "Start your studio" : "Welcome back"}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-ink-2">
             {isSignup
               ? "Make an account so your songs stay yours."
               : "Pick up where you left off."}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-          <label className="flex flex-col gap-1.5 text-sm text-foreground">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-7 shadow-l2"
+          noValidate
+        >
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-ink-2">
             Email
             <input
               type="email"
@@ -133,7 +155,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             />
           </label>
 
-          <label className="flex flex-col gap-1.5 text-sm text-foreground">
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-ink-2">
             Password
             <input
               type="password"
@@ -146,7 +168,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           </label>
 
           {isSignup && (
-            <label className="flex flex-col gap-1.5 text-sm text-foreground">
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-ink-2">
               Type it once more
               <input
                 type="password"
@@ -160,12 +182,20 @@ export function AuthForm({ mode }: { mode: Mode }) {
           )}
 
           {error && (
-            <p role="alert" className="text-sm text-amber-300">
+            <p role="alert" className="text-sm text-problem leading-snug">
               {error}
             </p>
           )}
 
-          <Button type="submit" disabled={busy || !email || !password} className="mt-1">
+          <button
+            type="submit"
+            disabled={busy || !email || !password}
+            className={cn(
+              "mt-1 flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold transition-all duration-150",
+              "bg-frank text-ground hover:bg-frank-shade",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+            )}
+          >
             {busy ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-label="One moment" />
             ) : isSignup ? (
@@ -173,21 +203,21 @@ export function AuthForm({ mode }: { mode: Mode }) {
             ) : (
               "Log in"
             )}
-          </Button>
+          </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-muted-foreground">
+        <p className="mt-5 text-center text-sm text-ink-3">
           {isSignup ? (
             <>
               Already have an account?{" "}
-              <Link href={`/login?next=${encodeURIComponent(next)}`} className="text-primary hover:underline">
+              <Link href={`/login?next=${encodeURIComponent(next)}`} className="text-ink underline underline-offset-4 hover:text-frank transition-colors">
                 Log in
               </Link>
             </>
           ) : (
             <>
               New here?{" "}
-              <Link href={`/signup?next=${encodeURIComponent(next)}`} className="text-primary hover:underline">
+              <Link href={`/signup?next=${encodeURIComponent(next)}`} className="text-ink underline underline-offset-4 hover:text-frank transition-colors">
                 Make an account
               </Link>
             </>

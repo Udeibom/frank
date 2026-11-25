@@ -3,6 +3,8 @@
 /**
  * PlayButton: the one play control in Frank, in three sizes. It never makes sound itself; it asks the
  * AudioEngine, so starting one sound stops any other. The accessible name always says what it plays.
+ *
+ * Visual: amber fill + active radial bloom when playing; ghost ring at rest. Stage size is 64px.
  */
 
 import { Loader2, Pause, Play } from "lucide-react"
@@ -12,9 +14,9 @@ import { usePlayback, useAudio, type Track } from "@/store/audio"
 type Size = "stage" | "card" | "row"
 
 const SIZE: Record<Size, { box: string; icon: string }> = {
-  stage: { box: "h-12 w-12", icon: "h-5 w-5" },
-  card: { box: "h-9 w-9", icon: "h-4 w-4" },
-  row: { box: "h-7 w-7", icon: "h-3.5 w-3.5" },
+  stage: { box: "h-16 w-16", icon: "h-6 w-6" },   // 64px — Stitch stage large
+  card:  { box: "h-10 w-10", icon: "h-4 w-4" },   // 40px — card medium
+  row:   { box: "h-7 w-7",   icon: "h-3.5 w-3.5" }, // 28px — row small
 }
 
 interface PlayButtonProps {
@@ -44,12 +46,14 @@ export function PlayButton({ track, size = "card", keepPosition, className, onPr
       aria-label={`${playing ? "Pause" : "Play"} ${track.label}${where ? `, ${where}` : ""}`}
       aria-pressed={playing}
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full border transition-colors",
+        "play-bloom flex shrink-0 items-center justify-center rounded-full border transition-all duration-150",
         dims.box,
-        // The amber fill belongs to what is playing right now; at rest, a plain ring.
+        // Amber fill + bloom when playing; ghost ring at rest
         playing
-          ? "border-frank bg-frank text-ground"
-          : "border-ink-3 bg-transparent text-ink hover:border-ink hover:bg-raised",
+          ? "border-frank bg-frank text-ground shadow-play-bloom"
+          : size === "stage"
+            ? "border-line bg-raised text-ink hover:border-frank/60 hover:bg-raised"
+            : "border-line bg-transparent text-ink hover:border-frank/50 hover:bg-raised",
         className,
       )}
     >

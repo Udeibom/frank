@@ -4,10 +4,12 @@
  * WakingUp — the free server sleeps after 15 minutes without visitors and takes up to a minute to wake
  * (ship-it spec 13, requirement 2.2; deployment rules). If the health check has not answered within 3 seconds,
  * say so kindly, so a slow first answer never looks like an error.
+ *
+ * Visual (Stitch spec): a centred warm card with a glowing filament animation — not a toast banner.
+ * The card dims the studio lightly so the person knows to wait, without blocking the UI.
  */
 
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
 import { SERVER_ANSWERED } from "@/lib/api/client"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -55,12 +57,36 @@ export function WakingUp() {
   }, [])
 
   if (!waking) return null
+
   return (
-    <div role="status" className="fixed inset-x-0 top-0 z-50 flex justify-center p-3">
-      <p className="flex items-center gap-2 rounded-full border border-primary/30 bg-card px-4 py-2 text-sm text-foreground shadow-lg">
-        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-        Frank is waking up. The first visit after a quiet spell takes up to a minute; everything you made is safe.
-      </p>
+    // Overlay: dims the studio, centres the warm card
+    <div
+      role="status"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ground/70 backdrop-blur-sm"
+    >
+      <div className="relative mx-4 max-w-sm overflow-hidden rounded-xl border border-frank/20 bg-surface px-8 py-7 shadow-l3 text-center">
+        {/* Glowing amber filament strip along the top */}
+        <div
+          aria-hidden="true"
+          className="frank-filament pointer-events-none absolute inset-x-0 top-0 h-0.5 rounded-t"
+        />
+
+        {/* Warm filament icon — a simple glowing dot */}
+        <div className="mb-4 flex justify-center">
+          <span
+            aria-hidden="true"
+            className="filament-glow inline-block h-3 w-3 rounded-full bg-frank"
+            style={{ boxShadow: "0 0 12px 4px rgb(var(--frank) / 0.5)" }}
+          />
+        </div>
+
+        <p className="font-written italic text-xl text-ink leading-7">
+          Frank is waking up the studio.
+        </p>
+        <p className="mt-2 text-sm text-ink-2">
+          The first visit after a quiet spell takes up to a minute. Everything you made is safe.
+        </p>
+      </div>
     </div>
   )
 }

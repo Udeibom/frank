@@ -47,7 +47,7 @@ export function BeatVersions({ versions, activeVersionId, onSetActive, onRename 
 
   return (
     <section aria-labelledby="versions-heading" className="flex flex-col gap-2">
-      <h2 id="versions-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+      <h2 id="versions-heading" className="text-label-md font-semibold uppercase tracking-[0.06em] text-ink-3">
         How the music got here
       </h2>
       <ol className="flex flex-col">
@@ -94,7 +94,7 @@ export function BeatVersions({ versions, activeVersionId, onSetActive, onRename 
                     )}
                   </p>
                 )}
-                <p className="line-clamp-2 text-sm text-ink-2">{whatChanged(v, v.id === oldest)}</p>
+                <p className="line-clamp-2 text-sm text-ink-3 font-mono text-code">{whatChanged(v, v.id === oldest)}</p>
               </div>
               {inUse ? (
                 <span className="flex shrink-0 items-center gap-1 self-start pt-1 text-sm text-music">
@@ -103,7 +103,7 @@ export function BeatVersions({ versions, activeVersionId, onSetActive, onRename 
               ) : (
                 <button
                   onClick={() => onSetActive(v.id)}
-                  className="shrink-0 self-start rounded-md border border-line px-2.5 py-1 text-sm text-ink hover:border-ink-3"
+                  className="shrink-0 self-start rounded-md border border-line px-2.5 py-1 text-sm text-ink hover:border-frank/50 hover:text-frank transition-colors"
                 >
                   Use this
                 </button>

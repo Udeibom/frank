@@ -59,83 +59,84 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="mb-10 flex items-end justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Your Songs</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-written italic text-4xl text-ink leading-tight">Your Songs</h1>
+          <p className="mt-1.5 text-sm text-ink-2">
             Pick up where you left off, or start something new.
           </p>
-          <Link href="/taste" className="mt-2 inline-block text-xs text-muted-foreground underline hover:text-foreground">
+          <Link href="/taste" className="mt-2 inline-block text-xs text-ink-3 underline underline-offset-4 hover:text-ink transition-colors">
             What Frank knows about your taste
           </Link>
         </div>
         <button
           onClick={handleNewProject}
           disabled={creating}
-          className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-60"
+          id="new-song-btn"
+          className="cta-glow flex items-center gap-2 rounded-full bg-frank px-5 py-2.5 text-sm font-semibold text-ground transition-all hover:bg-frank-shade disabled:opacity-60 disabled:animate-none"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4" aria-hidden="true" />
           {creating ? "Opening…" : "New Song"}
         </button>
       </div>
 
       {/* Project list */}
       {loading ? (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3" role="status" aria-label="Loading your songs">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-20 rounded-xl bg-card animate-pulse border border-border"
+              className="h-20 rounded-xl border border-line bg-surface animate-pulse"
             />
           ))}
         </div>
       ) : projects.length === 0 ? (
         /* Empty state */
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border py-20 text-center">
-          <div className="rounded-full bg-muted p-4">
-            <Music2 className="h-8 w-8 text-muted-foreground" />
+        <div className="flex flex-col items-center gap-5 rounded-2xl border border-dashed border-line py-20 text-center">
+          <div className="rounded-full bg-raised border border-line p-5">
+            <Music2 className="h-8 w-8 text-ink-3" aria-hidden="true" />
           </div>
           <div>
-            <p className="font-medium text-foreground">No songs yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="font-medium text-ink">No songs yet</p>
+            <p className="mt-1 text-sm text-ink-2">
               You have a song in your head. Let&apos;s get it out.
             </p>
           </div>
           <button
             onClick={handleNewProject}
             disabled={creating}
-            className="mt-2 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+            className="mt-2 rounded-full bg-frank px-6 py-2.5 text-sm font-semibold text-ground hover:bg-frank-shade disabled:opacity-60 transition-colors"
           >
             {creating ? "Opening…" : "Start a Song"}
           </button>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           {projects.map((project) => (
             <button
               key={project.id}
               onClick={() => router.push(`/${project.id}/idea`)}
               className={cn(
-                "group flex w-full items-center gap-4 rounded-xl border border-border bg-card px-5 py-4",
-                "text-left transition-all hover:border-primary/30 hover:bg-secondary",
+                "group flex w-full items-center gap-4 rounded-xl border border-line/70 bg-surface px-5 py-4",
+                "text-left transition-all duration-150 hover:border-frank/25 hover:bg-raised hover:shadow-l2",
               )}
             >
               {/* Icon */}
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted group-hover:bg-primary/10">
-                <Music2 className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-raised border border-line group-hover:border-frank/30 group-hover:bg-frank/10 transition-colors">
+                <Music2 className="h-5 w-5 text-ink-3 group-hover:text-frank transition-colors" aria-hidden="true" />
               </div>
 
               {/* Info */}
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-foreground">
+                <p className="truncate font-written italic text-[17px] leading-[25px] text-ink">
                   {project.title}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 font-mono text-code text-ink-3">
                   {STATUS_LABELS[project.status] ?? project.status}
                 </p>
               </div>
 
               {/* Last worked on */}
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60 shrink-0">
-                <Clock className="h-3 w-3" />
+              <div className="flex items-center gap-1.5 font-mono text-code text-ink-3 shrink-0">
+                <Clock className="h-3 w-3" aria-hidden="true" />
                 {formatRelativeDate(project.updated_at)}
               </div>
             </button>

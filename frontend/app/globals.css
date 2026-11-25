@@ -3,36 +3,38 @@
 @tailwind utilities;
 
 /*
- * Frank's visual system. Authority: .kiro/steering/design-and-ui.md.
+ * Frank's visual system. Authority: .kiro/steering/design-and-ui.md + design/stitch/[room]/DESIGN.md.
  * Colours are RGB channels so Tailwind opacity modifiers work and the exact values (and their
  * checked contrast ratios) are preserved. Do not add new colours here without a reason in that file.
  */
 @layer base {
   :root {
-    /* Dark neutral surfaces — cool enough that the amber accent pops */
-    --ground: 10 9 9;        /* #0A0909 — near-black, neutral, no brown cast */
-    --surface: 18 17 16;     /* #121110 — first elevation, barely visible lift */
-    --raised: 27 25 23;      /* #1B1917 — second elevation, card surfaces */
-    --line: 42 39 35;        /* #2A2723 — border/divider, still warm-tinted */
+    /* Dark neutral surfaces — cool charcoal, like brushed anodized aluminum */
+    --ground: 18 19 22;        /* #121316 — deep master console substrate */
+    --surface: 24 26 31;       /* #181A1F — rack-mount bays, work surfaces */
+    --raised: 32 35 42;        /* #20232A — elevated modules, channel strips */
+    --line: 42 46 55;          /* #2A2E37 — milled hairline separation */
 
-    /* Text — lighter and less yellow so it reads crisply on the deeper dark */
-    --ink: 245 240 234;      /* #F5F0EA — near-white with the faintest warmth */
-    --ink-2: 188 179 166;    /* #BCB3A6 — secondary, good contrast */
-    --ink-3: 155 147 136;    /* #9B9388 — quietest allowed text */
+    /* Text — Studio Bone hierarchy */
+    --ink: 226 232 240;        /* #E2E8F0 — Studio Bone, primary high-contrast type */
+    --ink-2: 148 163 184;      /* #94A3B8 — Studio Silver, secondary metadata */
+    --ink-3: 71 85 105;        /* #475569 — Studio Muted, inactive/placeholder */
 
     /* The four materials of a song */
-    --words: 216 203 176;    /* #D8CBB0 */
-    --feel: 142 134 201;     /* #8E86C9 */
-    --music: 79 163 154;     /* #4FA39A */
-    --voice: 226 125 95;     /* #E27D5F */
+    --words: 251 113 133;      /* #FB7185 — Warm Coral/Terracotta for lyrical content */
+    --feel: 129 140 248;       /* #818CF8 — Luminous Violet/Indigo for mood */
+    --music: 34 211 238;       /* #22D3EE — Electric Teal/Cyan for rhythm */
+    --voice: 250 204 21;       /* #FACC15 — Resonant Honey/Gold for vocal takes */
 
-    /* Frank: the playhead, the one primary action, "Frank is waiting for you". Nothing else. */
-    --frank: 240 168 48;     /* #F0A830 */
+    /* Frank: the playhead, the one primary action. Nothing else. */
+    --frank: 245 158 11;       /* #F59E0B — Filament amber glow */
+    --frank-shade: 217 119 6;  /* #D97706 — Pressed/active tactile states */
+    --frank-glow: 251 191 36;  /* #FBBF24 — Luminescence on active state */
 
     /* Status (always with an icon and a sentence) */
-    --ok: 123 181 138;       /* #7BB58A */
-    --caution: 224 182 78;   /* #E0B64E */
-    --problem: 226 106 95;   /* #E26A5F */
+    --ok: 16 185 129;          /* #10B981 — Studio Green */
+    --caution: 251 191 36;     /* #FBBF24 — Soft amber caution */
+    --problem: 251 113 133;    /* #FB7185 — Muted coral (same as Words) */
 
     /* shadcn names, mapped onto the tokens above so existing components inherit the system */
     --background: var(--ground);
@@ -54,7 +56,7 @@
     --border: var(--line);
     --input: var(--line);
     --ring: var(--frank);
-    --radius: 0.375rem;   /* 6px */
+    --radius: 0.5rem;   /* 8px — calibrated roundedness level 2 */
   }
 }
 
@@ -66,22 +68,22 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  /* One focus ring everywhere: 2px, Frank's colour, offset so it never hides the control. */
+  /* One focus ring everywhere: 2px, Frank amber, offset so it never hides the control. */
   :focus-visible {
     outline: 2px solid rgb(var(--frank));
     outline-offset: 2px;
   }
   /* Scrollbar: quiet */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
     background: rgb(var(--line));
-    border-radius: 4px;
+    border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: rgb(var(--ink-3));
@@ -89,13 +91,28 @@
 }
 
 @layer utilities {
+  /* ── Elevation shadows (analog hardware depth) ───────────────────────────────
+     L2: cards, active channels.
+     L3: modals, overlays, popovers. */
+  .shadow-l2 {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+  .shadow-l3 {
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65);
+  }
+
+  /* ── Active Frank Luminescence ────────────────────────────────────────────── */
+  .frank-luminescence {
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+  }
+
   /* A progress sweep for things being made: informs, does not decorate. Static under reduced motion. */
-  /* Colour follows the material being made: set --sweep on a parent (defaults to the feeling). */
+  /* Colour follows the material being made: set --sweep on a parent (defaults to frank amber). */
   .sweep {
     background-image: linear-gradient(
       90deg,
       transparent 0%,
-      rgb(var(--sweep, var(--feel)) / 0.35) 50%,
+      rgb(var(--sweep, var(--frank)) / 0.25) 50%,
       transparent 100%
     );
     background-size: 200% 100%;
@@ -105,7 +122,7 @@
     .sweep {
       animation: none;
       background-image: none;
-      background-color: rgb(var(--sweep, var(--feel)) / 0.2);
+      background-color: rgb(var(--sweep, var(--frank)) / 0.15);
     }
   }
   .waveform-container {
@@ -156,7 +173,7 @@
   .room-words { background-color: rgb(var(--words) / 0.03); }
   .room-feel  { background-color: rgb(var(--feel)  / 0.03); }
   .room-music { background-color: rgb(var(--music) / 0.03); }
-  .room-voice { background-color: rgb(var(--voice) / 0.04); }
+  .room-voice { background-color: rgb(var(--voice) / 0.03); }
 
   /* ── Frank thinking: three amber dots ──────────────────────────────────────
      Use <div class="dot-pulse"><span/><span/><span/></div> */
@@ -184,22 +201,66 @@
   @media (prefers-reduced-motion: reduce) {
     .frank-note-border { animation: none; }
   }
+
+  /* ── Frank filament bar (busy state) ────────────────────────────────────────
+     A glowing amber bar sweeping across the top of a Frank Note when busy.
+     Use: <div aria-hidden class="frank-filament absolute inset-x-0 top-0 h-0.5 rounded-t" /> */
+  .frank-filament {
+    animation: filamentSweep 1.8s ease-in-out infinite;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(var(--frank) / 0.6) 40%,
+      rgb(var(--frank-glow) / 0.9) 50%,
+      rgb(var(--frank) / 0.6) 60%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .frank-filament {
+      animation: none;
+      background: rgb(var(--frank) / 0.4);
+    }
+  }
+
+  /* ── WakingUp filament glow (the pulsing bar inside the warm card) ──────── */
+  .filament-glow {
+    animation: filamentPulse 2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .filament-glow { animation: none; opacity: 0.8; }
+  }
+
+  /* ── Play button active radial bloom ────────────────────────────────────── */
+  .play-bloom {
+    transition: box-shadow 0.15s ease;
+  }
+  .play-bloom[aria-pressed="true"] {
+    box-shadow: 0 0 20px 4px rgb(var(--frank) / 0.35);
+  }
 }
 
-@keyframes sweep {
-  from {
-    background-position: 200% 0;
+@layer utilities {
+  /* ── code-mono typography ───────────────────────────────────────────────── */
+  .font-mono {
+    font-family: var(--font-mono), "Courier New", monospace;
   }
-  to {
-    background-position: -200% 0;
+  .text-code {
+    font-family: var(--font-mono), "Courier New", monospace;
+    font-size: 11px;
+    line-height: 16px;
+    letter-spacing: 0.02em;
   }
 }
 
 /* Words room editor (frankenstein spec 14, 5.1): one paragraph per line, rhythm marks only when asked for. */
 .frank-lyrics p { margin: 0; min-height: 1.6em; position: relative; }
 [data-rhythm="off"] .frank-stress, [data-rhythm="off"] .frank-beats { display: none; }
-.frank-stress { font-family: var(--font-sans); font-size: 9px; letter-spacing: 1px; vertical-align: super; margin-left: 2px; color: rgb(var(--ink-3)); }
-.frank-beats { font-family: var(--font-sans); font-size: 12px; margin-left: 12px; color: rgb(var(--ink-3)); white-space: nowrap; }
+.frank-stress { font-family: var(--font-mono, monospace); font-size: 9px; letter-spacing: 1px; vertical-align: super; margin-left: 2px; color: rgb(var(--ink-3)); }
+.frank-beats  { font-family: var(--font-mono, monospace); font-size: 12px; margin-left: 12px; color: rgb(var(--ink-3)); white-space: nowrap; }
 [data-rhythm="on"] .frank-lyrics p[data-rhyme]::before {
   content: ""; position: absolute; left: -18px; top: 0.6em; width: 7px; height: 7px; border-radius: 9999px;
 }
@@ -209,6 +270,11 @@
 .frank-lyrics p[data-rhyme="3"]::before { background: rgb(var(--voice)); }
 .frank-lyrics p[data-rhyme="4"]::before { background: rgb(var(--ok)); }
 .frank-lyrics p[data-rhyme="5"]::before { background: rgb(var(--caution)); }
+
+@keyframes sweep {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(16px); }
@@ -228,4 +294,24 @@
 @keyframes frankBorderPulse {
   0%, 100% { border-color: rgb(var(--frank) / 0.35); }
   50%       { border-color: rgb(var(--frank) / 0.85); }
+}
+
+@keyframes filamentSweep {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+@keyframes filamentPulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1;   }
+}
+
+@keyframes pulse-amber {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
 }

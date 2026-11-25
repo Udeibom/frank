@@ -224,13 +224,13 @@ export default function ExportRoomPage() {
     <div className="flex h-full flex-col overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
       <div className="mx-auto flex w-full max-w-[860px] flex-col gap-8">
         <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
-          <h1 className="text-base font-medium text-ink">Finish</h1>
-          <span className="text-sm text-ink-2">A last listen, then it's yours</span>
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-ink-2" />
+          <h1 className="font-written italic text-3xl leading-tight text-ink">Finish</h1>
+          <span className="text-sm text-ink-3">A last listen, then it's yours</span>
         </div>
 
         {/* The song: its name, its shape, one play control */}
-        <section aria-labelledby="song-name" className="flex flex-col gap-5 rounded-md bg-surface p-8">
+        <section aria-labelledby="song-name" className="flex flex-col gap-5 rounded-xl border border-line/50 bg-surface p-8 shadow-l2">
           <div className="flex items-center gap-5">
             <PlayButton track={track!} size="stage" keepPosition />
             <div className="min-w-0">

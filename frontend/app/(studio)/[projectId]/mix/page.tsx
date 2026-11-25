@@ -326,9 +326,9 @@ export default function MixRoomPage() {
     <div className="flex h-full">
       <div className="flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
         <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
-          <h1 className="text-base font-medium text-ink">Blend</h1>
-          <span className="text-sm text-ink-2">Bring your voice and the music together</span>
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-ink-2" />
+          <h1 className="font-written italic text-3xl leading-tight text-ink">Blend</h1>
+          <span className="text-sm text-ink-3">Bring your voice and the music together</span>
         </div>
 
         <FrankNote aside={aside} answers={answers} problem={failed} busy={rendering}>
@@ -337,7 +337,7 @@ export default function MixRoomPage() {
 
         {/* Listening is the main thing here: one large control and, when there is an earlier blend, compare */}
         {(hasMix || rendering) && (
-          <section aria-labelledby="listen-heading" className="flex items-center gap-5 rounded-md bg-surface p-5">
+          <section aria-labelledby="listen-heading" className="flex items-center gap-5 rounded-md border border-line/50 bg-surface p-5 shadow-l2">
             {track ? <PlayButton track={track} size="stage" keepPosition /> : <span className="sweep h-12 w-12 rounded-full" aria-hidden="true" />}
             <div className="min-w-0 flex-1">
               <h2 id="listen-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">

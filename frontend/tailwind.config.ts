@@ -13,7 +13,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Frank's system (design-and-ui.md)
+        // Frank's system (design-and-ui.md + design/stitch/*/DESIGN.md)
         ground: channel("ground"),
         surface: channel("surface"),
         raised: channel("raised"),
@@ -24,6 +24,8 @@ const config: Config = {
         music: channel("music"),
         voice: channel("voice"),
         frank: channel("frank"),
+        "frank-shade": channel("frank-shade"),
+        "frank-glow": channel("frank-glow"),
         ok: channel("ok"),
         caution: channel("caution"),
         problem: channel("problem"),
@@ -42,25 +44,45 @@ const config: Config = {
         ring: channel("ring"),
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        // Stitch roundedness level 2: 8px default
+        lg: "var(--radius)",          // 8px — studio panels, trays
+        md: "calc(var(--radius) - 2px)", // 6px — inputs, standard buttons  (kept compat)
+        sm: "0.25rem",                // 4px — smallest elements
+        xl: "1rem",                   // 16px — sliding panels (top corners)
+        "2xl": "1.5rem",              // 24px — large cards
+        full: "9999px",               // pills and badges
       },
       fontFamily: {
-        // The faces are loaded in app/layout.tsx with next/font and exposed as these variables.
+        // Loaded in app/layout.tsx with next/font/local and exposed as CSS variables.
+        // Stitch: Plus Jakarta Sans (tool/studio text), Newsreader (user/artistic), Space Mono (timestamps/code)
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
         written: ["var(--font-written)", "Georgia", "serif"],
+        mono: ["var(--font-mono)", "Courier New", "monospace"],
       },
-      // The type scale: five sizes only (design-and-ui.md). Nothing under 12px.
+      // Type scale: Stitch spec + prior 5-step scale kept for backward compat
       fontSize: {
-        xs: ["0.75rem", { lineHeight: "1rem" }],      // 12/16
-        sm: ["0.8125rem", { lineHeight: "1.125rem" }], // 13/18
-        base: ["0.9375rem", { lineHeight: "1.375rem" }], // 15/22
-        xl: ["1.25rem", { lineHeight: "1.625rem" }],   // 20/26
-        "2xl": ["1.5rem", { lineHeight: "1.75rem" }],  // 24/28
+        // Stitch label scales
+        "label-sm": ["0.6875rem", { lineHeight: "0.875rem", letterSpacing: "0.06em" }], // 11/14
+        "label-md": ["0.75rem",   { lineHeight: "1rem",     letterSpacing: "0.04em" }], // 12/16
+        // Utility names (backward compat — existing code uses these)
+        xs:   ["0.75rem",   { lineHeight: "1rem" }],       // 12/16
+        sm:   ["0.8125rem", { lineHeight: "1.125rem" }],   // 13/18 body-sm
+        base: ["0.875rem",  { lineHeight: "1.25rem" }],    // 14/20 body-md (frank-voice)
+        lg:   ["1rem",      { lineHeight: "1.5rem" }],     // 16/24 body-lg
+        xl:   ["1.25rem",   { lineHeight: "1.875rem" }],   // 20/30 user-lyric-display
+        "2xl": ["1.5rem",   { lineHeight: "2rem" }],       // 24/32 headline-md
+        "3xl": ["2rem",     { lineHeight: "2.5rem" }],     // 32/40 headline-lg
+        "4xl": ["2.5rem",   { lineHeight: "3rem" }],       // 40/48 headline-xl
+      },
+      boxShadow: {
+        // Elevation system (design/stitch/*/DESIGN.md)
+        l2: "0 8px 24px rgba(0, 0, 0, 0.45)",          // L2: cards, active channels
+        l3: "0 20px 48px rgba(0, 0, 0, 0.65)",          // L3: modals, overlays, popovers
+        "frank-luminescence": "0 0 16px rgba(245, 158, 11, 0.25)", // Active Frank glow
+        "play-bloom": "0 0 20px 4px rgba(245, 158, 11, 0.35)",     // Play button active
+        "play-bloom-lg": "0 0 28px 8px rgba(245, 158, 11, 0.4)",   // Stage play button active
       },
       keyframes: {
-        // Kept only for the not-yet-redesigned Voice room's recording button.
         "pulse-amber": {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.4" },
@@ -69,10 +91,20 @@ const config: Config = {
           from: { transform: "translateX(100%)", opacity: "0" },
           to: { transform: "translateX(0)", opacity: "1" },
         },
+        filamentPulse: {
+          "0%, 100%": { opacity: "0.4" },
+          "50%": { opacity: "1" },
+        },
+        filamentSweep: {
+          from: { backgroundPosition: "200% 0" },
+          to: { backgroundPosition: "-200% 0" },
+        },
       },
       animation: {
         "pulse-amber": "pulse-amber 2s ease-in-out infinite",
         "slide-in-right": "slide-in-right 0.2s ease-out",
+        "filament-pulse": "filamentPulse 2s ease-in-out infinite",
+        "filament-sweep": "filamentSweep 1.8s ease-in-out infinite",
       },
     },
   },

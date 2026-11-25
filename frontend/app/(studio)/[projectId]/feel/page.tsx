@@ -282,8 +282,8 @@ export default function FeelingPage() {
     <div className="flex h-full">
       <div className="room-feel flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
         <div className="flex items-center gap-3">
-          <span aria-hidden="true" className="h-3 w-3 rounded-full bg-feel" />
-          <h1 className="font-written italic text-3xl" style={{ color: "rgb(var(--feel))" }}>Feeling</h1>
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-feel ring-1 ring-feel/30" />
+          <h1 className="font-written italic text-3xl leading-tight" style={{ color: "rgb(var(--feel))" }}>Feeling</h1>
           <span className="text-sm text-ink-3">Find how the song should feel</span>
         </div>
 

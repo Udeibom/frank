@@ -49,7 +49,7 @@ export function LyricsVersionHistory({ versions, activeVersionId, onRestore, onL
 
   return (
     <section aria-labelledby="drafts-heading" className="flex flex-col gap-2">
-      <h2 id="drafts-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+      <h2 id="drafts-heading" className="text-label-md font-semibold uppercase tracking-[0.06em] text-ink-3">
         Drafts
       </h2>
       {versions.length === 0 ? (
@@ -66,8 +66,8 @@ export function LyricsVersionHistory({ versions, activeVersionId, onRestore, onL
                   aria-expanded={open}
                   className="w-full rounded-sm text-left"
                 >
-                  <span className="line-clamp-1 font-written text-[17px] leading-[25px] text-words">{firstLine(v.content)}</span>
-                  <span className="text-sm text-ink-3">{v.label ? v.label : when(v.created_at)}</span>
+                  <span className="line-clamp-1 font-written italic text-[17px] leading-[25px] text-words">{firstLine(v.content)}</span>
+                  <span className="font-mono text-code text-ink-3">{v.label ? v.label : when(v.created_at)}</span>
                 </button>
                 <div className="mt-1 flex items-center gap-3">
                   {current ? (
@@ -75,7 +75,7 @@ export function LyricsVersionHistory({ versions, activeVersionId, onRestore, onL
                       <Check className="h-3.5 w-3.5" aria-hidden="true" /> On the page
                     </span>
                   ) : (
-                    <button onClick={() => onRestore(v)} className="text-sm text-ink underline underline-offset-4 hover:text-frank">
+                    <button onClick={() => onRestore(v)} className="text-sm text-ink-2 underline underline-offset-4 hover:text-frank transition-colors">
                       Bring this back
                     </button>
                   )}
@@ -92,7 +92,7 @@ export function LyricsVersionHistory({ versions, activeVersionId, onRestore, onL
                       }}
                       aria-label="Name this draft"
                       placeholder="Name this draft"
-                      className="min-w-0 flex-1 rounded-sm bg-raised px-2 py-0.5 text-sm text-ink placeholder:text-ink-3"
+                      className="min-w-0 flex-1 rounded-md border border-line bg-raised px-2 py-0.5 text-sm text-ink placeholder:text-ink-3 focus-visible:border-frank/60"
                     />
                   ) : (
                     <button

@@ -202,8 +202,8 @@ export default function WordsPage() {
     <div className="flex h-full">
       <div className="room-words flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
         <div className="flex items-center gap-3">
-          <span aria-hidden="true" className="h-3 w-3 rounded-full bg-words" />
-          <h1 className="font-written italic text-3xl" style={{ color: "rgb(var(--words))" }}>Words</h1>
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-words ring-1 ring-words/30" />
+          <h1 className="font-written italic text-3xl leading-tight" style={{ color: "rgb(var(--words))" }}>Words</h1>
           <span className="text-sm text-ink-3">Write your song</span>
         </div>
 
@@ -215,7 +215,7 @@ export default function WordsPage() {
           {/* The page */}
           <div className="min-w-0 max-w-[640px] flex-1">
             {loaded ? (
-              <div className="rounded-xl border border-line/60 bg-raised/40 px-8 py-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]">
+              <div className="rounded-xl border border-line/50 bg-raised px-8 py-6 shadow-l2">
                 <LyricsEditor
                   projectId={projectId}
                   initialContent={editorContent}

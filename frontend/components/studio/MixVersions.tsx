@@ -55,7 +55,7 @@ export function MixVersions({ versions, activeVersionId, onSetActive, onRename }
 
   return (
     <section aria-labelledby="blends-heading" className="flex flex-col gap-2">
-      <h2 id="blends-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+      <h2 id="blends-heading" className="text-label-md font-semibold uppercase tracking-[0.06em] text-ink-3">
         Every blend so far
       </h2>
       <ol className="flex flex-col">
@@ -94,14 +94,14 @@ export function MixVersions({ versions, activeVersionId, onSetActive, onRename }
                   )}
                 </p>
               )}
-              <p className="truncate text-sm text-ink-2">{summarize(v)}</p>
+              <p className="truncate font-mono text-code text-ink-3">{summarize(v)}</p>
             </div>
             {v.id === activeVersionId ? (
               <span className="flex shrink-0 items-center gap-1 text-sm text-voice">
                 <Check className="h-3.5 w-3.5" aria-hidden="true" /> In the song
               </span>
             ) : (
-              <button onClick={() => onSetActive(v.id)} className="shrink-0 rounded-md border border-line px-2.5 py-1 text-sm text-ink hover:border-ink-3">
+              <button onClick={() => onSetActive(v.id)} className="shrink-0 rounded-md border border-line px-2.5 py-1 text-sm text-ink hover:border-frank/50 hover:text-frank transition-colors">
                 Use this
               </button>
             )}

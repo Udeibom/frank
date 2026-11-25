@@ -85,20 +85,20 @@ export default function LandingPage() {
 
         {/* Layered ambient background */}
         <div className="pointer-events-none absolute inset-0 -z-10">
-          {/* Bottom-center: amber bloom */}
+          {/* Bottom-center: frank/amber bloom */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 70% 55% at 50% 75%, rgb(240 168 48 / 0.12) 0%, transparent 65%)",
+            background: "radial-gradient(ellipse 70% 55% at 50% 75%, rgb(var(--frank) / 0.10) 0%, transparent 65%)",
           }} />
-          {/* Top-left: feel/purple bloom */}
+          {/* Top-left: feel/indigo bloom */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 50% 45% at 10% 10%, rgb(142 134 201 / 0.08) 0%, transparent 60%)",
+            background: "radial-gradient(ellipse 50% 45% at 10% 10%, rgb(var(--feel) / 0.07) 0%, transparent 60%)",
           }} />
-          {/* Top-right: music/teal bloom */}
+          {/* Top-right: music/cyan bloom */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 45% 40% at 90% 15%, rgb(79 163 154 / 0.06) 0%, transparent 55%)",
+            background: "radial-gradient(ellipse 45% 40% at 90% 15%, rgb(var(--music) / 0.06) 0%, transparent 55%)",
           }} />
         </div>
 
@@ -131,7 +131,7 @@ export default function LandingPage() {
             <button
               onClick={handleStart}
               disabled={loading}
-              className="cta-glow group relative rounded-full bg-primary px-12 py-4 text-base font-semibold text-primary-foreground disabled:opacity-60"
+              className="cta-glow group relative rounded-full bg-frank px-12 py-4 text-base font-semibold text-ground disabled:opacity-60"
             >
               <span className="flex items-center gap-2">
                 {buttonLabel}
@@ -201,7 +201,7 @@ export default function LandingPage() {
             ].map(({ step, color, title, body }) => (
               <div
                 key={step}
-                className="relative rounded-xl border border-line bg-surface p-6 flex flex-col gap-4"
+                className="relative rounded-xl border border-line bg-surface p-6 flex flex-col gap-4 shadow-l2 transition-shadow hover:shadow-frank-luminescence"
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -303,14 +303,14 @@ export default function LandingPage() {
                 color: "rgb(var(--music))",
                 bg: "rgb(var(--music) / 0.07)",
                 icon: "🎸",
-                desc: "Describe a vibe in plain English. Frank generates chords, progressions, and a full arrangement.",
+                desc: "Describe a vibe in plain English. Frank builds an arrangement around it.",
               },
               {
                 label: "Voice Room",
                 color: "rgb(var(--voice))",
                 bg: "rgb(var(--voice) / 0.07)",
                 icon: "🎤",
-                desc: "Record a melody, hum a hook, or just talk it out. Frank transcribes, refines, and layers your voice.",
+                desc: "Record a melody, hum a hook, or just talk it out. Frank brings your voice into the song.",
               },
             ].map(({ label, color, bg, icon, desc }) => (
               <div
@@ -356,7 +356,7 @@ export default function LandingPage() {
           <button
             onClick={handleStart}
             disabled={loading}
-            className="cta-glow group relative mt-4 rounded-full bg-primary px-12 py-4 text-base font-semibold text-primary-foreground disabled:opacity-60"
+            className="cta-glow group relative mt-4 rounded-full bg-frank px-12 py-4 text-base font-semibold text-ground disabled:opacity-60"
           >
             <span className="flex items-center gap-2">
               {buttonLabel}

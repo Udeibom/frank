@@ -20,12 +20,12 @@ export function NextStepBar({ projectId, room }: { projectId: string; room: Room
     room,
   )
   return (
-    <div role="note" aria-label="What to do next" className="flex items-center gap-3 border-b border-line bg-surface px-5 py-2 text-sm">
+    <div role="note" aria-label="What to do next" className="flex items-center gap-3 border-b border-line bg-surface px-5 py-3.5 text-sm">
       <span className="text-ink">{step.text}</span>
       {!step.here && (
         <Link
           href={`/${projectId}/${step.room}`}
-          className="ml-auto flex shrink-0 items-center gap-1 rounded-md border border-line px-2.5 py-1 text-ink hover:border-ink-3"
+          className="ml-auto flex shrink-0 items-center gap-1 rounded-md border border-line px-2.5 py-1 text-ink hover:border-frank/50 hover:text-frank transition-colors"
         >
           Go to {roomName(step.room)} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Link>

@@ -46,10 +46,10 @@ interface ConversationPanelProps {
 }
 
 const RULE: Record<Material, string> = {
-  words: "border-words text-words",
-  feel: "border-feel text-words",
-  music: "border-music text-words",
-  voice: "border-voice text-words",
+  words: "border-words",
+  feel:  "border-feel",
+  music: "border-music",
+  voice: "border-voice",
 }
 
 const ROOM_MATERIAL: Record<string, Material> = { idea: "words", feel: "feel", beat: "music", voice: "voice", mix: "music", export: "music" }
@@ -97,7 +97,7 @@ export function ConversationPanel({
 
   // Narrow windows start with the panel tucked away so it never squeezes the room.
   useEffect(() => {
-    if (window.matchMedia("(max-width: 1100px)").matches) setOpen(false)
+    if (window.matchMedia("(max-width: 1200px)").matches) setOpen(false)
   }, [])
 
   // The stored conversation from earlier visits. Loaded once per room; a failure just means nothing is shown.
@@ -143,15 +143,15 @@ export function ConversationPanel({
   // User lines: written face + room colour rule
   const lineUser = cn("border-l-2 pl-3 font-written text-[17px] leading-[25px]", rule)
   // Frank lines: subtle amber tint left border
-  const lineFrank = "border-l-2 border-frank/40 pl-3 py-1.5 rounded-r-md bg-frank/[0.04] text-base text-ink"
+  const lineFrank = "border-l-2 border-frank/40 pl-3 py-1.5 rounded-r-md bg-frank/[0.04] text-base leading-[21px] font-[500] text-ink"
 
   return (
     <>
-      {/* At 1100px and below the panel opens over the room; this keeps the tab's place in the row. */}
-      <div aria-hidden="true" className="hidden w-14 shrink-0 max-[1100px]:block" />
+      {/* At 1200px and below the panel opens over the room; this keeps the tab's place in the row. */}
+      <div aria-hidden="true" className="hidden w-14 shrink-0 max-[1200px]:block" />
       <aside
         aria-label="Frank"
-        className="flex w-[340px] shrink-0 flex-col border-l border-line bg-surface max-[1100px]:fixed max-[1100px]:bottom-0 max-[1100px]:right-0 max-[1100px]:top-10 max-[1100px]:z-30 max-[1100px]:shadow-2xl"
+        className="flex w-[340px] shrink-0 flex-col border-l border-line bg-surface max-[1200px]:fixed max-[1200px]:bottom-0 max-[1200px]:right-0 max-[1200px]:top-12 max-[1200px]:z-30 max-[1200px]:shadow-l3"
       >
         {/* Panel header */}
         <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
