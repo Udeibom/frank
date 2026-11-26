@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     spaces_token: str = ""                   # HF token that may call (and deploy) Frank's own Spaces
     ears_space: str = "Udeibom/frank-ears"
     hands_space: str = "Udeibom/frank-hands"
+    groove_humanizer_enabled: bool = False
+    groove_humanizer_timeout_s: float = 180.0
     freesound_api_key: str = ""
     jamendo_client_id: str = ""
     jamendo_client_secret: str = ""          # accepted but unused: searching and streaming need only the client id

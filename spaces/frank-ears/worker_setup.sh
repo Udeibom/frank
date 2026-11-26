@@ -39,6 +39,6 @@ fi
 # Sounds and the words index, inside the backend folder where the code expects them
 cd "$W"
 [ -f assets/MuseScore_General.sf3 ] || bash scripts/fetch_soundfont.sh
-[ -d assets/sfz/Keys ] || bash scripts/fetch_samples.sh "$W/assets/sfz"
+[ -f assets/sfz/Harp.sfz ] || bash scripts/fetch_samples.sh "$W/assets/sfz"
 [ -f assets/words.sqlite ] || PYTHONPATH="$W" "$BASE/env/bin/python" scripts/build_words_db.py
 echo "worker setup complete"

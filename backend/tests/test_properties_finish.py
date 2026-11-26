@@ -118,6 +118,34 @@ def test_the_mix_room_makes_at_most_three_changes_and_understands_parts():
     assert "space" not in p["vocal_effects"], "a fourth change is not made"
 
 
+def test_mix_room_understands_room_amount_interaction_and_drum_bus():
+    from app.routers.mix import DEFAULT_MIX_PARAMS, apply_actions
+
+    acts = [
+        {"type": "apply_effect", "params": {"target": "vocal", "effect": "space", "on": True, "amount": 0.42}},
+        {"type": "duck", "params": {"key": "vocal", "target": "piano", "amount": 3.0}},
+        {"type": "drum_bus", "params": {"on": True, "glue": 2.0}},
+    ]
+    p, render = apply_actions(dict(DEFAULT_MIX_PARAMS), acts)
+    assert render
+    assert p["vocal_space_amount"] == 0.42
+    assert p["interactions"] == {"vocal:keys": 1.0}
+    assert p["drum_bus"] == {"on": True, "glue": 1.0}
+
+
+def test_mix_room_part_space_and_section_index_are_clamped():
+    from app.routers.mix import DEFAULT_MIX_PARAMS, apply_actions
+
+    acts = [
+        {"type": "part_adjust", "params": {"part": "piano", "space_amount": 0.6}},
+        {"type": "section_adjust", "params": {"section_index": 2, "delta_db": 40.0}},
+    ]
+    p, render = apply_actions(dict(DEFAULT_MIX_PARAMS), acts)
+    assert render
+    assert p["parts"]["keys"]["space_amount"] == 0.6
+    assert p["section_gain_db"]["2"] == 12.0
+
+
 # ── intent, surprise, separate parts, waveform ──────────────────────────
 
 def test_the_first_description_is_kept_and_asked_back_in_their_words():

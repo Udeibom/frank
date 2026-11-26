@@ -32,10 +32,20 @@ PROGRESSIONS: dict[str, list[list[int]]] = {
     "minor_sad":      [[0, 5, 2, 6], [0, 3, 6, 4], [0, 2, 5, 6], [0, 6, 5, 3]],   # i-VI-III-VII, i-iv-VII-v, i-III-VI-VII, i-VII-VI-iv
     "minor_tense":    [[0, 1, 4, 0], [0, 6, 3, 4], [0, 3, 0, 4], [0, 5, 1, 4]],   # i-ii-v-i, i-VII-iv-v, i-iv-i-v, i-VI-ii-v
     "minor_driving":  [[0, 6, 5, 4], [0, 0, 5, 6], [0, 2, 6, 5], [0, 5, 6, 0]],   # i-VII-VI-v, i-i-VI-VII, i-III-VII-VI, i-VI-VII-i
+    "minor_building": [[0, 3, 4, 0], [0, 6, 4, 0], [0, 3, 6, 4], [0, 5, 4, 0]],   # i-iv-v-i, i-VII-v-i, i-iv-VII-v, i-VI-v-i
+    "dorian_sad":     [[0, 5, 2, 6], [0, 3, 6, 5], [0, 2, 4, 6], [0, 6, 5, 4]],   # i-VI-III-VII with the Dorian lift
+    "dorian_warm":    [[0, 4, 5, 3], [0, 5, 3, 4], [0, 3, 4, 0], [4, 5, 0, 3]],   # i-IV-V-iv and friends
+    "dorian_driving": [[0, 6, 5, 4], [0, 4, 6, 5], [0, 2, 6, 4], [0, 5, 4, 6]],   # i-VII-VI-v, i-IV-VII-VI
+    "dorian_building":[[0, 3, 4, 0], [0, 4, 3, 0], [0, 6, 4, 3], [0, 5, 4, 0]],   # i-iv-v-i, i-IV-iv-i
     # major-key progressions
     "major_warm":     [[0, 4, 5, 3], [0, 5, 3, 4], [0, 3, 0, 4], [5, 3, 0, 4]],   # I-V-vi-IV, I-vi-IV-V, I-IV-I-V, vi-IV-I-V
     "major_bright":   [[0, 3, 4, 0], [0, 4, 0, 3], [0, 5, 3, 4], [0, 4, 5, 3]],   # I-IV-V-I, I-V-I-IV, I-vi-IV-V, I-V-vi-IV
     "major_floating": [[0, 3, 5, 4], [0, 2, 3, 4], [0, 4, 5, 3], [3, 0, 4, 5]],   # I-IV-vi-V, I-iii-IV-V, I-V-vi-IV, IV-I-V-vi
+    "major_building": [[0, 5, 3, 4], [0, 3, 5, 4], [0, 4, 3, 0], [5, 3, 4, 0]],   # I-vi-IV-V, I-IV-vi-V, I-V-IV-I
+    "mixolydian_warm":[[0, 4, 3, 0], [0, 3, 5, 4], [0, 5, 3, 4], [3, 4, 0, 5]],   # I-IV-bVII-I with the flat seven
+    "mixolydian_bright":[[0, 3, 4, 0], [0, 4, 0, 3], [0, 5, 4, 0], [0, 3, 5, 4]], # I-IV-V-I, I-bVII-IV-I
+    "mixolydian_floating":[[0, 3, 5, 4], [0, 5, 3, 5], [0, 4, 5, 3], [3, 0, 4, 5]],
+    "mixolydian_driving":[[0, 6, 4, 0], [0, 4, 6, 5], [0, 5, 6, 4], [0, 6, 5, 4]],
 }
 
 
@@ -157,18 +167,31 @@ def choose_progression_family(mode: str, energy: float, tempo_feel: str) -> str:
     Pick a progression family from the mood. This is an explicit, explainable
     mapping — not a black box. Energy is 0..1.
     """
+    if tempo_feel == "building":
+        return f"{mode}_building" if f"{mode}_building" in PROGRESSIONS else (
+            "minor_building" if mode in ("minor", "dorian") else "major_building"
+        )
     if mode in ("minor", "dorian"):
         if tempo_feel == "driving" or energy >= 0.6:
-            return "minor_driving"
+            return f"{mode}_driving"
         if energy <= 0.35:
-            return "minor_sad"
+            return f"{mode}_sad"
+        if mode == "dorian":
+            return "dorian_warm"
         return "minor_tense"
-    else:  # major / mixolydian
+    if mode == "mixolydian":
+        if tempo_feel == "driving" or energy >= 0.6:
+            return "mixolydian_driving"
         if tempo_feel == "floating":
-            return "major_floating"
-        if energy >= 0.6:
-            return "major_bright"
-        return "major_warm"
+            return "mixolydian_floating"
+        if energy >= 0.65:
+            return "mixolydian_bright"
+        return "mixolydian_warm"
+    if tempo_feel == "floating":
+        return "major_floating"
+    if energy >= 0.6:
+        return "major_bright"
+    return "major_warm"
 
 
 def build_progression(
@@ -179,20 +202,23 @@ def build_progression(
     extension: float = 0.0,
     seed: int = 0,
     voice: bool = True,
+    mode: str | None = None,
 ) -> dict:
     """
     The main entry point. Given a key and mood, produce a concrete chord progression as MIDI note
     lists, plus the scale for melodies and the bass notes.
 
     `extension` is the chance (0..1) that a chord gets its seventh, decided per chord from `seed`, so
-    the same seed always gives the same chords. `voice` makes the chords move smoothly.
+    the same seed always gives the same chords. `voice` makes the chords move smoothly. `mode` lets the
+    fingerprint's mode colour the chords when it differs from the key's default reading.
 
     Returns a dict the composer consumes. The keys root, mode, family, degrees, chords, scale and
     bass_notes are the ones earlier code relied on; chord_pcs and sevenths are new.
     """
     from app.services.generation.rng import rng_for
 
-    root, mode = parse_key(key)
+    root, key_mode = parse_key(key)
+    mode = mode if mode in SCALE_INTERVALS else key_mode
     family = choose_progression_family(mode, energy, tempo_feel)
     options = PROGRESSIONS[family]
     degrees = options[variant % len(options)]

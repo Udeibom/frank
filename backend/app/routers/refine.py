@@ -25,7 +25,7 @@ from app.db import projects as projects_db
 from app.db import refine as refine_db
 from app.db import song as song_db
 from app.models.feel import JobResponse
-from app.services.jobs.refine_runner import load_basis, run_preview_job, run_propose_job
+from app.services.jobs.refine_runner import basis_fingerprint, is_stale, load_basis, proposal_idempotency_key, preview_idempotency_key, run_preview_job, run_propose_job
 from app.services.refine import resolve as resolver
 from app.services.refine.models import Direction
 from app.services.team import conversation_store as convo
@@ -69,8 +69,13 @@ async def _proposal(project_id: str, proposal_id: str) -> dict:
 
 @router.post("/refine", response_model=JobResponse)
 async def refine(project_id: str, body: RefineRequest, background: BackgroundTasks) -> JobResponse:
-    job = await jobs_db.create_job(project_id, job_type="refine")
-    await dispatch.start(background, job, run_propose_job, project_id, body.concern)
+    basis = await load_basis(project_id)
+    key = proposal_idempotency_key(project_id, body.concern, basis, body.room)
+    active = await jobs_db.find_active_job(project_id, key)
+    if active:
+        return JobResponse(job_id=active["id"])
+    job = await jobs_db.create_job(project_id, job_type="refine", idempotency_key=key)
+    await dispatch.start(background, job, run_propose_job, project_id, body.concern, body.room)
     return JobResponse(job_id=job["id"])
 
 
@@ -82,8 +87,18 @@ async def latest(project_id: str) -> dict[str, Any]:
 
 @router.post("/refine/{proposal_id}/preview/{n}", response_model=JobResponse)
 async def preview(project_id: str, proposal_id: str, n: int, background: BackgroundTasks) -> JobResponse:
-    await _proposal(project_id, proposal_id)
-    job = await jobs_db.create_job(project_id, job_type="refine_preview")
+    row = await _proposal(project_id, proposal_id)
+    directions = row.get("directions") or []
+    if not 0 <= n < len(directions):
+        raise HTTPException(status_code=404, detail="That idea isn't on the list.")
+    basis = await load_basis(project_id)
+    if is_stale(basis, row):
+        raise HTTPException(status_code=409, detail="The song has changed since I suggested these. Ask me again and I'll listen fresh.")
+    key = preview_idempotency_key(proposal_id, n, basis)
+    active = await jobs_db.find_active_job(project_id, key)
+    if active:
+        return JobResponse(job_id=active["id"])
+    job = await jobs_db.create_job(project_id, job_type="refine_preview", idempotency_key=key)
     await dispatch.start(background, job, run_preview_job, project_id, proposal_id, n)
     return JobResponse(job_id=job["id"])
 
@@ -100,6 +115,8 @@ def _decision(row: dict, n: int) -> dict:
         "rationale": chosen.get("plain"),
         "proposed_by": "producer",
         "options": [{"title": d["title"], "plain": d["plain"], "kind": d["kind"], "actions": d["actions"],
+                     "addresses": d.get("addresses", []), "evidence": d.get("evidence", []),
+                     "targets": d.get("targets", []), "source": d.get("source", "listener"),
                      "experiment": bool(row.get("experiment"))} for d in directions],
         "evidence": [{"id": f.get("id"), "plain": f.get("plain"), "measurements": f.get("evidence", [])} for f in findings],
         "chosen_option": chosen["title"],
@@ -118,17 +135,24 @@ async def choose(project_id: str, proposal_id: str, n: int, background: Backgrou
         raise HTTPException(status_code=404, detail="That idea isn't on the list.")
     d = Direction(**directions[n])
     basis = await load_basis(project_id)
+    if is_stale(basis, row):
+        raise HTTPException(status_code=409, detail="The song has changed since I suggested these. Ask me again and I'll listen fresh.")
+    key = f"refine-choose:{proposal_id}:{n}:{basis_fingerprint(basis)}"
+    claimed = await asyncio.to_thread(refine_db.set_chosen, proposal_id, n)
+    if not claimed:
+        prior = row.get("chosen_job_id")
+        if row.get("chosen") == n and prior:
+            return ChooseResponse(job_id=prior, kind=d.kind, message="I'm already putting that one into the song. Have a listen when it's ready.")
+        raise HTTPException(status_code=409, detail="You already chose an idea from this set. Ask me again for more.")
     if d.kind == "beat":
-        if basis["beat_id"] != (row.get("based_on") or {}).get("beat"):
-            raise HTTPException(status_code=409, detail="The song has changed since I suggested these. Ask me again and I'll listen fresh.")
-        job = await jobs_db.create_job(project_id, job_type="beat_operations")
+        job = await jobs_db.create_job(project_id, job_type="beat_operations", idempotency_key=key)
         await dispatch.start(background, job, run_operations_job, project_id, d.actions)
     else:
         params, _ = apply_actions(basis["mix_params"] or {}, d.actions)
-        job = await jobs_db.create_job(project_id, job_type="mix_render")
+        job = await jobs_db.create_job(project_id, job_type="mix_render", idempotency_key=key)
         await dispatch.start(background, job, run_mix_job, project_id, params, "preview")
+    await asyncio.to_thread(refine_db.set_chosen, proposal_id, n, job["id"])
     await song_db.insert_decision(project_id, _decision(row, n))
-    await asyncio.to_thread(refine_db.set_chosen, proposal_id, n)
     from app.services.taste.signals import record_choice
 
     await record_choice(project_id, directions[n], [s.name for s in basis["sections"]], bool(row.get("experiment")))

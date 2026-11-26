@@ -54,6 +54,25 @@ async def get_job_status(
     )
 
 
+@router.post("/{job_id}/cancel")
+async def cancel_job_status(
+    job_id: str, user_id: str = Depends(get_current_user_id)
+) -> dict[str, bool]:
+    try:
+        job = await jobs_db.get_job(job_id)
+    except APIError:
+        job = None
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    try:
+        project = await projects_db.get_project(project_id=job["project_id"])
+    except APIError:
+        project = None
+    if not owns_project(project, user_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"cancelled": await jobs_db.cancel_job(job_id)}
+
+
 WORDS = {1: "One song is", 2: "Two songs are", 3: "Three songs are"}
 
 

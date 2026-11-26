@@ -201,11 +201,16 @@ export default function WordsPage() {
   return (
     <div className="flex h-full">
       <div className="room-words flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
-        <div className="flex items-center gap-3">
-          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-words ring-1 ring-words/30" />
-          <h1 className="font-written italic text-3xl leading-tight" style={{ color: "rgb(var(--words))" }}>Words</h1>
-          <span className="text-sm text-ink-3">Write your song</span>
+        {/* Room header — Stitch design */}
+        <div className="border-b border-line/50 pb-5">
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: "rgb(var(--words))" }} />
+            <h1 className="text-xl font-bold text-ink">Words</h1>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 01</span>
+          </div>
+          <p className="mt-1 text-sm text-ink-2">Write your song in plain language. Frank listens, catches rhymes, and never overwrites without asking.</p>
         </div>
+
 
         <FrankNote answers={answers} material="words">
           {note}

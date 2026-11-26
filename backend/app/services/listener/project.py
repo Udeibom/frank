@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
 
 from app.db import beat as beat_db
 from app.db import mix as mix_db
@@ -28,6 +28,21 @@ Progress = Optional[Callable[[str], Awaitable[None]]]
 def cache_key(parts: dict[str, str], scope: Optional[list[str]]) -> str:
     ids = "|".join(f"{k}:{parts[k]}" for k in sorted(parts))
     return f"v{service.LISTENER_VERSION}|{ids}|scope:{','.join(sorted(scope)) if scope else 'all'}"
+
+
+def _part_urls(project_id: str, beat_id: Optional[str]) -> dict[str, str]:
+    if not beat_id:
+        return {}
+    try:
+        rows = beat_db.list_part_stems_sync(project_id)
+    except Exception:  # noqa: BLE001  a missing part cache never stops listening
+        log.warning("could not list part stems", exc_info=True)
+        return {}
+    return {
+        row["stem_type"]: row["audio_url"]
+        for row in rows
+        if row.get("beat_version_id") == beat_id and row.get("section") == beat_db.PART_SECTION and row.get("stem_type") and row.get("audio_url")
+    }
 
 
 def _cache_get(key: str) -> Optional[MeasurementReport]:
@@ -66,6 +81,9 @@ async def measure_song(project_id: str, scope: Optional[list[str]] = None, progr
     versions: dict[str, str] = {}
     if beat:
         versions["beat"] = beat["id"]
+    part_urls = await asyncio.to_thread(_part_urls, project_id, beat_id)
+    if part_urls:
+        versions["parts"] = "|".join(f"{k}:{part_urls[k]}" for k in sorted(part_urls))
     if vocal_url:
         versions["vocal"] = (comp or take or {}).get("id", vocal_url)
     if mix:
@@ -102,6 +120,12 @@ async def measure_song(project_id: str, scope: Optional[list[str]] = None, progr
         contour = await asyncio.to_thread(detect_pitch_contour, wav)
     if mix and mix.get("render_url"):
         mix_audio = service.decode(await asyncio.to_thread(fetch_audio_bytes, mix["render_url"]))
+    parts_audio: dict[str, Any] = {}
+    for family, url in part_urls.items():
+        try:
+            parts_audio[family] = service.decode(await asyncio.to_thread(fetch_audio_bytes, url), sr=service.LISTEN_SR)
+        except Exception:  # noqa: BLE001  a missing part stem never stops listening
+            log.warning("could not read part %s", family, exc_info=True)
 
     shift = float(fp.get("music_start_s") or 0.0) if fp else 0.0
     if shift > 0:
@@ -115,7 +139,7 @@ async def measure_song(project_id: str, scope: Optional[list[str]] = None, progr
     await _say(progress, "Comparing the parts...")
     report = await asyncio.to_thread(
         service.measure_audio, sections, bpm,
-        beat=beat_audio, vocal=vocal_audio, mix=mix_audio, sr=service.LISTEN_SR, key=fp.get("key"), score=score, scope=scope, vocal_contour=contour,
+        beat=beat_audio, vocal=vocal_audio, mix=mix_audio, parts=parts_audio or None, sr=service.LISTEN_SR, key=fp.get("key"), score=score, scope=scope, vocal_contour=contour,
     )
     report.audio_versions = versions
     await asyncio.to_thread(_cache_put, key, report)

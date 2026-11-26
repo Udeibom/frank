@@ -23,6 +23,10 @@ def _wav(samples: np.ndarray) -> bytes:
     return buf.getvalue()
 
 
+def _stereo_wav(samples: np.ndarray) -> bytes:
+    return _wav(samples.T)
+
+
 mono_audio = hnp.arrays(
     dtype=np.float32,
     shape=st.integers(min_value=1, max_value=3000),
@@ -87,13 +91,67 @@ def test_section_gain_changes_only_the_named_sections(layout, target, gain_db):
 
     assert out.shape == beat.shape
     factor = 10.0 ** (gain_db / 20.0)
+    fade = min(int(0.012 * SR), total // 8)
     cursor = 0
     for name, bars in layout:
         length = int(bars * 4 * (SR * 60.0 / bpm))
-        window = out[:, cursor : cursor + length]
+        window = out[:, cursor + fade : cursor + length - fade]
         expected = 0.1 * (factor if name == target else 1.0)
         assert np.allclose(window, expected, rtol=1e-4)
         cursor += length
+
+
+def test_section_spans_match_the_beat_engine_exactly():
+    from app.services.generation import beat
+
+    sections = [{"name": "verse", "bars": 3}, {"name": "chorus", "bars": 4}]
+    plans = [beat.SectionPlan(i, s["name"], s["name"], s["bars"], 0.5, 0.5, []) for i, s in enumerate(sections)]
+    assert mixing._section_spans(sections, 123.4) == beat.section_spans(plans, 123.4)
+
+
+def test_section_automation_accepts_index_and_label_without_clicks():
+    sections = [{"name": "verse", "label": "Open", "bars": 2}, {"name": "chorus", "bars": 2}]
+    bpm = 120
+    beats = np.full((2, 4 * SR), 0.1, dtype=np.float32)
+    out = mixing._apply_section_gains(beats, {"Open": 6.0}, sections, bpm, {"1": -6.0})
+    assert out.shape == beats.shape
+    assert not np.allclose(out, beats)
+    assert np.all(np.isfinite(out))
+    assert float(np.abs(out[:, SR - 50 : SR + 50]).max()) <= 0.2
+
+
+def test_duck_lowers_the_target_only_while_the_key_is_loud():
+    n = SR
+    key = np.zeros((2, n), dtype=np.float32)
+    key[:, n // 2 :] = 0.8
+    target = np.full((2, n), 0.2, dtype=np.float32)
+    out = mixing._duck(target, key, 0.6)
+    assert out.shape == target.shape
+    assert np.allclose(out[:, : n // 4], target[:, : n // 4])
+    assert np.all(out[:, 3 * n // 4 :] < target[:, 3 * n // 4 :])
+
+
+def test_drum_bus_glues_drums_without_changing_the_shape():
+    n = SR
+    drums = np.full((2, n), 0.3, dtype=np.float32)
+    keys = np.full((2, n), 0.2, dtype=np.float32)
+    params = {"drum_bus": {"on": True, "glue": 0.6}}
+    parts = [("drums", lambda: _stereo_wav(drums)), ("keys", lambda: _stereo_wav(keys))]
+    out = mixing.render_mix(None, None, None, params, parts=parts)
+    assert out.shape == (2, n)
+    assert np.all(np.isfinite(out))
+    assert float(np.abs(out).max()) <= 0.97 + 1e-4
+
+
+def test_ducking_reaches_the_mix_room_params():
+    n = SR
+    vocal = np.full((2, n), 0.6, dtype=np.float32)
+    keys = np.full((2, n), 0.3, dtype=np.float32)
+    parts = [("keys", lambda: _stereo_wav(keys))]
+    plain = mixing.render_mix(_stereo_wav(vocal), None, None, {}, parts=parts)
+    ducked = mixing.render_mix(_stereo_wav(vocal), None, None, {"interactions": {"vocal:keys": 0.7}}, parts=parts)
+    assert ducked.shape == plain.shape
+    assert np.all(ducked <= plain + 1e-6)
 
 
 # ── Cross-room vocal resolution (voice-to-export-flow R2) ────────

@@ -58,16 +58,11 @@
     --ring: var(--frank);
     --radius: 0.5rem;   /* 8px — calibrated roundedness level 2 */
   }
-}
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 56px; /* height of sticky nav */
+  }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
   /* One focus ring everywhere: 2px, Frank amber, offset so it never hides the control. */
   :focus-visible {
     outline: 2px solid rgb(var(--frank));

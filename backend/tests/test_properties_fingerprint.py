@@ -63,6 +63,20 @@ def test_key_is_never_empty(fp):
     assert normalize(fp)["key"]
 
 
+def test_unsupported_fingerprint_hints_are_reported():
+    out = normalize({"key": "C major", "mode": "lydian", "tempo_feel": "swung", "texture_palette": 99})
+    assert out["mode"] == "major"
+    assert out["tempo_feel"] == "steady"
+    assert {"lydian", "swung", "texture_palette"} <= set(out["unsupported_hints"])
+
+
+def test_mode_and_tone_shape_the_texture_cache_key():
+    base = {"key": "C major", "warmth": 0.6, "brightness": 0.4}
+    assert texture_cache_key({**base, "mode": "dorian"}) != texture_cache_key(base)
+    assert texture_cache_key({**base, "warmth": 0.9}) != texture_cache_key(base)
+    assert texture_cache_key({**base, "brightness": 0.9}) != texture_cache_key(base)
+
+
 @settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(fingerprints)
 def test_cache_key_is_deterministic(fp):

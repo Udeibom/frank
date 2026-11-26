@@ -22,9 +22,12 @@ export async function askForDirections(
   concern: string | null,
   room: "beat" | "mix" | "voice",
   onProgress?: Progress,
+  onJob?: (jobId: string) => void,
+  signal?: AbortSignal,
 ): Promise<RefineProposal> {
   const { job_id } = await api.post<{ job_id: string }>(`/projects/${projectId}/refine`, { concern, room })
-  const done = await pollJob(job_id, progressOf(onProgress))
+  onJob?.(job_id)
+  const done = await pollJob(job_id, progressOf(onProgress), signal)
   return done.result as unknown as RefineProposal
 }
 
@@ -34,9 +37,12 @@ export async function previewDirection(
   proposalId: string,
   n: number,
   onProgress?: Progress,
+  onJob?: (jobId: string) => void,
+  signal?: AbortSignal,
 ): Promise<RefinePreview> {
   const { job_id } = await api.post<{ job_id: string }>(`/projects/${projectId}/refine/${proposalId}/preview/${n}`)
-  const done = await pollJob(job_id, progressOf(onProgress))
+  onJob?.(job_id)
+  const done = await pollJob(job_id, progressOf(onProgress), signal)
   return done.result as unknown as RefinePreview
 }
 

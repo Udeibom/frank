@@ -16,6 +16,7 @@ import re
 from typing import Any
 
 from app.services.generation import theory, composer, renderer, fingerprint as fp_utils
+from app.services.generation.styles import pick_style
 
 TEXTURE_BARS = 4
 
@@ -84,6 +85,7 @@ def generate_texture_wav(fingerprint: dict) -> bytes:
         key=fp["key"],
         energy=fp["energy_level"],
         tempo_feel=fp["tempo_feel"],
+        mode=fp["mode"],
     )
 
     # Textures are intentionally sparse: keys + pad, drums only if energetic.
@@ -97,7 +99,9 @@ def generate_texture_wav(fingerprint: dict) -> bytes:
 
     _, keys, pad, _ = PALETTES[palette_for(fp)]
     ctx = composer.SectionContext(name="intro", parts={"keys": {"preset": keys}, "pad": {"preset": pad},
-                                                       "arp": {"preset": keys}})
+                                                        "arp": {"preset": keys}}, style=pick_style(fp),
+                                  tempo_feel=fp["tempo_feel"])
+
     parts = composer.compose_section(
         section="intro",
         progression=prog,

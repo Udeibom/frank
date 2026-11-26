@@ -43,3 +43,13 @@ FLAT_CHANGE = 0.12
 
 # Findings are only believed when at least this much of the song could be measured.
 MIN_SECTION_SECONDS = 1.0
+
+# One part is "too busy" when it plays well over twice the notes of a typical part in the same section.
+PART_BUSY_RATIO = 1.8
+PART_BUSY_MIN_NOTES = 2.0
+
+# A part is "too loud" when it sits clearly above the other parts in the recorded beat.
+PART_LOUD_GAP = 4.0
+
+# A chorus is thin when it has few parts while the rest of the song is fuller.
+PART_THIN_COUNT = 2

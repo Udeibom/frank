@@ -23,7 +23,7 @@ from app.services.listener.models import Difference, MeasurementReport, SectionI
 
 log = logging.getLogger(__name__)
 SR = 44100
-LISTENER_VERSION = 1            # bump when measurements change, so cached reports are not reused
+LISTENER_VERSION = 2            # bump when measurements change, so cached reports are not reused
 
 
 # ── score facts: what the song's own notes say (no audio) ────────────────
@@ -88,6 +88,7 @@ def measure_audio(
     beat: Optional[np.ndarray] = None,
     vocal: Optional[np.ndarray] = None,
     mix: Optional[np.ndarray] = None,
+    parts: Optional[dict[str, np.ndarray]] = None,
     sr: int = SR,
     key: Optional[str] = None,
     score: Optional[dict[int, dict[str, Any]]] = None,
@@ -101,6 +102,7 @@ def measure_audio(
     rep = MeasurementReport(scope=scope)
     v, un = rep.values, rep.unmeasured
     score = score or {}
+    rep.score_facts = {str(k): val for k, val in score.items()}
     chosen = [s for s in sections if not scope or s.name in scope]
     rep.sections = [SectionInfo(index=s.index, name=s.name, bars=s.bars, parts=list(score.get(s.index, {}).get("parts", s.layers))) for s in chosen]
     spans = dict(zip((s.index for s in sections), beat_engine.section_spans(sections, bpm))) if sections and bpm > 0 else {}
@@ -127,6 +129,9 @@ def measure_audio(
             facts = score.get(s.index)
             if facts:
                 v[f"section.{s.index}.parts"] = float(len(facts["parts"]))
+                for part, count in (facts.get("notes_per_bar") or {}).items():
+                    v[f"section.{s.index}.notes_per_bar.{part}"] = float(count)
+                    v[f"part.{part}.section.{s.index}.notes_per_bar"] = float(count)
                 for k in ("melody_fit", "melody_range", "melody_movement"):
                     if k in facts:
                         v[f"section.{s.index}.{k}"] = float(facts[k])
@@ -199,7 +204,15 @@ def measure_audio(
         if cl is not None:
             v["mix.clipping"] = cl
     if beat is not None and score:
-        un.append(Unmeasured(id="part_loudness", why="I can tell which parts play and how busy each is, but not how loud each one is on its own yet."))
+        if not parts:
+            un.append(Unmeasured(id="part_loudness", why="I can tell which parts play and how busy each is, but not how loud each one is on its own yet."))
+        else:
+            for family, audio in sorted(parts.items()):
+                put(f"part.{family}.loudness", dsp.loudness(audio, sr), f"I couldn't measure how loud the {family} part is on its own.")
+                for s in chosen:
+                    seg = _slice(audio, spans.get(s.index, (0, 0)), sr)
+                    put(f"part.{family}.section.{s.index}.loudness", dsp.loudness(seg, sr),
+                        f"I couldn't measure how loud the {family} part is in {s.name}.")
     return rep
 
 

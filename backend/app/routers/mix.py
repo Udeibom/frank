@@ -30,6 +30,9 @@ DEFAULT_MIX_PARAMS = {
     "vocal_effects": [],
     "beat_effects": [],
     "section_gain_db": {},
+    "vocal_space_amount": 0.18,
+    "interactions": {},
+    "drum_bus": {"on": False, "glue": 0.35},
 }
 
 _ALLOWED_ACTIONS = {
@@ -40,6 +43,8 @@ _ALLOWED_ACTIONS = {
     "analyze_mix",
     "refine",
     "part_adjust",
+    "duck",
+    "drum_bus",
 }
 MAX_CHANGES = 3                 # keep feedback loops tight (spec 11 requirement 1.2)
 PARTS = ("drums", "bass", "keys", "melody", "pad", "strings", "arp", "extras")
@@ -49,6 +54,10 @@ PART_WORDS = {"piano": "keys", "keys": "keys", "drum": "drums", "drums": "drums"
 
 def _clamp_db(v: float) -> float:
     return max(-24.0, min(12.0, v))
+
+
+def _clamp_unit(v: float) -> float:
+    return max(0.0, min(1.0, float(v)))
 
 
 def apply_actions(params: dict, actions: list[dict]) -> tuple[dict, bool]:
@@ -61,6 +70,8 @@ def apply_actions(params: dict, actions: list[dict]) -> tuple[dict, bool]:
     p["vocal_effects"] = list(p.get("vocal_effects", []))
     p["beat_effects"] = list(p.get("beat_effects", []))
     p["section_gain_db"] = dict(p.get("section_gain_db", {}))
+    p["interactions"] = dict(p.get("interactions") or {})
+    p["drum_bus"] = dict(p.get("drum_bus") or {})
     p["parts"] = {k: dict(v, sections=dict(v.get("sections") or {})) for k, v in (p.get("parts") or {}).items()}
     render = False
     changing = [a for a in actions if a.get("type") not in ("analyze_mix", "refine")][:MAX_CHANGES]
@@ -86,6 +97,8 @@ def apply_actions(params: dict, actions: list[dict]) -> tuple[dict, bool]:
                     p[key].append(effect)
                 elif not on and effect in p[key]:
                     p[key].remove(effect)
+                if effect == "space" and "amount" in ap:
+                    p["vocal_space_amount" if target == "vocal" else "beat_space_amount"] = _clamp_unit(ap["amount"])
                 render = True
 
         elif atype == "toggle_harmony":
@@ -93,8 +106,9 @@ def apply_actions(params: dict, actions: list[dict]) -> tuple[dict, bool]:
             render = True
 
         elif atype == "section_adjust":
-            section = ap.get("section")
-            if section:
+            section = ap.get("section") or ap.get("section_index")
+            if section is not None:
+                section = str(section)
                 cur = p["section_gain_db"].get(section, 0.0)
                 p["section_gain_db"][section] = _clamp_db(cur + float(ap.get("delta_db", 0)))
                 render = True
@@ -114,9 +128,30 @@ def apply_actions(params: dict, actions: list[dict]) -> tuple[dict, bool]:
                     st["tone"] = ap.get("tone")
                 if "space" in ap:
                     st["space"] = bool(ap.get("space"))
+                if "space_amount" in ap:
+                    st["space_amount"] = _clamp_unit(ap["space_amount"])
                 if "muted" in ap:
                     st["muted"] = bool(ap.get("muted"))
                 render = True
+
+        elif atype == "duck":
+            key = "vocal" if str(ap.get("key", "")).lower() == "vocal" else PART_WORDS.get(str(ap.get("key", "")).lower())
+            target = PART_WORDS.get(str(ap.get("target", "")).lower())
+            if key and target and key != target:
+                pair = f"{key}:{target}"
+                amount = _clamp_unit(ap.get("amount", 0.3))
+                if amount > 0.0:
+                    p["interactions"][pair] = amount
+                else:
+                    p["interactions"].pop(pair, None)
+                render = True
+
+        elif atype == "drum_bus":
+            if "on" in ap:
+                p["drum_bus"]["on"] = bool(ap["on"])
+            if "glue" in ap:
+                p["drum_bus"]["glue"] = _clamp_unit(ap["glue"])
+            render = True
 
         elif atype == "analyze_mix":
             # Handled separately by the caller; no param change, no render

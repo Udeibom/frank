@@ -35,10 +35,45 @@ def _mix(title: str, plain: str, *actions: dict) -> Direction:
     return Direction(title=title, plain=plain, kind="mix", actions=list(actions))
 
 
-def from_findings(findings: list[dict], sections: list[SectionPlan], has_mix: bool) -> list[Direction]:
+CRITIC_IDS = {"part_busy", "part_loud", "chorus_thin"}
+
+
+def _part_of(f: dict, sections: list[SectionPlan], where: list[int]) -> Optional[str]:
+    for part in f.get("parts") or []:
+        if part in {"drums", "bass", "keys", "melody", "pad", "strings", "arp"}:
+            return part
+    for evidence in f.get("evidence") or []:
+        bits = str(evidence).split(".")
+        if len(bits) >= 3 and bits[0] == "section" and bits[1].isdigit():
+            part = bits[3] if len(bits) > 3 else None
+            if part in {"drums", "bass", "keys", "melody", "pad", "strings", "arp"}:
+                return part
+        if len(bits) >= 2 and bits[0] == "part":
+            part = bits[1]
+            if part in {"drums", "bass", "keys", "melody", "pad", "strings", "arp"}:
+                return part
+    return None
+
+
+def _link(d: Direction, f: dict) -> Direction:
+    fid = f.get("id")
+    targets = [int(i) for i in f.get("sections", []) if isinstance(i, int)]
+    if not targets:
+        targets = [int(a["section"]) for a in d.actions if isinstance(a.get("section"), int)]
+    return d.model_copy(update={
+        "addresses": [fid] if fid else [],
+        "evidence": [str(e) for e in (f.get("evidence") or [])],
+        "targets": targets,
+        "source": "critic" if fid in CRITIC_IDS else "listener",
+        "expectation": {"finding": fid, "plain": f.get("plain")},
+    })
+
+
+def from_findings(findings: list[dict], sections: list[SectionPlan], has_mix: bool, hummed_tune: bool = False) -> list[Direction]:
     """Candidate directions for the findings, most important finding first. Some may not apply; the caller validates."""
     out: list[Direction] = []
     for f in findings:
+        start = len(out)
         fid, where = f.get("id"), [i for i in f.get("sections", []) if 0 <= i < len(sections)]
         if fid == "chorus_lift" and len(where) == 2:
             verse, chorus = where
@@ -71,7 +106,7 @@ def from_findings(findings: list[dict], sections: list[SectionPlan], has_mix: bo
             if busy:
                 out.append(_beat("Simpler drums in the verses", "Calmer drums in the verses, full drums in the choruses.",
                                  {"op": "sparser", "part": "drums", "section": busy}))
-        elif fid == "melody_wanders" and where:
+        elif fid == "melody_wanders" and where and not hummed_tune:
             out.append(_beat("A new tune there", "Try a different tune that sits closer to the chords.",
                              {"op": "try_another", "part": "melody", "section": where}))
             out.append(_beat("Leave the tune out there", "Take the tune out of that part so nothing clashes.",
@@ -100,6 +135,27 @@ def from_findings(findings: list[dict], sections: list[SectionPlan], has_mix: bo
             out.append(_mix("Everything louder" if step > 0 else "Everything a little softer",
                             "Change the level of the whole song, keeping the balance.",
                             {"type": "adjust_levels", "params": {"vocal_delta_db": step, "beat_delta_db": step}}))
+        elif fid == "part_busy" and where:
+            part = _part_of(f, sections, where)
+            if part:
+                idxs = _with(sections, where, part)
+                if idxs:
+                    out.append(_beat("Give that part room", "Let one part play less, so the others can be heard.",
+                                     {"op": "sparser", "part": part, "section": idxs}))
+        elif fid == "part_loud" and where:
+            part = _part_of(f, sections, where)
+            if part:
+                idxs = _with(sections, where, part)
+                if idxs:
+                    out.append(_beat("Bring that part back", "Hold one part back so the others sit with it.",
+                                     {"op": "sparser", "part": part, "section": idxs}))
+        elif fid == "chorus_thin" and where:
+            for i in where:
+                missing = next((p for p in ("strings", "pad", "arp") if p not in sections[i].layers), None)
+                if missing:
+                    out.append(_beat("A fuller chorus", "Bring in one more layer when the chorus starts.",
+                                     {"op": "add_part", "part": missing, "section": i}))
+        out[start:] = [_link(d, f) for d in out[start:]]
     return out
 
 
@@ -145,4 +201,4 @@ def experiment_menu(
     words = (concern or "").lower()
     named = {"verse": "verse" in words, "chorus": "chorus" in words, "voice": any(w in words for w in ("voice", "vocal", "sing"))}
     menu.sort(key=lambda kv: 0 if named.get(kv[0]) else 1)       # stable: the menu's order otherwise
-    return [d for _, d in menu]
+    return [d.model_copy(update={"source": "experiment", "addresses": [], "evidence": [], "targets": []}) for _, d in menu]

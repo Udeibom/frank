@@ -10,6 +10,7 @@ Endpoints (api_name):
   /speak       Kokoro: Frank's note read aloud (mp3 out)
   /ambience    Stable Audio 3 Small / Open: a short atmosphere from words (file out)              (GPU)
   /sing        DiffSinger (Tiger voicebank): a guide voice singing the words on the tune            (CPU)
+  /groove_humanize  Per-lane timing and accents for a one-bar drum pattern                        (CPU)
 """
 from __future__ import annotations
 
@@ -291,6 +292,29 @@ def sing_layout() -> str:
     return json.dumps(layout(str(CACHE)))
 
 
+def groove_humanize(text: str) -> str:
+    data = json.loads(text)
+    feel = int(data.get("feel", 0))
+    seed = int(data.get("seed", 0))
+    scale = {0: 1.0, 1: 1.45, -1: 0.55}.get(feel, 1.0)
+    rng = np.random.default_rng(seed)
+    centers = {"kick": -0.008, "snare": 0.014, "hat": 0.006, "open": 0.02, "ghost": -0.012}
+    lanes = {}
+    for lane, pattern in (data.get("lanes") or {}).items():
+        row = str(pattern).ljust(16, ".")[:16]
+        offsets, accents = [], []
+        for ch in row:
+            if ch == ".":
+                offsets.append(0.0)
+                accents.append(1.0)
+                continue
+            center = centers.get(lane, 0.0) * scale
+            offsets.append(round(float(np.clip(rng.normal(center, 0.018 * scale), -0.06, 0.06)), 4))
+            accents.append(round(float(np.clip(1.0 + rng.normal(0.0, 0.06 * scale), 0.75, 1.3)), 3))
+        lanes[lane] = {"offset": offsets, "accent": accents}
+    return json.dumps({"source": "frank-hands groove humanizer", "lanes": lanes})
+
+
 def health() -> str:
     return "ok"
 
@@ -303,6 +327,7 @@ ENDPOINTS = [
     (ambience, ["text", "number"], ["file"]),
     (sing, ["text"], ["file"]),
     (sing_layout, [], ["text"]),
+    (groove_humanize, ["text"], ["text"]),
 ]
 
 

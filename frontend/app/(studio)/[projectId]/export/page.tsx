@@ -104,8 +104,16 @@ export default function ExportRoomPage() {
   }
 
   async function sayNotYet() {
-    const reply = await answerIntent(projectId, false, said)
-    if (reply.next === "refine") router.push(`/${projectId}/mix?refine=${encodeURIComponent(reply.concern ?? said)}`)
+    setWorking("Listening to what you said…")
+    setError(null)
+    try {
+      const reply = await answerIntent(projectId, false, said)
+      if (reply.next === "refine") router.push(`/${projectId}/mix?refine=${encodeURIComponent(reply.concern ?? said)}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Frank couldn't read that just then. Want to try again?")
+    } finally {
+      setWorking(null)
+    }
   }
 
   async function finish() {
@@ -223,11 +231,16 @@ export default function ExportRoomPage() {
   return (
     <div className="flex h-full flex-col overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
       <div className="mx-auto flex w-full max-w-[860px] flex-col gap-8">
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-ink-2" />
-          <h1 className="font-written italic text-3xl leading-tight text-ink">Finish</h1>
-          <span className="text-sm text-ink-3">A last listen, then it's yours</span>
+        {/* Room header — Stitch design */}
+        <div className="border-b border-line/50 pb-5">
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
+            <h1 className="text-xl font-bold text-ink">Finish</h1>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 06</span>
+          </div>
+          <p className="mt-1 text-sm text-ink-2">A last listen, then it&apos;s yours.</p>
         </div>
+
 
         {/* The song: its name, its shape, one play control */}
         <section aria-labelledby="song-name" className="flex flex-col gap-5 rounded-xl border border-line/50 bg-surface p-8 shadow-l2">
@@ -304,14 +317,16 @@ export default function ExportRoomPage() {
             </label>
             <div className="flex items-end gap-3">
               <input
-                id="what-missing"
-                value={said}
-                onChange={(e) => setSaid(e.target.value)}
+                 id="what-missing"
+                 value={said}
+                 disabled={working !== null}
+                 onChange={(e) => setSaid(e.target.value)}
+
                 className="max-w-xl flex-1 rounded-md bg-raised px-3 py-2.5 font-written text-[17px] text-words placeholder:font-sans placeholder:text-base placeholder:text-ink-3"
                 placeholder="It should feel lonelier…"
                 autoFocus
               />
-              <button type="submit" className="h-10 rounded-md border border-line bg-raised px-5 text-base text-ink hover:border-ink-3">
+              <button type="submit" disabled={working !== null} className="h-10 rounded-md border border-line bg-raised px-5 text-base text-ink hover:border-ink-3 disabled:opacity-60">
                 Find a few ideas
               </button>
             </div>

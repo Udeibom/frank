@@ -416,18 +416,22 @@ Always a JSON object:
 ACTION TYPES (you may combine a couple):
 - Adjust balance (positive = louder, negative = softer, in small steps like 2-3):
   { "type": "adjust_levels", "params": { "vocal_delta_db": 0, "beat_delta_db": 0, "harmony_delta_db": 0 } }
-- Add/remove an effect:
-  { "type": "apply_effect", "params": { "target": "vocal|beat", "effect": "warm|space|smooth|clarity|closer|clean_low|sit_back", "on": true } }
+- Add/remove an effect. `amount` (0..1) says how much room; leave it out for a little:
+  { "type": "apply_effect", "params": { "target": "vocal|beat", "effect": "warm|space|smooth|clarity|closer|clean_low|sit_back", "on": true, "amount": 0.25 } }
 - Toggle the harmony:
   { "type": "toggle_harmony", "params": { "on": true } }
 - Change ONE part of the music (drums, bass, keys, melody, pad, strings, arp, extras), everywhere or in one
   section by its position (section_index from the list you are given). Any of: level_delta_db, tone
-  ("warmer" | "brighter" | "clearer" | null), space (true/false), muted (true/false):
+  ("warmer" | "brighter" | "clearer" | null), space (true/false), space_amount (0..1), muted (true/false):
   { "type": "part_adjust", "params": { "part": "keys", "level_delta_db": -3, "section_index": 5 } }
   "bring the piano down in the bridge" -> part_adjust keys -3 in the bridge's section_index.
   Call the parts by what they sound like: "the drums", "the piano/keys", "the bass", "the tune", "the soft
   background" (pad), "the strings", "the running pattern" (arp), "the little touches" (extras).
-- Make a section louder/softer (by section name: intro, verse, chorus, bridge, outro):
+- Let one part get out of another's way ("the piano leaves room for the voice"):
+  { "type": "duck", "params": { "key": "vocal|drums|bass|keys|melody|pad|strings|arp|extras", "target": "keys", "amount": 0.3 } }
+- Make the drums feel like one played kit instead of separate pieces:
+  { "type": "drum_bus", "params": { "on": true, "glue": 0.35 } }
+- Make a section louder/softer (by section name or section_index):
   { "type": "section_adjust", "params": { "section": "chorus", "delta_db": 2 } }
 - Analyze the mix when they can't name the problem:
   { "type": "analyze_mix", "params": {} }
@@ -440,7 +444,9 @@ TRANSLATION GUIDE (reactions -> moves):
 - "beat too loud" -> beat_delta_db -3
 - "it's muddy" -> apply_effect beat clean_low on
 - "more warmth" -> apply_effect vocal warm on
-- "more space / echoey" -> apply_effect vocal space on
+- "more space / echoey" -> apply_effect vocal space on, or amount 0.45 for a lot
+- "too busy under the voice" -> duck vocal:keys 0.3 and duck vocal:pad 0.25
+- "drums feel scattered" -> drum_bus on, glue 0.35
 - "too processed / too much" -> turn the relevant effect off
 - "chorus should be bigger" -> section_adjust chorus +2
 

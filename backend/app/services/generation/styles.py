@@ -23,6 +23,7 @@ PARTS = ("keys", "bass", "melody", "pad", "strings", "arp")
 TIERS = ("sparse", "medium", "busy")
 LANES = ("kick", "snare", "hat", "ghost", "half_kick", "half_snare", "half_hat")
 LANE_CHARS = set("xog.")
+WARMTH_THRESHOLD = {"keys": 0.25, "bass": -0.1, "melody": 0.1, "pad": 0.35, "strings": -0.2, "arp": 0.2}
 
 
 @dataclass
@@ -130,10 +131,11 @@ def pick_style(fp: dict) -> StyleChoice:
     data = _merged(name)
 
     instruments: dict[str, int] = {}
+    tone_score = warmth - brightness
     for part in PARTS:
         value = data["instruments"][part]
         if isinstance(value, list):                     # [warm choice, bright choice]
-            value = value[0] if warmth >= brightness else value[1]
+            value = value[0] if tone_score >= WARMTH_THRESHOLD.get(part, 0.0) else value[1]
         instruments[part] = int(value)
 
     drum_gain = float(data["drum_gain"])

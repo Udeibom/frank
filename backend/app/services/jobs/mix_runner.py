@@ -49,6 +49,10 @@ def _summarize_params(mix_params: dict) -> str:
         bits.append({"warm": "warmer", "space": "more space", "smooth": "smoother"}.get(e, e))
     for e in mix_params.get("beat_effects", []):
         bits.append({"clean_low": "cleaner low end"}.get(e, e))
+    if (mix_params.get("drum_bus") or {}).get("on"):
+        bits.append("drums together")
+    if mix_params.get("interactions"):
+        bits.append("parts making room")
     return ", ".join(bits) if bits else "balanced"
 
 

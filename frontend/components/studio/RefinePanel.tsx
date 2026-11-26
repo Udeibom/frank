@@ -6,10 +6,10 @@
  * "Use this" makes it a new version; the earlier one is kept.
  */
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { askForDirections, chooseDirection, disagree, previewDirection } from "@/lib/api/refine"
-import { pollJob } from "@/lib/api/jobs"
+import { cancelJob, pollJob } from "@/lib/api/jobs"
 import type { RefinePreview, RefineProposal } from "@/types/api"
 import { Ear, Loader2, Play, Pause, Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -40,7 +40,9 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
   const [chosen, setChosen] = useState<number | null>(null)
   const [disagreeing, setDisagreeing] = useState(false)
   const [said, setSaid] = useState("")
-  // Everything plays through the shared AudioEngine; what is playing is read back from it.
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
+  const jobIdRef = useRef<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const engine = useAudio()
   const trackId = (n: number, side: Side) => `refine:${proposal?.proposal_id ?? ""}:${n}:${side}`
   const playing: { n: number; side: Side } | null = (() => {
@@ -53,28 +55,63 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
     return null
   })()
 
+  function rememberJob(id: string) {
+    jobIdRef.current = id
+    setActiveJobId(id)
+  }
+
+  function clearJob() {
+    jobIdRef.current = null
+    setActiveJobId(null)
+    abortRef.current = null
+  }
+
+  async function stopActive() {
+    const id = jobIdRef.current
+    abortRef.current?.abort()
+    if (id) await cancelJob(id).catch(() => undefined)
+    clearJob()
+    setLoadingPreview(null)
+    setCommitting(null)
+    setPhase((p) => (p === "listening" ? "error" : p))
+    setProgress("You stopped that one. Nothing was lost. Ask when you're ready.")
+  }
+
   useEffect(() => {
     if (startKey <= 0) return
     let cancelled = false
+    const controller = new AbortController()
+    abortRef.current = controller
     setPhase("listening")
     setProgress("Listening to your song… this takes about a minute.")
     setProposal(null)
     setPreviews({})
+    setLoadingPreview(null)
+    setCommitting(null)
     setChosen(null)
-    askForDirections(projectId, concern, room, (t) => !cancelled && setProgress(t))
+    setDisagreeing(false)
+    setSaid("")
+    clearJob()
+    askForDirections(projectId, concern, room, (t) => !cancelled && setProgress(t), (id) => !cancelled && rememberJob(id), controller.signal)
       .then((p) => {
         if (cancelled) return
         setProposal(p)
         setPhase("ready")
+        clearJob()
         onSay(p.message)
       })
       .catch((err: unknown) => {
         if (cancelled) return
         setPhase("error")
         setProgress(err instanceof Error ? err.message : "I couldn't listen just now. Want to try again?")
+        clearJob()
       })
     return () => {
       cancelled = true
+      controller.abort()
+      const id = jobIdRef.current
+      if (id) void cancelJob(id).catch(() => undefined)
+      clearJob()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startKey])
@@ -112,14 +149,17 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
     }
     setLoadingPreview(n)
     setPreviewText("Playing it the new way… usually under a minute.")
+    const controller = new AbortController()
+    abortRef.current = controller
     try {
-      const p = await previewDirection(projectId, proposal.proposal_id, n, setPreviewText)
+      const p = await previewDirection(projectId, proposal.proposal_id, n, setPreviewText, rememberJob, controller.signal)
       setPreviews((all) => ({ ...all, [n]: p }))
       play(n, "new", p)
     } catch (err) {
       onSay(err instanceof Error ? err.message : "I couldn't play that idea just now. Want to try again?")
     } finally {
       setLoadingPreview(null)
+      clearJob()
     }
   }
 
@@ -143,11 +183,17 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
   }
 
   async function sendDisagree() {
-    if (!proposal || !said.trim()) return
-    const res = await disagree(projectId, proposal.proposal_id, said.trim())
-    onSay(res.message)
-    setSaid("")
-    setDisagreeing(false)
+    if (!proposal || !said.trim() || disagreeing) return
+    setDisagreeing(true)
+    try {
+      const res = await disagree(projectId, proposal.proposal_id, said.trim())
+      onSay(res.message)
+      setSaid("")
+      setDisagreeing(false)
+    } catch (err) {
+      onSay(err instanceof Error ? err.message : "Tell me once more in a moment.")
+      setDisagreeing(false)
+    }
   }
 
   return (
@@ -163,10 +209,15 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
       </div>
 
       {phase !== "ready" && (
-        <p className="flex items-center gap-2 text-base text-ink-2" role="status">
+        <div className="flex items-center gap-2 text-base text-ink-2" role="status">
           {phase === "listening" && <Loader2 className="h-4 w-4 animate-spin" />}
-          {progress}
-        </p>
+          <span>{progress}</span>
+          {phase === "listening" && activeJobId && (
+            <button onClick={() => void stopActive()} className="text-sm text-ink-2 underline underline-offset-4 hover:text-ink">
+              Stop
+            </button>
+          )}
+        </div>
       )}
 
       {phase === "ready" && proposal && (
@@ -193,12 +244,13 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
                   <p className="text-sm text-ink-2">{d.plain}</p>
                   {p ? (
                     <div className="flex gap-2" role="group" aria-label={`Compare ${d.title} with the song now`}>
-                      <Button size="sm" variant={playing?.n === n && playing.side === "new" ? "default" : "outline"} onClick={() => play(n, "new")}>
+                        <Button size="sm" variant={playing?.n === n && playing.side === "new" ? "default" : "outline"} disabled={committing !== null || chosen !== null} onClick={() => play(n, "new")}>
+
                         {playing?.n === n && playing.side === "new" ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
                         New idea
                       </Button>
                       {p.before_url && (
-                        <Button size="sm" variant={playing?.n === n && playing.side === "now" ? "default" : "outline"} onClick={() => play(n, "now")}>
+                        <Button size="sm" variant={playing?.n === n && playing.side === "now" ? "default" : "outline"} disabled={committing !== null || chosen !== null} onClick={() => play(n, "now")}>
                           {playing?.n === n && playing.side === "now" ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
                           As it is now
                         </Button>
@@ -210,7 +262,16 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
                       Hear it
                     </Button>
                   )}
-                  {loadingPreview === n && <p className="text-sm text-ink-2" role="status">{previewText}</p>}
+                  {loadingPreview === n && (
+                    <div className="flex items-center gap-2 text-sm text-ink-2" role="status">
+                      <span>{previewText}</span>
+                      {activeJobId && (
+                        <button onClick={() => void stopActive()} className="underline underline-offset-4 hover:text-ink">
+                          Stop
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {chosen === n ? (
                     <span className="flex items-center gap-1 text-sm text-music">
                       <Check className="h-3.5 w-3.5" /> In the song now
@@ -235,6 +296,7 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
               <div className="flex gap-2">
                 <input
                   value={said}
+                  disabled={disagreeing}
                   onChange={(e) => setSaid(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendDisagree()}
                   placeholder="What do you hear instead?"
@@ -242,7 +304,7 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
                   className="flex-1 rounded-md bg-raised px-3 py-1.5 text-base text-ink"
                   autoFocus
                 />
-                <Button size="sm" variant="outline" onClick={sendDisagree}>Tell Frank</Button>
+                <Button size="sm" variant="outline" disabled={disagreeing || !said.trim()} onClick={sendDisagree}>Tell Frank</Button>
               </div>
             ) : (
               <button onClick={() => setDisagreeing(true)} className="self-start text-sm text-ink-2 underline underline-offset-4 hover:text-ink">

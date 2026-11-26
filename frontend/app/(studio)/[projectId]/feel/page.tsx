@@ -281,11 +281,16 @@ export default function FeelingPage() {
   return (
     <div className="flex h-full">
       <div className="room-feel flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
-        <div className="flex items-center gap-3">
-          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-feel ring-1 ring-feel/30" />
-          <h1 className="font-written italic text-3xl leading-tight" style={{ color: "rgb(var(--feel))" }}>Feeling</h1>
-          <span className="text-sm text-ink-3">Find how the song should feel</span>
+        {/* Room header — Stitch design */}
+        <div className="border-b border-line/50 pb-5">
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: "rgb(var(--feel))" }} />
+            <h1 className="text-xl font-bold text-ink">Feeling</h1>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 02</span>
+          </div>
+          <p className="mt-1 text-sm text-ink-2">Find how the song should feel. Listen to the sonic moods Frank imagined for your lyrics, or hum a tune directly.</p>
         </div>
+
 
         <FrankNote aside={aside} answers={answers} material="feel">
           {note}

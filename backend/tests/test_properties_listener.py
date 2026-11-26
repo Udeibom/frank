@@ -241,3 +241,40 @@ def test_noise_is_only_measured_when_the_recording_has_pauses():
     pauses = np.concatenate([noise(4, 1.0, 0.2), noise(5, 1.0, 0.002)] * 3)   # phrases with a quiet room between them
     floor = dsp.noise_floor_db(pauses, SR)
     assert floor is not None and floor < -40
+
+
+def test_part_loudness_is_measured_from_cached_stems():
+    secs, beat = song(["verse", "chorus"], [0.1, 0.2])
+    score = {0: {"parts": ["keys", "bass", "drums"], "notes_per_bar": {"keys": 4, "bass": 2, "drums": 8}},
+             1: {"parts": ["keys", "bass", "drums"], "notes_per_bar": {"keys": 4, "bass": 2, "drums": 8}}}
+    rep = service.measure_audio(secs, BPM, beat=beat, parts={"keys": beat, "bass": beat * 0.3}, sr=SR, score=score)
+    assert rep.score_facts["0"]["notes_per_bar"]["keys"] == 4
+    assert "part.keys.loudness" in rep.values and "part.bass.loudness" in rep.values
+    assert "part.keys.section.1.loudness" in rep.values
+    assert not any(u.id == "part_loudness" for u in rep.unmeasured)
+
+
+def test_symbolic_critic_findings_point_at_real_evidence_and_stay_plain():
+    from app.services.listener import critic
+
+    secs = plan(["verse", "chorus", "verse", "chorus"])
+    values: dict[str, float] = {}
+    facts: dict[str, dict] = {}
+    for s in secs:
+        note_counts = {"keys": 8.0, "bass": 2.0, "drums": 2.0}
+        if s.name == "chorus":
+            note_counts = {"keys": 8.0, "bass": 2.0}
+        facts[str(s.index)] = {"parts": list(note_counts), "notes_per_bar": note_counts}
+        values[f"section.{s.index}.parts"] = float(len(note_counts))
+        for part, count in note_counts.items():
+            values[f"section.{s.index}.notes_per_bar.{part}"] = count
+    values["part.keys.loudness"] = -10.0
+    values["part.bass.loudness"] = -20.0
+    values["part.drums.loudness"] = -20.0
+    rep = MeasurementReport(sections=[SectionInfo(index=s.index, name=s.name, bars=s.bars) for s in secs], values=values, score_facts=facts)
+    found = findings.find_issues(rep, "busy loud and thin")
+    ids = {f.id for f in found.findings}
+    assert {"part_busy", "part_loud", "chorus_thin"} <= ids
+    for f in found.findings:
+        assert f.evidence and all(e in rep.values for e in f.evidence)
+        assert not JARGON.search(f.plain) and not re.search(r"\d", f.plain)

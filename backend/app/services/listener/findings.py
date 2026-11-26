@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from app.services.listener import config as cfg
+from app.services.listener import critic
 from app.services.listener.models import Finding, FindingsReport, MeasurementReport
 
 ORDINALS = ["first", "second", "third", "fourth", "fifth"]
@@ -206,6 +207,8 @@ CONCERN_WORDS: dict[str, set[str]] = {
     "tune": {"melody", "tuning"}, "flat-note": {"tuning"}, "sharp": {"tuning"}, "melody": {"melody"},
     "harsh": {"harsh"}, "loud": {"loud"}, "quiet": {"quiet"}, "noise": {"noise"}, "hiss": {"noise"},
     "off": {"off"}, "wrong": {"off"}, "weird": {"off"},
+    "busy": {"busy", "crowded"}, "crowded": {"crowded", "busy"}, "thin": {"thin", "empty"},
+    "empty": {"empty", "thin"}, "space": {"empty", "thin"},
 }
 
 SEVERITY_ORDER = {"likely_problem": 0, "worth_a_look": 1, "note": 2}
@@ -232,6 +235,10 @@ def find_issues(report: MeasurementReport, concern: Optional[str] = None) -> Fin
         if tags is not None and "off" not in tags and not (tags & rule_tags):
             continue
         found.extend(fn(report))
+    for f in critic.critique(report):
+        if tags is not None and "off" not in tags and not (tags & critic.CRITIC_TAGS.get(f.id, {"off"})):
+            continue
+        found.append(f)
     found.sort(key=lambda f: (SEVERITY_ORDER[f.severity], f.id))
     could = [u.why for u in report.unmeasured]
     return FindingsReport(concern=concern, findings=found, no_clear_cause=bool(concern) and not found, could_not_check=could)

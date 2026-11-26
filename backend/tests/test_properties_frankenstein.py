@@ -11,7 +11,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from app.services import provenance, region
-from app.services.generation import composer, grooves
+from app.services.generation import composer, grooves, sampled
 from app.services.generation.styles import default_choice
 from app.services.intake import moment, picture
 from app.services.llm import gemini_media
@@ -51,6 +51,92 @@ def test_drums_stay_inside_their_bars_and_in_midi_range(bars, energy, density, s
     for e in part.events:
         assert 0.0 <= e.start < bars * 4.0 + 0.1
         assert 1 <= e.velocity <= 127
+
+
+def test_mined_patterns_are_valid_one_bar_lane_strings():
+    assert grooves.pick_pattern("_default")
+    for style in STYLES:
+        pattern = grooves.pick_pattern(style, "verse", random.Random(4))
+        assert pattern is None or all(len(row) == 16 and set(row) <= set("xog.") for row in pattern.values())
+
+
+def test_a_mined_pattern_replaces_the_typed_lane_pattern():
+    pattern = {"kick": "x...............", "snare": "....x...........", "hat": "x...x...x...x...",
+               "open": "................", "ghost": "................"}
+    original = grooves.pick_pattern
+    grooves.pick_pattern = lambda *a, **k: pattern
+    try:
+        part = composer.compose_drums(1, 0.5, 0.6, composer.SectionContext(seed=2, style=default_choice()))
+    finally:
+        grooves.pick_pattern = original
+    assert sum(e.note == composer.KICK for e in part.events) == 1
+    assert sum(e.note == composer.SNARE for e in part.events) == 1
+    assert sum(e.note == composer.CLOSED_HAT for e in part.events) == 4
+
+
+def test_groove_humanizer_is_off_until_it_is_asked_for(monkeypatch):
+    class Off:
+        groove_humanizer_enabled = False
+        groove_humanizer_timeout_s = 1.0
+
+    monkeypatch.setattr(grooves, "get_settings", lambda: Off())
+    assert grooves.humanize({"kick": "x" * 16}, "soul", 0, 1) is None
+
+
+def test_groove_humanizer_output_is_clamped_to_a_safe_range(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.services.remote import organs
+
+    class On:
+        groove_humanizer_enabled = True
+        groove_humanizer_timeout_s = 1.0
+
+    monkeypatch.setattr(grooves, "get_settings", lambda: On())
+    monkeypatch.setattr(organs, "groove_humanize", lambda *a, **k: {"lanes": {"kick": {
+        "offset": [99.0] + [0.0] * 15, "accent": [-9.0] + [1.0] * 15}}})
+    out = grooves.humanize({"kick": "x" * 16}, "soul", 0, 1)
+    assert out["kick"]["offset"][0] == 0.06
+    assert out["kick"]["accent"][0] == 0.7
+
+
+def test_recorded_instruments_cover_real_engine_parts_and_fall_back(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    for name in ("VSUpright1.sfz", "ViolinEnsSusVib.sfz", "Harp.sfz", "FluteSusVib.sfz"):
+        (tmp_path / name).write_text("")
+    monkeypatch.setattr(sampled, "sfz_dir", lambda: tmp_path)
+
+    def part(name, preset):
+        return SimpleNamespace(name=name, preset=preset, is_drums=False)
+
+    assert sampled.instrument_for(part("keys", 0)).name == "VSUpright1.sfz"
+    assert sampled.instrument_for(part("finale_keys", 2)).name == "VSUpright1.sfz"
+    assert sampled.instrument_for(part("strings", 48)).name == "ViolinEnsSusVib.sfz"
+    assert sampled.instrument_for(part("strings", 50)).name == "ViolinEnsSusVib.sfz"
+    assert sampled.instrument_for(part("arp", 46)).name == "Harp.sfz"
+    assert sampled.instrument_for(part("melody", 73)).name == "FluteSusVib.sfz"
+    assert sampled.instrument_for(part("keys", 4)) is None
+    assert sampled.instrument_for(part("melody", 99)) is None
+    assert sampled.instrument_for(SimpleNamespace(name="drums", preset=0, is_drums=True)) is None
+
+
+def test_recorded_render_is_deterministic_for_the_same_score():
+    from app.services.generation.composer import NoteEvent, Part
+
+    part = Part("keys", 0, False, [NoteEvent(60, 0.0, 2.0, 90), NoteEvent(64, 1.0, 2.0, 80)])
+    if not sampled.enabled() or sampled.instrument_for(part) is None:
+        return
+    first = sampled.render(part, 100.0, 4.0, 2.0)
+    second = sampled.render(part, 100.0, 4.0, 2.0)
+    assert first is not None and np.array_equal(first, second)
+
+
+def test_recorded_part_aliases_share_one_calibration():
+    assert sampled.canonical_part("finale_pad") == "pad"
+    assert sampled.canonical_part("finale_bass") == "bass"
+    assert sampled.canonical_part("finale_keys") == "keys"
+    assert sampled.canonical_part("melody") == "melody"
 
 
 def test_a_tapped_rhythm_is_played_exactly_as_tapped():

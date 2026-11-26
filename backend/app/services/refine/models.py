@@ -22,6 +22,13 @@ class Direction(BaseModel):
     before_url: Optional[str] = None
     # Meta Audiobox Aesthetics before/after (frankenstein spec 14, 2.4): {"before", "after", "plain"}
     made_well: Optional[dict[str, Any]] = None
+    quality: Optional[dict[str, Any]] = None
+    addresses: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+    targets: list[int] = Field(default_factory=list)
+    source: Literal["listener", "critic", "experiment", "producer"] = "listener"
+    expectation: Optional[dict[str, Any]] = None
+    critic: Optional[dict[str, Any]] = None
 
     def signature(self) -> str:
         """Two directions with the same signature would sound the same: they are not two choices."""

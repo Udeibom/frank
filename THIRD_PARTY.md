@@ -54,7 +54,7 @@ Frank's own source code is MIT (see `LICENSE`). Frank is stitched together from 
 | Part | Licence |
 |---|---|
 | MuseScore General SoundFont | MIT |
-| Versilian Studios VSCO-2 CE (upright piano, violin section) | CC0 |
+| Versilian Studios VSCO-2 CE (piano, strings, bass, harp, woodwinds and brass SFZ subset) | CC0 |
 | Freesound clips (atmosphere) | Each clip's own Creative Commons licence; Frank credits the author and licence per clip |
 
 ## Services (free tiers)

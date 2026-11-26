@@ -62,7 +62,7 @@ def _arrangement_params(
         "lead": lead.to_dict() if lead else None,
         "lead_info": beat_engine.lead_info(sections, lead),
         "style": style.name,
-        "unsupported_hints": style.unsupported,
+        "unsupported_hints": list(dict.fromkeys([*style.unsupported, *list(fp.get("unsupported_hints") or [])])),
         "sections": [
             {
                 "index": s.index,
@@ -179,6 +179,10 @@ def _credit_beat(project_id: str, version_id: str, sections: list, fp: dict) -> 
         provenance.note(project_id, "beat", version_id, "groove")
     if sampled.enabled() and layers & set(sampled.INSTRUMENTS):
         provenance.note(project_id, "beat", version_id, "samples")
+    from app.config import get_settings
+
+    if get_settings().groove_humanizer_enabled:
+        provenance.note(project_id, "beat", version_id, "groove_humanizer")
 
 
 async def _fingerprint_and_lead(project_id: str, fingerprint: dict) -> tuple[dict, lead_mod.Lead | None]:

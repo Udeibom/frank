@@ -1,7 +1,7 @@
 """Listener data shapes (listener spec 03). Raw numbers live in MeasurementReport; plain words in Finding."""
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +30,7 @@ class MeasurementReport(BaseModel):
     """
     audio_versions: dict[str, str] = Field(default_factory=dict)      # kind -> version id the numbers came from
     sections: list[SectionInfo] = Field(default_factory=list)
+    score_facts: dict[str, dict[str, Any]] = Field(default_factory=dict)
     values: dict[str, float] = Field(default_factory=dict)
     unmeasured: list[Unmeasured] = Field(default_factory=list)
     scope: Optional[list[str]] = None                                 # section names measured, None for all

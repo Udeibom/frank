@@ -71,7 +71,7 @@ PART_GAIN = {
 
 LEAD_GAIN = 1.1              # the person's own tune sits a little in front of the other parts
 PEAK_TARGET = 0.89
-ENGINE_VERSION = 6          # bumps when a change would make an old beat sound different if re-rendered
+ENGINE_VERSION = 7          # bumps when a change would make an old beat sound different if re-rendered
 FADE_OUT_SECONDS = 1.5
 EQ_MIN_DB = 0.25
 
@@ -338,7 +338,8 @@ def plan_contexts(
             variant = (ROLE_VARIANT.get(s.name, 0) + offset) % 4
             # Real songs in this style decide which of the family's loops this kind of section takes
             # (Chordonomicon, frankenstein spec 14, 3.2); never the same loop as another section already has.
-            _, mode = theory.parse_key(key)
+            _, key_mode = theory.parse_key(key)
+            mode = key_mode if lead else (fp.get("mode") if fp.get("mode") in theory.SCALE_INTERVALS else key_mode)
             options = theory.PROGRESSIONS[theory.choose_progression_family(mode, fp["energy_level"], fp["tempo_feel"])]
             order = chord_tables.ranked(options, style.name, s.name, mode)
             if order:
@@ -351,6 +352,7 @@ def plan_contexts(
                 variant=variant,
                 extension=style.extension,
                 seed=derive_seed(seed, "voicing", s.name),
+                mode=mode,
             )
     for s in sections:
         harmony = (s.parts or {}).get("harmony")
@@ -380,6 +382,7 @@ def plan_contexts(
                 next_energy=nxt.energy if nxt else None,
                 moments=planned.get(s.index, []),
                 lead=lead if (lead and s.name in lead_mod.LEAD_SECTIONS) else None,
+                tempo_feel=fp["tempo_feel"],
             )
         )
     return style, contexts, progressions

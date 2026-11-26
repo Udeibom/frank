@@ -22,13 +22,22 @@ DEFAULTS = {
     "brightness": 0.4,
     "warmth": 0.6,
     "genre_proximity": [],
-    "instrumentation_hints": [],
+         "instrumentation_hints": [],
 }
+
+TEMPO_FEELS = {"steady", "building", "floating", "driving"}
 
 
 def normalize(fingerprint: dict) -> dict:
     """Fill in missing fields with defaults and clamp numeric ranges to 0..1."""
-    fp = {**DEFAULTS, **(fingerprint or {})}
+    from app.services.generation.texture import PALETTES
+    from app.services.generation.theory import SCALE_INTERVALS, parse_key
+
+    raw = fingerprint or {}
+    fp = {**DEFAULTS, **raw}
+    unsupported = list(fp.get("unsupported_hints") or [])
+    if not isinstance(unsupported, list):
+        unsupported = []
 
     # Clamp the 0..1 feel parameters
     for k in ("energy_level", "density", "brightness", "warmth"):
@@ -51,10 +60,49 @@ def normalize(fingerprint: dict) -> dict:
     fp["tempo_bpm"] = max(50, min(180, fp["tempo_bpm"]))
 
     # Ensure key carries a mode the theory layer understands
-    if not fp.get("key"):
+    if not isinstance(fp.get("key"), str) or not fp["key"].strip():
+        if "key" in raw:
+            unsupported.append("key")
         fp["key"] = DEFAULTS["key"]
 
+    feel = fp.get("tempo_feel")
+    if feel not in TEMPO_FEELS:
+        if "tempo_feel" in raw and feel is not None:
+            unsupported.append(str(feel))
+        fp["tempo_feel"] = DEFAULTS["tempo_feel"]
+
+    _, key_mode = parse_key(fp["key"])
+    mode = fp.get("mode")
+    if "mode" in raw and mode in SCALE_INTERVALS:
+        pass
+    else:
+        if "mode" in raw and mode is not None and mode not in SCALE_INTERVALS:
+            unsupported.append(str(mode))
+        mode = key_mode
+    fp["mode"] = mode
+
+    palette = fp.get("texture_palette")
+    if palette is not None:
+        try:
+            palette = int(palette)
+            if not 0 <= palette < len(PALETTES):
+                raise ValueError
+        except (TypeError, ValueError):
+            unsupported.append("texture_palette")
+            palette = None
+    fp["texture_palette"] = palette
+    fp["unsupported_hints"] = _unique(unsupported)
+
     return fp
+
+
+def _unique(values: list) -> list:
+    """Keep the first mention of each unsupported hint."""
+    out: list = []
+    for value in values:
+        if value not in out:
+            out.append(value)
+    return out
 
 
 def _palette(fp: dict) -> int:
@@ -71,10 +119,13 @@ def texture_cache_key(fingerprint: dict) -> str:
     fp = normalize(fingerprint)
     relevant = {
         "key": fp["key"],
+        "mode": fp["mode"],
         "tempo_bpm": fp["tempo_bpm"],
         "tempo_feel": fp["tempo_feel"],
         "energy_level": round(fp["energy_level"], 2),
         "density": round(fp["density"], 2),
+        "warmth": round(fp["warmth"], 2),
+        "brightness": round(fp["brightness"], 2),
         # The sound family it plays on (core-path spec 15, 4.1): a different direction is a different file.
         "palette": _palette(fp),
     }

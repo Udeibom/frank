@@ -33,7 +33,8 @@ def finding(fid: str, sections: list[int]) -> dict:
     return {"id": fid, "plain": "Something.", "severity": "worth_a_look", "confidence": 0.7, "evidence": [], "sections": sections, "parts": []}
 
 
-FINDING_IDS = ["chorus_lift", "copy", "flat", "melody_wanders", "voice_buried", "voice_crowded", "too_quiet", "clipping", "too_loud"]
+FINDING_IDS = ["chorus_lift", "copy", "flat", "melody_wanders", "voice_buried", "voice_crowded", "too_quiet", "clipping", "too_loud",
+               "part_busy", "part_loud", "chorus_thin"]
 
 
 @st.composite
@@ -323,6 +324,11 @@ def test_the_propose_job_completes_with_the_findings(monkeypatch):
     async def mention(pid, key, note):
         return note
 
+    async def no_hear(*a, **k):
+        return None
+
+    monkeypatch.setattr(rr.ears, "hear", no_hear)
+    monkeypatch.setattr(rr.ears, "style_check", no_hear)
     monkeypatch.setattr(rr.jobs_db, "mark_processing", nothing)
     monkeypatch.setattr(rr.jobs_db, "mark_complete", complete)
     monkeypatch.setattr(rr.jobs_db, "mark_failed", fail)
@@ -338,3 +344,63 @@ def test_the_propose_job_completes_with_the_findings(monkeypatch):
         {"title": "Leave the tune out", "plain": "x", "kind": "beat", "actions": [{"op": "remove_part", "part": "melody", "section": [2]}]}]})
     asyncio.run(rr.run_propose_job("job", "proj", "the chorus doesn't hit"))
     assert done["proposal_id"] == "p1" and isinstance(done["findings"], list) and 2 <= len(done["directions"]) <= 3
+
+
+def test_basis_fingerprint_covers_every_active_layer():
+    from app.services.jobs import refine_runner as rr
+
+    b1 = {"beat_id": "b1", "mix_id": "m1", "vocal_id": None, "comp_id": None}
+    b2 = {**b1, "mix_id": "m2"}
+    b3 = {**b1, "vocal_id": "take1"}
+    b4 = {**b1, "comp_id": "comp1"}
+    assert rr.basis_fingerprint(b1) != rr.basis_fingerprint(b2)
+    assert rr.basis_fingerprint(b1) != rr.basis_fingerprint(b3)
+    assert rr.basis_fingerprint(b1) != rr.basis_fingerprint(b4)
+    assert rr.basis_fingerprint(b1) == rr.basis_fingerprint({**b1})
+
+
+def test_stale_proposals_include_mix_and_voice_changes():
+    from app.services.jobs import refine_runner as rr
+
+    basis = {"beat_id": "b1", "mix_id": "m1", "vocal_id": "take1", "comp_id": None}
+    row = {"based_on": {"beat": "b1", "mix": "m1", "key": rr.basis_fingerprint(basis)}}
+    assert not rr.is_stale(basis, row)
+    assert rr.is_stale({**basis, "mix_id": "m2"}, row)
+    assert rr.is_stale({**basis, "vocal_id": "take2"}, row)
+    old = {"based_on": {"beat": "b1", "mix": "m1"}}
+    assert not rr.is_stale(basis, old)
+
+
+def test_ready_directions_are_linked_to_the_finding_they_address():
+    sections = plan()
+    found = {"findings": [finding("chorus_lift", [1, 2])]}
+    _, dirs, experiment = propose.propose(None, found, sections, SEED, None, False, use_model=False, fp=FP)
+    assert not experiment and dirs
+    for d in dirs:
+        assert d.addresses == ["chorus_lift"]
+        assert d.source == "listener"
+        assert d.targets and set(d.targets) <= {1, 2}
+        assert d.expectation and d.expectation["finding"] == "chorus_lift"
+
+
+def test_experiments_are_marked_as_experiments():
+    _, dirs, experiment = propose.propose(None, {"findings": []}, plan(), SEED, MIX, True, use_model=False, fp=FP)
+    assert experiment and dirs
+    assert all(d.source == "experiment" and d.addresses == [] for d in dirs)
+
+
+def test_preview_scores_survive_a_direction_round_trip():
+    d = Direction(title="A", plain="b", kind="beat", actions=[{"op": "bigger", "section": 2}],
+                  made_well={"plain": "That felt closer."}, quality={"plain": "It stayed clean."})
+    assert Direction.model_validate(d.model_dump()).quality == d.quality
+    assert Direction.model_validate(d.model_dump()).made_well == d.made_well
+
+
+def test_only_confirmed_critic_notes_can_steer_a_direction():
+    found = {"findings": [], "heard": {"notes": [
+        {"tag": "chorus_lift", "plain": "I think the chorus could lift.", "confirmed": True, "confidence": 0.8, "sections": [1, 2]},
+        {"tag": "flat", "plain": "I think it feels the same all through.", "confirmed": False, "confidence": 0.9},
+    ]}}
+    _, dirs, experiment = propose.propose(None, found, plan(), SEED, None, False, use_model=False, fp=FP)
+    assert not experiment and dirs
+    assert all(d.addresses == ["chorus_lift"] for d in dirs)

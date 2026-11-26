@@ -61,10 +61,12 @@ def facts_from(sections: list) -> list[Facts]:
 KIND_ORDER = ["verse", "chorus", "bridge", "outro", "pre-chorus", "intro"]
 
 
-def _colour(seed: int, name: str, warm: bool) -> int:
+def _colour(seed: int, name: str, tone_score: float) -> int:
     """A sound for this kind of section. Different kinds of section get different sounds."""
-    pool = WARM_COLOURS if warm else BRIGHT_COLOURS
-    start = rng_for(seed, "colour").randrange(len(pool))
+    rng = rng_for(seed, "colour", name)
+    warm_chance = max(0.1, min(0.9, 0.5 + tone_score * 0.5))
+    pool = WARM_COLOURS if rng.random() < warm_chance else BRIGHT_COLOURS
+    start = rng.randrange(len(pool))
     position = KIND_ORDER.index(name) if name in KIND_ORDER else len(KIND_ORDER)
     return pool[(start + position) % len(pool)]
 
@@ -83,7 +85,7 @@ def one_off_section(facts: list[Facts], seed: int) -> Optional[int]:
 
 def plan_moments(facts: list[Facts], seed: int, warmth: float, brightness: float) -> dict[int, list[Moment]]:
     """Moments for every section, keyed by section index."""
-    warm = warmth >= brightness
+    tone_score = warmth - brightness
     plan: dict[int, list[Moment]] = {f.index: [] for f in facts}
     special = one_off_section(facts, seed)
     last = facts[-1].index if facts else None
@@ -106,11 +108,11 @@ def plan_moments(facts: list[Facts], seed: int, warmth: float, brightness: float
         # A call-and-response sound that fills the gaps in the tune. A different sound for each kind of section.
         answer_chance = {"chorus": 0.9 if f.repeat >= 1 else 0.35, "verse": 0.5 if f.repeat >= 1 else 0.0, "bridge": 0.7}
         if f.bars >= 4 and rng.random() < answer_chance.get(f.name, 0.0):
-            moments.append(Moment("answer", program=_colour(seed, f.name, warm)))
+            moments.append(Moment("answer", program=_colour(seed, f.name, tone_score)))
 
         # A different voice in the places a song changes character.
         if f.name == "bridge":
-            taken = _colour(seed, "bridge", warm)
+            taken = _colour(seed, "bridge", tone_score)
             moments.append(Moment("swap_voice", parts=("keys",), program=rng.choice([k for k in KEYS_SWAPS if k != taken])))
         if (f.name == "chorus" and f.repeat >= 1) or f.name == "bridge":
             if rng.random() < 0.6:
@@ -126,7 +128,7 @@ def plan_moments(facts: list[Facts], seed: int, warmth: float, brightness: float
 
         # One sound that appears once in the whole song.
         if f.index == special:
-            moments.append(Moment("one_off", program=ONE_OFF_WARM if warm else ONE_OFF_BRIGHT))
+            moments.append(Moment("one_off", program=ONE_OFF_WARM if tone_score >= -0.05 else ONE_OFF_BRIGHT))
 
         # Every song ends on purpose.
         if f.index == last:

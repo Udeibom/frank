@@ -325,11 +325,16 @@ export default function MixRoomPage() {
   return (
     <div className="flex h-full">
       <div className="flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-ink-2" />
-          <h1 className="font-written italic text-3xl leading-tight text-ink">Blend</h1>
-          <span className="text-sm text-ink-3">Bring your voice and the music together</span>
+        {/* Room header — Stitch design */}
+        <div className="border-b border-line/50 pb-5">
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
+            <h1 className="text-xl font-bold text-ink">Blend</h1>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 05</span>
+          </div>
+          <p className="mt-1 text-sm text-ink-2">Bring your voice and the music together.</p>
         </div>
+
 
         <FrankNote aside={aside} answers={answers} problem={failed} busy={rendering}>
           {note}

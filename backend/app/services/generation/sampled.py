@@ -1,6 +1,6 @@
 """
-Recorded instruments (frankenstein spec 14, requirement 3.5): the piano and the string section are played from
-real recordings (Versilian Studios VSCO-2 CE, CC0) through sfizz, instead of the General MIDI SoundFont.
+Recorded instruments (frankenstein spec 14, requirement 3.5): the piano, strings, bass, harp, woodwinds and brass
+are played from real recordings (Versilian Studios VSCO-2 CE, CC0) through sfizz, instead of the SoundFont.
 
 `render(part, bpm, total_beats)` returns exactly what renderer.SynthSession.render returns (int16 stereo, the
 section plus the ringing tail), so the engine does not know which instrument played. Anything unexpected
@@ -11,6 +11,7 @@ sound never changes the mix balance the engine was tuned for. sfizz streams samp
 """
 from __future__ import annotations
 
+import io
 import logging
 import os
 import shutil
@@ -28,12 +29,26 @@ from app.config import get_settings
 log = logging.getLogger("frank.sampled")
 
 SAMPLE_RATE = 44100
-# part name -> (sfz file, General MIDI programs it may stand in for)
+PART_ALIASES = {"finale_keys": "keys", "finale_pad": "pad", "finale_bass": "bass",
+                "finale_strings": "strings", "accompaniment": "melody", "color": "melody",
+                "color_once": "melody"}
 INSTRUMENTS = {
-    "keys": ("VSUpright1.sfz", set(range(0, 4))),          # acoustic pianos only; electric pianos stay synthesised
-    "strings": ("ViolinEnsSusVib.sfz", set(range(48, 52))),  # string ensembles
+    "keys": {p: ("VSUpright1.sfz", "UprightPiano.sfz") for p in range(0, 4)},
+    "bass": {p: ("ContrabassSusVB.sfz",) for p in (32, 33, 34)},
+    "melody": {56: ("TrumpetSus.sfz",), 60: ("FHornSus.sfz",), 65: ("OboeSusVib.sfz",),
+               68: ("FHornSus.sfz",), 73: ("FluteSusVib.sfz",), 74: ("FluteSusVib.sfz",)},
+    "pad": {48: ("ViolinEnsSusVib.sfz",), 49: ("ViolaEnsSusVib.sfz", "ViolinEnsSusVib.sfz"),
+            89: ("ViolinEnsSusVib-Quiet.sfz", "ViolinEnsSusVib.sfz"),
+            90: ("ViolaEnsSusVib-Quiet.sfz", "ViolaEnsSusVib.sfz"),
+            91: ("ViolinEnsSusVib-Quiet.sfz", "ViolinEnsSusVib.sfz")},
+    "strings": {48: ("ViolinEnsSusVib.sfz",), 49: ("ViolaEnsSusVib.sfz", "ViolinEnsSusVib.sfz"),
+                50: ("CelloEnsSusVib.sfz", "ViolinEnsSusVib.sfz"),
+                51: ("ContrabassSusVB.sfz", "CelloEnsSusVib.sfz"),
+                52: ("ViolinEnsSusVib.sfz",)},
+    "arp": {10: ("Glockenspiel.sfz",), 11: ("Glockenspiel.sfz",), 12: ("Marimba.sfz",),
+            13: ("Xylophone.sfz",), 46: ("Harp.sfz",)},
 }
-ORGAN_FOR = {"keys": "samples", "strings": "samples"}
+ORGAN_FOR = {name: "samples" for name in INSTRUMENTS}
 
 
 def binary() -> Optional[str]:
@@ -49,19 +64,26 @@ def enabled() -> bool:
     return os.environ.get("SAMPLED_INSTRUMENTS", "on") != "off" and binary() is not None
 
 
+def canonical_part(name: str) -> str:
+    return PART_ALIASES.get(name, name)
+
+
 def instrument_for(part) -> Optional[Path]:
-    if part.is_drums or part.name not in INSTRUMENTS:
+    name = canonical_part(part.name)
+    table = INSTRUMENTS.get(name)
+    if part.is_drums or not table:
         return None
-    name, programs = INSTRUMENTS[part.name]
-    if part.preset not in programs:
+    names = table.get(int(part.preset))
+    if not names:
         return None
-    path = sfz_dir() / name
-    return path if path.exists() else None
+    for candidate in names:
+        path = sfz_dir() / candidate
+        if path.exists():
+            return path
+    return None
 
 
 def _midi(events: list[tuple[int, float, float, int]], bpm: float) -> bytes:
-    import io
-
     import mido
 
     tpb = 960
@@ -86,15 +108,21 @@ def _midi(events: list[tuple[int, float, float, int]], bpm: float) -> bytes:
     return buf.getvalue()
 
 
-def _run(sfz: Path, events: list[tuple[int, float, float, int]], bpm: float) -> np.ndarray:
-    """float32 (samples, 2) from sfizz_render."""
+@lru_cache(maxsize=16)
+def _render_bytes(sfz: str, midi: bytes, bpm: float) -> bytes:
     with tempfile.TemporaryDirectory(prefix="frank-sfz-") as d:
         mid, wav = Path(d) / "in.mid", Path(d) / "out.wav"
-        mid.write_bytes(_midi(events, bpm))
-        subprocess.run([binary(), "--sfz", str(sfz), "--midi", str(mid), "--wav", str(wav),
+        mid.write_bytes(midi)
+        subprocess.run([binary(), "--sfz", sfz, "--midi", str(mid), "--wav", str(wav),
                         "--samplerate", str(SAMPLE_RATE), "--quality", "2"],
                        capture_output=True, timeout=180, check=True)
-        audio, sr = sf.read(wav, dtype="float32", always_2d=True)
+        return wav.read_bytes()
+
+
+def _run(sfz: Path, events: list[tuple[int, float, float, int]], bpm: float) -> np.ndarray:
+    """float32 (samples, 2) from sfizz_render."""
+    wav_bytes = _render_bytes(str(sfz), _midi(events, bpm), bpm)
+    audio, sr = sf.read(io.BytesIO(wav_bytes), dtype="float32", always_2d=True)
     if audio.shape[1] == 1:
         audio = np.repeat(audio, 2, axis=1)
     return audio[:, :2]
@@ -109,7 +137,7 @@ def gain_for(part_name: str, preset: int) -> float:
     from app.services.generation.composer import NoteEvent, Part
     from app.services.generation.renderer import SynthSession
 
-    part = Part(part_name, preset, False, [NoteEvent(n, s, d, v) for n, s, d, v in CAL_CHORD])
+    part = Part(canonical_part(part_name), preset, False, [NoteEvent(n, s, d, v) for n, s, d, v in CAL_CHORD])
     with SynthSession(sampled=False) as synth:
         ref = synth.render(part, 90.0, 8.0).astype(np.float32)
     rec = _run(instrument_for(part), CAL_CHORD, 90.0) * 32767.0

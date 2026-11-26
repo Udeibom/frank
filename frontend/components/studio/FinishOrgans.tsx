@@ -55,7 +55,7 @@ export function MatchedFinish({ projectId, mixVersionId, frankUrl }: { projectId
             }}
           >
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find free music by feeling" aria-label="Find free music" className="min-w-0 flex-1 rounded-md border border-line bg-raised px-3 py-1.5 text-sm text-ink" />
-            <button className="rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3">Find</button>
+            <button type="submit" className="rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3">Find</button>
           </form>
           {tracks.length > 0 && (
             <ul className="flex flex-col gap-1 text-sm">

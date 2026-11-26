@@ -43,7 +43,8 @@ fingerprints = st.fixed_dictionaries(
 
 
 def prog_for(fp: dict, seed: int = 0, variant: int = 0) -> dict:
-    return theory.build_progression(fp["key"], fp["energy_level"], fp["tempo_feel"], variant=variant, seed=seed)
+    return theory.build_progression(fp["key"], fp["energy_level"], fp["tempo_feel"], variant=variant, seed=seed,
+                                    mode=fp.get("mode"))
 
 
 def events_of(parts) -> list:
@@ -54,7 +55,8 @@ def compose(name: str, fp: dict, seed: int, index: int = 0, repeat: int = 0, fin
             density: float | None = None, next_name: str | None = None, layers: list[str] | None = None):
     f = fp_utils.normalize(fp)
     ctx = composer.SectionContext(name=name, index=index, repeat=repeat, final=final, seed=seed,
-                                  style=pick_style(f), next_name=next_name)
+                                   style=pick_style(f), next_name=next_name, tempo_feel=f["tempo_feel"])
+
     return composer.compose_section(
         name, prog_for(f, seed), bars, f["energy_level"], f["density"] if density is None else density,
         layers=layers, ctx=ctx,
@@ -141,6 +143,34 @@ def test_genre_and_instrument_words_change_the_music():
     hinted = events_of(compose("verse", {**BASE_FP, "instrumentation_hints": ["guitar"]}, 5))
     assert base != other
     assert base != hinted
+
+
+def test_mode_and_tempo_feel_change_the_score_not_just_the_tone():
+    base = fp_utils.normalize({"key": "C major", "energy_level": 0.5, "tempo_feel": "steady"})
+    dorian = fp_utils.normalize({**base, "mode": "dorian"})
+    mixolydian = fp_utils.normalize({**base, "mode": "mixolydian"})
+    building = fp_utils.normalize({**base, "tempo_feel": "building"})
+    assert prog_for(base)["family"] == "major_warm"
+    assert prog_for(dorian)["family"] == "dorian_warm"
+    assert prog_for(mixolydian)["family"] == "mixolydian_warm"
+    assert prog_for(building)["family"] == "major_building"
+    assert prog_for(dorian)["scale"] != prog_for(base)["scale"]
+
+
+def test_bass_vocabulary_tracks_style_and_feel():
+    base = {"genre_proximity": ["soul"], "energy_level": 0.6, "density": 0.6}
+    steady = events_of(compose("verse", {**base, "tempo_feel": "steady"}, 5, layers=["bass"]))
+    driving = events_of(compose("verse", {**base, "tempo_feel": "driving"}, 5, layers=["bass"]))
+    rock = events_of(compose("verse", {**base, "genre_proximity": ["rock"]}, 5, layers=["bass"]))
+    assert steady and steady != driving
+    assert steady != rock
+
+
+def test_warmth_and_brightness_change_continuous_music_choices():
+    fixed = {**BASE_FP, "genre_proximity": ["soul"], "brightness": 0.4}
+    mild = events_of(compose("verse", {**fixed, "warmth": 0.6}, 5))
+    warmer = events_of(compose("verse", {**fixed, "warmth": 0.9}, 5))
+    assert mild != warmer
 
 
 def test_words_frank_cannot_act_on_are_reported():

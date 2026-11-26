@@ -30,15 +30,20 @@ export function isTransientPollError(err: unknown): boolean {
 export async function pollJob(
   jobId: string,
   onProgress?: (status: JobStatusResponse) => void,
+  signal?: AbortSignal,
 ): Promise<JobStatusResponse> {
   const started = Date.now()
   let consecutiveErrors = 0
   const watch = typeof window !== "undefined" ? watchJob(jobId) : null
   try {
-    return await pollLoop(jobId, started, watch, onProgress, () => consecutiveErrors, (n) => (consecutiveErrors = n))
+    return await pollLoop(jobId, started, watch, onProgress, () => consecutiveErrors, (n) => (consecutiveErrors = n), signal)
   } finally {
     watch?.close()
   }
+}
+
+export function cancelJob(jobId: string): Promise<{ cancelled: boolean }> {
+  return api.post(`/jobs/${jobId}/cancel`)
 }
 
 async function pollLoop(
@@ -48,12 +53,13 @@ async function pollLoop(
   onProgress: ((status: JobStatusResponse) => void) | undefined,
   errors: () => number,
   setErrors: (n: number) => void,
+  signal?: AbortSignal,
 ): Promise<JobStatusResponse> {
   let consecutiveErrors = errors()
   while (Date.now() - started < MAX_WAIT_MS) {
-    // A live update wakes us at once; otherwise poll (more slowly while the live connection is up).
+    if (signal?.aborted) throw new Error("You stopped that one. Nothing was lost.")
     const delay = pollDelay(Date.now() - started) * (watch?.live() ? LIVE_SLOWDOWN : 1)
-    await (watch ? Promise.race([sleep(delay), watch.next()]) : sleep(delay))
+    await (watch ? Promise.race([sleep(delay, signal), watch.next()]) : sleep(delay, signal))
 
     let status: JobStatusResponse
     try {
@@ -86,6 +92,17 @@ export function pollDelay(elapsedMs: number): number {
   return elapsedMs < FAST_PHASE_MS ? FAST_POLL_MS : SLOW_POLL_MS
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error("You stopped that one. Nothing was lost."))
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort)
+      resolve()
+    }, ms)
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(new Error("You stopped that one. Nothing was lost."))
+    }
+    signal?.addEventListener("abort", onAbort, { once: true })
+  })
 }

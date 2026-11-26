@@ -8,9 +8,12 @@ played: a touch early or late, and how hard, the way the drummers in the dataset
 from __future__ import annotations
 
 import json
+import random
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
+
+from app.config import get_settings
 
 PATH = Path(__file__).resolve().parent / "styles" / "grooves.json"
 MIN_RECORDINGS = 20
@@ -36,6 +39,61 @@ def for_style(name: str) -> Optional[dict]:
     zero = lanes.get("kick", {}).get("offset", [0.0])[0]
     return {lane: {"offset": [o - zero for o in row["offset"]], "spread": row["spread"], "accent": row["accent"]}
             for lane, row in lanes.items()}
+
+
+def _pattern(row: dict) -> dict[str, str]:
+    out = {}
+    for lane in ("kick", "snare", "hat", "open", "ghost"):
+        raw = str(row.get(lane, ""))
+        out[lane] = "".join(ch if ch in "xog." else "." for ch in raw)[:16].ljust(16, ".")
+    return out
+
+
+def patterns_for_style(name: str) -> dict[str, dict[str, str]]:
+    entry = _table().get(name)
+    if not entry or entry.get("recordings", 0) < MIN_RECORDINGS:
+        entry = _table().get("_default")
+    if not entry:
+        return {}
+    patterns = entry.get("patterns") or {}
+    natural = patterns.get("natural") if isinstance(patterns, dict) else {}
+    if not isinstance(natural, dict) or not natural:
+        return {}
+    section = natural.get("all")
+    if isinstance(section, dict):
+        return {"all": _pattern(section)}
+    return {key: _pattern(value) for key, value in natural.items() if isinstance(value, dict)}
+
+
+def pick_pattern(name: str, section: Optional[str] = None, rng=None) -> Optional[dict[str, str]]:
+    patterns = patterns_for_style(name)
+    if not patterns:
+        return None
+    row = patterns.get(section or "") or patterns.get("all")
+    if isinstance(row, list):
+        row = (rng or random).choice(row)
+    if not isinstance(row, dict):
+        return None
+    return _pattern(row)
+
+
+def humanize(lanes: dict[str, str], style: str, feel: int, seed: int) -> Optional[dict[str, dict[str, list[float]]]]:
+    settings = get_settings()
+    if not settings.groove_humanizer_enabled or not lanes:
+        return None
+    try:
+        from app.services.remote import organs
+
+        raw = organs.groove_humanize(lanes, style, feel, seed, timeout=settings.groove_humanizer_timeout_s)
+    except Exception:
+        return None
+    out = {}
+    for lane, row in (raw.get("lanes") or {}).items():
+        offsets = [max(-0.06, min(0.06, float(v))) for v in row.get("offset", [])]
+        accents = [max(0.7, min(1.4, float(v))) for v in row.get("accent", [])]
+        if len(offsets) == 16 and len(accents) == 16:
+            out[lane] = {"offset": offsets, "accent": accents}
+    return out or None
 
 
 def shape(groove: Optional[dict], lane: str, step: int, feel: int, rng, swung: bool) -> tuple[float, float]:

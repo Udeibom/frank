@@ -11,6 +11,8 @@ from __future__ import annotations
 from app.services import provenance
 
 import asyncio
+import hashlib
+import json
 import logging
 import os
 import subprocess
@@ -29,6 +31,7 @@ from app.services.generation import ops as ops_mod
 from app.services.generation.renderer import SAMPLE_RATE, to_mp3_bytes
 from app.services.jobs.heavy import HEAVY, log_memory
 from app.services.jobs.listen_runner import _progress
+from app.services.listener import ears
 from app.services.listener import findings as findings_mod
 from app.services.listener import project as listen_project
 from app.services.refine import propose as propose_mod
@@ -48,6 +51,7 @@ async def load_basis(project_id: str) -> dict[str, Any]:
 
     state = await projects_db.get_project_active_state(project_id) or {}
     basis: dict[str, Any] = {"beat_id": state.get("active_beat_version_id"), "mix_id": state.get("active_mix_id"),
+                             "vocal_id": state.get("active_vocal_id"), "comp_id": state.get("active_comp_id"),
                              "sections": [], "seed": 0, "fp": {}, "lead": None, "mix_params": None, "beat": None}
     if basis["beat_id"]:
         try:
@@ -65,6 +69,42 @@ async def load_basis(project_id: str) -> dict[str, Any]:
     return basis
 
 
+def basis_fingerprint(basis: dict[str, Any]) -> str:
+    from app.services.generation import beat as beat_mod
+    from app.services.listener import service as listener_service
+
+    relevant = {
+        "beat": basis.get("beat_id"),
+        "mix": basis.get("mix_id"),
+        "vocal": basis.get("vocal_id"),
+        "comp": basis.get("comp_id"),
+        "engine": getattr(beat_mod, "ENGINE_VERSION", None),
+        "listener": getattr(listener_service, "LISTENER_VERSION", None),
+        "refine": 1,
+    }
+    raw = json.dumps(relevant, sort_keys=True, default=str).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
+def is_stale(basis: dict[str, Any], row: dict[str, Any]) -> bool:
+    based_on = row.get("based_on") or {}
+    if based_on.get("beat") != basis.get("beat_id"):
+        return True
+    if based_on.get("mix") != basis.get("mix_id"):
+        return True
+    key = based_on.get("key")
+    return bool(key) and key != basis_fingerprint(basis)
+
+
+def proposal_idempotency_key(project_id: str, concern: Optional[str], basis: dict[str, Any], room: str = "beat") -> str:
+    raw = f"{project_id}|{room}|{concern or ''}|{basis_fingerprint(basis)}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:20]
+
+
+def preview_idempotency_key(proposal_id: str, n: int, basis: dict[str, Any]) -> str:
+    return f"refine-preview:{proposal_id}:{n}:{basis_fingerprint(basis)}"
+
+
 async def _prefs(project_id: str) -> dict[str, int]:
     try:
         from app.services.taste.signals import preference_map
@@ -74,7 +114,7 @@ async def _prefs(project_id: str) -> dict[str, int]:
         return {}
 
 
-async def run_propose_job(job_id: str, project_id: str, concern: Optional[str]) -> None:
+async def run_propose_job(job_id: str, project_id: str, concern: Optional[str], room: str = "beat") -> None:
     try:
         await jobs_db.mark_processing(job_id)
 
@@ -85,9 +125,18 @@ async def run_propose_job(job_id: str, project_id: str, concern: Optional[str]) 
         await say("Waiting for my ears to be free...")
         async with HEAVY:
             report = await listen_project.measure_song(project_id, None, progress=say)
-        found = findings_mod.find_issues(report, concern).model_dump()
+        issues = findings_mod.find_issues(report, concern)
+        found = issues.model_dump()
+        heard = await ears.hear(project_id, report, issues, None, concern)
+        found["heard"] = heard
+        style = await ears.style_check(project_id)
+        if style:
+            found["style"] = style
+            if style.get("finding"):
+                found["findings"].append(style["finding"])
         await say("Thinking of a few ways to go...")
         basis = await load_basis(project_id)
+        key = basis_fingerprint(basis)
         message, directions, experiment = await asyncio.to_thread(
             propose_mod.propose, concern, found, basis["sections"], basis["seed"], basis["mix_params"], basis["lead"] is not None,
             True, basis["fp"] or None, basis["lead"], await _prefs(project_id),
@@ -108,7 +157,10 @@ async def run_propose_job(job_id: str, project_id: str, concern: Optional[str]) 
         row = await asyncio.to_thread(refine_db.insert_proposal, {
             "project_id": project_id, "concern": concern, "findings": found, "experiment": experiment,
             "directions": [d.model_dump() for d in directions],
-            "based_on": {"beat": basis["beat_id"], "mix": basis["mix_id"]},
+            "based_on": {"beat": basis["beat_id"], "mix": basis["mix_id"],
+                         "vocal": basis.get("vocal_id"), "comp": basis.get("comp_id"), "key": key},
+            "basis_key": key,
+            "idempotency_key": proposal_idempotency_key(project_id, concern, basis, room),
         })
         await jobs_db.mark_complete(job_id, {
             "proposal_id": row["id"], "message": message, "experiment": experiment,
@@ -216,6 +268,34 @@ def score_change(before_url: Optional[str], after_url: Optional[str]) -> Optiona
     return {"before": b["made_well"], "after": a["made_well"], "plain": made_well_words(b["made_well"], a["made_well"])}
 
 
+def local_quality_check(before_url: Optional[str], after_url: Optional[str]) -> Optional[dict]:
+    from app.services.listener import dsp, service as listener_service
+    from app.services.storage.signing import fetch_audio_bytes
+
+    if not before_url or not after_url:
+        return None
+    try:
+        before = listener_service.decode(fetch_audio_bytes(before_url))
+        after = listener_service.decode(fetch_audio_bytes(after_url))
+    except Exception:  # noqa: BLE001
+        return None
+    lb, la = dsp.loudness(before, listener_service.LISTEN_SR), dsp.loudness(after, listener_service.LISTEN_SR)
+    pb, pa = dsp.peak_db(before), dsp.peak_db(after)
+    if lb is None or la is None:
+        return None
+    delta = la - lb
+    if delta >= 1.0:
+        plain = "This one comes through more strongly than the song as it is now."
+    elif delta <= -1.0:
+        plain = "This one sits further back than the song as it is now."
+    else:
+        plain = "This one sits at about the same level as the song as it is now."
+    return {
+        "loudness_before": round(lb, 2), "loudness_after": round(la, 2),
+        "loudness_delta": round(delta, 2), "peak_before": pb, "peak_after": pa, "plain": plain,
+    }
+
+
 async def run_preview_job(job_id: str, project_id: str, proposal_id: str, n: int) -> None:
     from app.routers.mix import apply_actions
     from app.services.jobs import mix_runner
@@ -231,8 +311,7 @@ async def run_preview_job(job_id: str, project_id: str, proposal_id: str, n: int
             await jobs_db.mark_complete(job_id, {"n": n, "preview_url": d.preview_url, "before_url": d.before_url})
             return
         basis = await load_basis(project_id)
-        stale = (d.kind == "beat" and basis["beat_id"] != (row.get("based_on") or {}).get("beat"))
-        if stale:
+        if is_stale(basis, row):
             await jobs_db.mark_failed(job_id, "The song has changed since I suggested these. Ask me again and I'll listen fresh.")
             return
         await _progress(job_id, "Playing it the new way..." if d.kind == "beat" else "Mixing it the new way...")
@@ -250,6 +329,9 @@ async def run_preview_job(job_id: str, project_id: str, proposal_id: str, n: int
         if made_well:
             urls["made_well"] = made_well
             await asyncio.to_thread(provenance.note, project_id, "refine", proposal_id, "aesthetics")
+        quality = await asyncio.to_thread(local_quality_check, urls.get("before_url"), urls.get("preview_url"))
+        if quality:
+            urls["quality"] = quality
         await asyncio.to_thread(refine_db.update_direction, proposal_id, n, urls)
         await jobs_db.mark_complete(job_id, {"n": n, **urls})
     except Exception as exc:  # noqa: BLE001

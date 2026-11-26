@@ -84,6 +84,7 @@ class SectionContext:
     moments: list = field(default_factory=list)   # planned one-off moments for this section (moments.py)
     lead: Any = None                               # the person's own tune (lead.Lead), when this section plays it
     parts: dict = field(default_factory=dict)      # per-part edits from the plan (SectionPlan.parts)
+    tempo_feel: str = "steady"                     # how the fingerprint says the song moves
 
 
 # ─────────────────────────────────────────────
@@ -147,6 +148,14 @@ def _bass_pitch(kind: str, root: int, tones: list[int], next_root: int, scale_pc
     if kind in ("third", "fifth"):
         pc = tones[1] if kind == "third" else tones[2]
         return root + ((pc - root) % 12)
+    if kind == "seventh":
+        pc = tones[3] if len(tones) > 3 else tones[2]
+        return root + ((pc - root) % 12)
+    if kind == "passing":
+        for step in (1, 2):
+            if (root + step) % 12 in scale_pcs:
+                return root + step
+        return root + 1
     if kind == "approach":
         direction = rng.choice([-1, 1])
         for _ in range(3):
@@ -157,6 +166,36 @@ def _bass_pitch(kind: str, root: int, tones: list[int], next_root: int, scale_pc
     return root
 
 
+def _bass_pattern(style: str, pattern: list, tempo_feel: str) -> list[tuple[float, str, float]]:
+    out = [[float(beat), kind, float(dur)] for beat, kind, dur in pattern]
+    if style in ("soul", "gospel", "lofi", "hiphop"):
+        for step in out:
+            if step[1] == "fifth":
+                step[1] = "third"
+    elif style in ("rock", "electronic"):
+        for step in out:
+            if step[1] == "approach":
+                step[1] = "passing"
+
+    if tempo_feel == "floating":
+        out = [step for step in out if step[1] != "approach"]
+        out.append([3.5, "passing", 0.6])
+        for step in out:
+            step[2] *= 1.2
+    elif tempo_feel == "building":
+        for step in out:
+            if step[1] == "approach":
+                step[1] = "seventh"
+        if not any(step[1] == "seventh" for step in out):
+            out.append([3.25, "seventh", 0.45])
+    elif tempo_feel == "driving":
+        for step in out:
+            if step[1] == "fifth":
+                step[1] = "octave"
+        out.append([3.5, "octave", 0.35])
+    return [(beat, kind, dur) for beat, kind, dur in out]
+
+
 def compose_bass(progression: dict, bars: int, energy: float, density: float, ctx: Optional[SectionContext] = None) -> Part:
     """Bass: follows each chord and steps toward the next one. Busier with higher density."""
     ctx = ctx or SectionContext()
@@ -164,7 +203,7 @@ def compose_bass(progression: dict, bars: int, energy: float, density: float, ct
     roots = progression["bass_notes"]
     tones = progression["tones"]
     scale_pcs = {(progression["root"] + i) % 12 for i in theory.SCALE_INTERVALS[progression["mode"]]}
-    pattern = ctx.style.bass[_tier(density)]
+    pattern = _bass_pattern(ctx.style.name, ctx.style.bass[_tier(density)], ctx.tempo_feel)
     rng = rng_for(ctx.seed, ctx.index, "bass")
 
     for bar in range(bars):
@@ -223,10 +262,6 @@ def compose_drums(bars: int, energy: float, density: float, ctx: Optional[Sectio
     style = ctx.style
     d = style.drums
     half = energy < style.half_time_below
-    kick = _lane(d["half_kick"] if half else d["kick"])
-    snare = _lane(d["half_snare"] if half else d["snare"])
-    hat = _lane(d["half_hat"] if half else d["hat"])
-    ghost = _lane(d["ghost"]) if (density >= 0.55 and not half) else []
     rng = rng_for(ctx.seed, ctx.index, "drums")
     gain = style.drum_gain
     part = Part("drums", 0, True)
@@ -239,12 +274,41 @@ def compose_drums(bars: int, energy: float, density: float, ctx: Optional[Sectio
     feel = int((ctx.parts.get("drums") or {}).get("feel", 0))
     feel_rng = rng_for(ctx.seed, ctx.index, "drum-feel")
     swung = style.swing > 0.2
+    if not half and not style.own_groove:
+        pattern = grooves.pick_pattern(style.name, ctx.name, rng_for(ctx.seed, ctx.index, "groove-pattern"))
+        if pattern:
+            d = dict(d)
+            if pattern["kick"].strip("."):
+                d["kick"] = pattern["kick"]
+            if pattern["snare"].strip("."):
+                d["snare"] = pattern["snare"]
+            if pattern["ghost"].strip("."):
+                d["ghost"] = pattern["ghost"]
+            hat = list(pattern["hat"])
+            for i, ch in enumerate(pattern["open"]):
+                if ch != ".":
+                    hat[i] = "o"
+            if "".join(hat).strip("."):
+                d["hat"] = "".join(hat)
+
+    kick = _lane(d["half_kick"] if half else d["kick"])
+    snare = _lane(d["half_snare"] if half else d["snare"])
+    hat = _lane(d["half_hat"] if half else d["hat"])
+    ghost = _lane(d["ghost"]) if (density >= 0.55 and not half) else []
+    humanized = None
+    if not style.own_groove:
+        humanized = grooves.humanize({key: d[key] for key in ("kick", "snare", "hat", "ghost") if d.get(key)},
+                                     style.name, feel, ctx.seed + ctx.index * 17)
 
     def add(note: int, step_or_beat: float, vel: float, spread: float = 5.0, dur: float = 0.2, jitter: float = 0.0,
             lane: Optional[str] = None, step: Optional[int] = None) -> None:
         shift, accent = grooves.shape(groove, lane, step, feel, feel_rng, swung) if lane is not None else (0.0, 1.0)
         if lane is not None:
             jitter = 0.0                       # the drummers' own spread replaces the generic wobble
+            row = (humanized or {}).get(lane)
+            if row and step is not None:
+                shift += row["offset"][step % 16]
+                accent *= row["accent"][step % 16]
         part.events.append(NoteEvent(note, max(0.0, step_or_beat + shift + (rng.uniform(-jitter, jitter) if jitter else 0.0)),
                                      dur, _vel(rng, min(127, vel * gain * accent), spread)))
 

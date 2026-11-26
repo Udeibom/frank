@@ -13,7 +13,10 @@ mix_params shape (stored on each mix version):
   "harmony_enabled": true,
   "vocal_effects": ["warm", "space"],     # plain-language effect ids
   "beat_effects": ["clean_low"],
-  "section_gain_db": { "chorus": 1.5 }     # per-section-name beat adjustments
+  "section_gain_db": { "chorus": 1.5 },    # per-section-name beat adjustments
+  "parts": { "keys": { "level_db": -2.0, "sections": { "2": 1.0 }, "space_amount": 0.2 } },
+  "interactions": { "vocal:keys": 0.3 },   # a loud voice gently clears the keys
+  "drum_bus": { "on": true, "glue": 0.35 }
 }
 
 All CPU. Mixing holds a few full-length float buffers in memory, so it runs in a
@@ -33,6 +36,7 @@ from pedalboard import (
     LowShelfFilter,
     HighShelfFilter,
     Gain,
+    Limiter,
 )
 
 SR = 44100
@@ -67,11 +71,22 @@ def _space(kind: str, amount: float):
     return studio.space(kind, amount)
 
 
-def _vocal_effect_board(effect_ids: list[str]) -> Pedalboard:
+def _unit(value, default: float) -> float:
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not np.isfinite(amount):
+        return default
+    return max(0.0, min(1.0, amount))
+
+
+def _vocal_effect_board(effect_ids: list[str], space_amount: float = 0.18) -> Pedalboard:
     plugins = []
     for eid in effect_ids:
         if eid == "space":          # "add a little space": a studio plate when installed (frankenstein spec 14, 3.6)
-            plugins.append(_space("plate", 0.18) or Reverb(room_size=0.35, wet_level=0.18, dry_level=0.85))
+            amount = _unit(space_amount, 0.18)
+            plugins.append(_space("plate", amount) or Reverb(room_size=0.35, wet_level=amount, dry_level=0.85))
         elif eid == "warm":         # "warm it up"
             plugins.append(LowShelfFilter(cutoff_frequency_hz=200, gain_db=2.5))
             plugins.append(Compressor(threshold_db=-18, ratio=2.0))
@@ -102,36 +117,91 @@ def _apply(board: Pedalboard, audio: np.ndarray) -> np.ndarray:
     return board(audio, SR)
 
 
+def _section_spans(sections: list[dict], bpm: float) -> list[tuple[int, int]]:
+    spans = []
+    beats = 0.0
+    seconds_per_beat = 60.0 / max(float(bpm), 1.0)
+    for section in sections:
+        start = int(round(beats * seconds_per_beat * SR))
+        beats += float(section.get("bars", 4)) * 4.0
+        end = int(round(beats * seconds_per_beat * SR))
+        spans.append((start, end))
+    return spans
+
+
 def _apply_section_gains(
-    beat: np.ndarray,
+    audio: np.ndarray,
     section_gain_db: dict,
     sections: list[dict],
-    bpm: int,
+    bpm: float,
+    per_index_db: dict | None = None,
 ) -> np.ndarray:
-    """
-    Apply per-section gain to the beat by time-windowing. Sections are laid out
-    in order; each is `bars` long at `bpm` (4 beats per bar). We know the
-    boundaries by construction (the engine built them), so no detection is
-    needed. A gain named by section type (e.g. "chorus") applies to every
-    section of that type.
-    """
-    if not section_gain_db or not sections:
-        return beat
+    by_name = section_gain_db or {}
+    by_index = per_index_db or {}
+    if not sections or (not by_name and not by_index):
+        return audio
+    spans = _section_spans(sections, bpm)
+    length = audio.shape[1]
+    gains = np.ones(length, dtype=np.float32)
+    for i, (start, end) in enumerate(spans):
+        end = min(end, length)
+        if start >= end:
+            continue
+        value = by_index.get(str(i), by_index.get(i))
+        if value is None:
+            section = sections[i]
+            value = by_name.get(section.get("name"))
+            if value is None:
+                value = by_name.get(section.get("label"))
+        if value is None:
+            continue
+        try:
+            db = float(value)
+        except (TypeError, ValueError):
+            continue
+        if not np.isfinite(db):
+            continue
+        gains[start:end] = _db_to_linear(max(-24.0, min(12.0, db)))
+    fade = min(int(0.012 * SR), max(0, length // 8))
+    if fade > 1:
+        for boundary in (span[0] for span in spans[1:]):
+            if boundary >= length:
+                continue
+            lo, hi = max(0, boundary - fade), min(length, boundary + fade)
+            if lo < hi:
+                left = gains[lo] if lo < boundary else gains[boundary - 1]
+                right = gains[hi - 1] if hi > boundary else gains[boundary]
+                gains[lo:hi] = np.linspace(left, right, hi - lo, dtype=np.float32)
+    out = audio.copy()
+    out *= gains[None, :]
+    return out
 
-    samples_per_beat = SR * 60.0 / max(bpm, 1)
-    cursor = 0
-    for s in sections:
-        bars = int(s.get("bars", 4))
-        length = int(bars * 4 * samples_per_beat)
-        name = s.get("name", "")
-        gain_db = section_gain_db.get(name)
-        if gain_db:
-            end = min(cursor + length, beat.shape[1])
-            beat[:, cursor:end] *= _db_to_linear(float(gain_db))
-        cursor += length
-        if cursor >= beat.shape[1]:
-            break
-    return beat
+
+def _duck(audio: np.ndarray, key: np.ndarray, amount: float) -> np.ndarray:
+    amount = _unit(amount, 0.0) * 0.85
+    if amount <= 0.0 or key.shape[1] == 0 or audio.shape[1] == 0:
+        return audio
+    window = max(1, int(0.03 * SR))
+    mono = np.mean(np.abs(key[:, : audio.shape[1]]), axis=0) if key.shape[1] >= audio.shape[1] else np.mean(np.abs(key), axis=0)
+    padded = np.pad(mono, (window // 2, window - window // 2))
+    cumulative = np.cumsum(padded, dtype=np.float64)
+    envelope = (cumulative[window:] - cumulative[:-window]) / window
+    peak = float(envelope.max()) if envelope.size else 0.0
+    if peak <= 1e-9:
+        return audio
+    gains = 1.0 - amount * (envelope / peak)
+    n = min(audio.shape[1], gains.size)
+    out = audio.copy()
+    out[:, :n] *= gains[:n][None, :]
+    return out
+
+
+def _drum_bus_board(glue: float) -> Pedalboard:
+    glue = _unit(glue, 0.35)
+    plugins = [Compressor(threshold_db=-22.0, ratio=1.0 + glue * 2.5, attack_ms=12.0, release_ms=160.0)]
+    if glue > 0.65:
+        plugins.append(Limiter(threshold_db=-1.0))
+    return Pedalboard(plugins)
 
 
 PART_TONES = ("warmer", "brighter", "clearer")
@@ -149,24 +219,10 @@ def _part_board(settings: dict) -> Pedalboard:
     elif tone == "clearer":
         plugins.append(HighpassFilter(cutoff_frequency_hz=120))
         plugins.append(HighShelfFilter(cutoff_frequency_hz=3500, gain_db=1.5))
-    if settings.get("space"):
-        plugins.append(_space("room", 0.2) or Reverb(room_size=0.45, wet_level=0.2, dry_level=0.9))
+    if settings.get("space") or settings.get("space_amount"):
+        amount = _unit(settings.get("space_amount", 0.2), 0.2)
+        plugins.append(_space("room", amount) or Reverb(room_size=0.45, wet_level=amount, dry_level=0.9))
     return Pedalboard(plugins)
-
-
-def _section_index_gains(audio: np.ndarray, per_index_db: dict, sections: list[dict], bpm: int) -> np.ndarray:
-    """Per-section level for ONE part ("bring the piano down in the bridge"), by section position."""
-    if not per_index_db or not sections:
-        return audio
-    samples_per_beat = SR * 60.0 / max(bpm, 1)
-    cursor = 0
-    for i, s in enumerate(sections):
-        length = int(int(s.get("bars", 4)) * 4 * samples_per_beat)
-        g = per_index_db.get(str(i), per_index_db.get(i))
-        if g:
-            audio[:, cursor:min(cursor + length, audio.shape[1])] *= _db_to_linear(float(g))
-        cursor += length
-    return audio
 
 
 def render_mix(
@@ -206,23 +262,61 @@ def render_mix(
             mix = grown
         mix[:, : layer.shape[1]] += layer
 
+    def _merge(base: np.ndarray | None, layer: np.ndarray) -> np.ndarray:
+        if base is None:
+            return layer.copy()
+        if layer.shape[1] > base.shape[1]:
+            grown = np.zeros((2, layer.shape[1]), dtype=np.float32)
+            grown[:, : base.shape[1]] += base
+            base = grown
+        base[:, : layer.shape[1]] += layer
+        return base
+
+    interactions: dict[str, list[tuple[str, float]]] = {}
+    for pair, amount in (mix_params.get("interactions") or {}).items():
+        key, _, target = str(pair).partition(":")
+        amount = _unit(amount, 0.0)
+        if key and target and amount > 0.0:
+            interactions.setdefault(target, []).append((key, amount))
+    vocal = None
+    if parts and any(key == "vocal" for ducks in interactions.values() for key, _ in ducks) and vocal_wav:
+        vocal = _load_stereo(vocal_wav)
+
     if parts:
         # The beat as its parts: each fetched, treated, levelled and added, then released (512 MB server).
         # The whole-beat settings (its level, effects, per-section levels) still apply to every part.
         settings_for = mix_params.get("parts") or {}
         beat_board = _beat_effect_board(mix_params.get("beat_effects", []))
+        needed_keys = {key for ducks in interactions.values() for key, _ in ducks if key != "vocal"}
+        key_buffers = {}
+        for name, fetch in parts:
+            if name in needed_keys:
+                key_buffers[name] = _load_stereo(fetch())
+        bus = mix_params.get("drum_bus") or {}
+        drum_bus: np.ndarray | None = None
         for name, fetch in parts:
             st = settings_for.get(name) or {}
             if st.get("muted"):
                 continue
             part = _load_stereo(fetch())
             part = _apply(_part_board(st), part)
-            part = _section_index_gains(part, st.get("sections") or {}, beat_sections or [], beat_bpm)
+            part = _apply_section_gains(part, {}, beat_sections or [], beat_bpm, st.get("sections") or {})
             part = _apply(beat_board, part)
             part = _apply_section_gains(part, mix_params.get("section_gain_db", {}), beat_sections or [], beat_bpm)
+            for key, amount in interactions.get(name, []):
+                key_audio = vocal if key == "vocal" else key_buffers.get(key)
+                if key_audio is not None:
+                    part = _duck(part, key_audio, amount)
             part *= _db_to_linear(float(st.get("level_db", 0.0)) + float(mix_params.get("beat_gain_db", -6.0)))
-            _add(_late(part))
+            if name == "drums" and bus.get("on"):
+                drum_bus = _merge(drum_bus, part)
+            else:
+                _add(_late(part))
             del part
+        if drum_bus is not None:
+            drum_bus = _apply(_drum_bus_board(float(bus.get("glue", 0.35))), drum_bus)
+            _add(_late(drum_bus))
+            del drum_bus
     elif beat_wav:
         beat = _load_stereo(beat_wav)
         beat = _apply(_beat_effect_board(mix_params.get("beat_effects", [])), beat)
@@ -234,8 +328,10 @@ def render_mix(
         del beat
 
     if vocal_wav:
-        vocal = _load_stereo(vocal_wav)
-        vocal = _apply(_vocal_effect_board(mix_params.get("vocal_effects", [])), vocal)
+        if vocal is None:
+            vocal = _load_stereo(vocal_wav)
+        vocal = _apply(_vocal_effect_board(mix_params.get("vocal_effects", []),
+                                           mix_params.get("vocal_space_amount", 0.18)), vocal)
         vocal *= _db_to_linear(mix_params.get("vocal_gain_db", 0.0))
         _add(vocal)
         del vocal

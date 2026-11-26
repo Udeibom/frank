@@ -15,6 +15,13 @@ def get_proposal(proposal_id: str) -> Optional[dict]:
     return rows[0] if rows else None
 
 
+def find_by_idempotency(project_id: str, idempotency_key: str) -> Optional[dict]:
+    rows = (get_supabase().table("refine_proposals").select("*")
+            .eq("project_id", project_id).eq("idempotency_key", idempotency_key)
+            .limit(1).execute().data)
+    return rows[0] if rows else None
+
+
 def latest_proposals(project_id: str, limit: int = 5) -> list[dict]:
     return (get_supabase().table("refine_proposals").select("*").eq("project_id", project_id)
             .order("created_at", desc=True).limit(limit).execute().data or [])
@@ -31,5 +38,12 @@ def update_direction(proposal_id: str, n: int, fields: dict[str, Any]) -> None:
         get_supabase().table("refine_proposals").update({"directions": directions}).eq("id", proposal_id).execute()
 
 
-def set_chosen(proposal_id: str, n: int) -> None:
-    get_supabase().table("refine_proposals").update({"chosen": n}).eq("id", proposal_id).execute()
+def set_chosen(proposal_id: str, n: int, job_id: str | None = None) -> bool:
+    table = get_supabase().table("refine_proposals")
+    if job_id:
+        result = (table.update({"chosen_job_id": job_id})
+                  .eq("id", proposal_id).eq("chosen", n).execute())
+        return bool(result.data)
+    result = (table.update({"chosen": n})
+              .eq("id", proposal_id).is_("chosen", None).execute())
+    return bool(result.data)

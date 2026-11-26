@@ -85,6 +85,11 @@ def accompany(notes: list[dict], bpm: float, beats: float) -> list[dict]:
     return spaces.call("hands", "/accompany", payload, timeout=360)["parts"]
 
 
+def groove_humanize(lanes: dict[str, str], style: str, feel: int, seed: int, timeout: float = 180.0) -> dict:
+    payload = json.dumps({"lanes": lanes, "style": style, "feel": feel, "seed": seed})
+    return spaces.call("hands", "/groove_humanize", payload, timeout=timeout)
+
+
 def timbre(data: bytes, instrument: str, ext: str = "wav") -> bytes:
     f = spaces.audio_file(data, ext)
     try:

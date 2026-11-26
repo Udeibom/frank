@@ -25,9 +25,25 @@ MIN_DIRECTIONS, MAX_DIRECTIONS = 2, 3
 PREVIEW_MAX_SECTIONS = 2
 PREVIEW_MAX_BARS = 12
 MIX_TYPES = {"adjust_levels", "apply_effect", "toggle_harmony", "section_adjust"}
+CRITIC_ACTIONABLE = {"chorus_lift", "voice_buried", "voice_crowded", "flat", "clipping"}
 
 
 # ── what a direction touches ─────────────────────────────────────────────
+
+def _confirmed_findings(found: dict) -> list[dict]:
+    heard = found.get("heard") or {}
+    seen = {f.get("id") for f in found.get("findings") or []}
+    out: list[dict] = []
+    for note in heard.get("notes") or []:
+        fid = note.get("tag")
+        if not note.get("confirmed") or fid not in CRITIC_ACTIONABLE or fid in seen:
+            continue
+        seen.add(fid)
+        out.append({"id": fid, "plain": note.get("plain") or "I think something here could feel closer.",
+                    "severity": "worth_a_look", "confidence": float(note.get("confidence") or 0.6),
+                    "evidence": [], "sections": [int(i) for i in note.get("sections", []) if isinstance(i, int)], "parts": []})
+    return out
+
 
 def _fingerprint(s: SectionPlan) -> str:
     return json.dumps([s.name, s.bars, round(s.energy, 4), round(s.density, 4), sorted(s.layers), s.parts], sort_keys=True, default=str)
@@ -90,9 +106,20 @@ def _mix_sentence(action: dict) -> str:
 
 def validate(
     d: Direction, sections: list[SectionPlan], seed: int, mix_params: Optional[dict],
-    fp: Optional[dict] = None, lead: Any = None,
+    fp: Optional[dict] = None, lead: Any = None, findings: Optional[list[dict]] = None,
+    strict: bool = True,
 ) -> Optional[Direction]:
     """The direction with its plain changes and preview sections filled in, or None if it cannot be applied."""
+    if strict and findings:
+        known = {f.get("id") for f in findings}
+        if d.addresses and not set(d.addresses) <= known:
+            return None
+        if not d.addresses and d.source not in {"experiment", "producer"}:
+            return None
+        if d.source == "producer" and not d.addresses:
+            return None
+        if d.targets and any(not 0 <= i < len(sections) for i in d.targets):
+            return None
     if d.kind == "beat":
         if not sections:
             return None
@@ -173,8 +200,10 @@ def _ask_producer(concern: str, found: dict, sections: list[SectionPlan], option
     lines = [f"The person said: {concern or '(nothing specific, they want it better)'}",
              "The song:\n" + (_plan_lines(sections) or "(no beat yet)"),
              "The Listener found:" if found.get("findings") else "The Listener found no clear cause.",
-             *[f"- {f['plain']} (sections {f.get('sections', [])})" for f in found.get("findings", [])[:5]],
-             *(["What this artist usually likes (offer the matching option first; you may mention it once):",
+              *[f"- {f['plain']} (sections {f.get('sections', [])})" for f in found.get("findings", [])[:5]],
+              *[f"- I think: {f['plain']}" for f in _confirmed_findings(found)],
+              *(["What this artist usually likes (offer the matching option first; you may mention it once):",
+
                 *[f"- {statement_for(t, d)}" for t, d in (prefs or {}).items()]] if prefs else []),
              "Ready-made options:",
              *[f"{n}. {d.title}: {d.plain} -> {d.kind} {json.dumps(d.actions)}" for n, d in enumerate(options, 1)]]
@@ -216,12 +245,14 @@ def propose(
     distinct; there are two or three when the song allows that many different changes.
     """
     has_mix = mix_params is not None
-    experiment = not found.get("findings")
+    findings = list(found.get("findings") or []) + _confirmed_findings(found)
+    all_found = {**found, "findings": findings}
+    experiment = not findings
     ready = (experiments.experiment_menu(sections, hummed_tune, has_mix, concern) if experiment
-             else experiments.from_findings(found["findings"], sections, has_mix))
-    ready = pick_distinct([v for v in (validate(d, sections, seed, mix_params, fp, lead) for d in ready) if v], limit=6)
+             else experiments.from_findings(findings, sections, has_mix, hummed_tune))
+    ready = pick_distinct([v for v in (validate(d, sections, seed, mix_params, fp, lead, findings) for d in ready) if v], limit=6)
     if not experiment and len(ready) < MIN_DIRECTIONS:
-        extra = [validate(d, sections, seed, mix_params, fp, lead) for d in experiments.experiment_menu(sections, hummed_tune, has_mix, concern)]
+        extra = [validate(d, sections, seed, mix_params, fp, lead, findings) for d in experiments.experiment_menu(sections, hummed_tune, has_mix, concern)]
         ready += [v for v in extra if v]
     ready = pick_distinct(ready, limit=6)
     if prefs:
@@ -234,10 +265,10 @@ def propose(
     message, chosen = "", []
     if use_model and ready:
         try:
-            reply = _ask_producer(concern or "", found, sections, ready, prefs)
+            reply = _ask_producer(concern or "", all_found, sections, ready, prefs)
             message = str(reply.get("message") or "")
             picked = _from_reply(reply, ready)
-            chosen = [v for v in (validate(d, sections, seed, mix_params, fp, lead) for d in picked) if v]
+            chosen = [v for v in (validate(d, sections, seed, mix_params, fp, lead, findings) for d in picked) if v]
             if experiment:   # an experiment changes exactly one thing; the model may not widen it
                 chosen = [d for d in chosen if len(d.actions) == 1]
         except Exception as exc:  # noqa: BLE001  the ready-made directions still work without the model
@@ -248,7 +279,7 @@ def propose(
 
         names = [s.name for s in sections]
         directions.sort(key=lambda d: -direction_score(d.kind, d.actions, names, prefs))
-    return finish_message(message, found, experiment), directions, experiment
+    return finish_message(message, all_found, experiment), directions, experiment
 
 
 INTERNAL_NAMES = ("listener", "producer", "the team", "specialist")

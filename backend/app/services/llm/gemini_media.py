@@ -121,7 +121,8 @@ def listen(audio: bytes, mime: str, measurements: dict, said: str = "") -> Optio
     return parse_heard(_post([_inline(audio, mime), {"text": prompt}]))
 
 
-FINDING_TO_TAG = {"too_quiet": "level", "too_loud": "level", "copy": "flat", "melody_wanders": "tuning"}
+FINDING_TO_TAG = {"too_quiet": "level", "too_loud": "level", "copy": "flat", "melody_wanders": "tuning",
+                  "voice_crowded": "muddy", "part_busy": "busy", "chorus_thin": "empty"}
 
 
 def tags_of(finding_ids: set[str]) -> set[str]:

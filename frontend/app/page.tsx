@@ -5,6 +5,7 @@ import { createProject } from "@/lib/api/projects"
 import { createClient } from "@/lib/supabase/client"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
+import Link from "next/link"
 
 export default function LandingPage() {
   const router = useRouter()
@@ -36,13 +37,10 @@ export default function LandingPage() {
       const { data } = await createClient().auth.getUser()
       if (!data.user) {
         setLoading(false)
-        // Pass ?next=/new-song so after sign-up/login the user lands on the
-        // trampoline page that creates a project and enters the studio.
         router.push("/signup?next=%2Fnew-song")
         return
       }
       const project = await createProject({ title: "Untitled Song" })
-      // Navigation is happening — leave the loading state so there's no flash.
       router.push(`/${project.id}/idea`)
     } catch (err) {
       const message =
@@ -58,338 +56,538 @@ export default function LandingPage() {
     }
   }
 
-  const buttonLabel = slowStart
-    ? "Frank is waking up\u2026"
-    : loading
-      ? "Opening the studio\u2026"
-      : "Start Your Song"
+  const buttonLabel = loading
+    ? slowStart
+      ? "Waking up the studio… (this takes about 20 seconds on first visit)"
+      : "Opening your studio…"
+    : "Start a Song — Free Session"
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-ground text-ink">
 
-      {/* ── Fixed top nav ──────────────────────────────────────────────────── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 md:px-10">
-        <span className="font-written text-xl italic text-foreground/90 tracking-tight">
-          Frank
-        </span>
-        <a
-          href="/login"
-          className="text-sm text-ink-2 hover:text-foreground transition-colors"
-        >
-          Sign in
-        </a>
-      </nav>
-
-      {/* ── Hero section ───────────────────────────────────────────────────── */}
-      <main className="relative flex min-h-screen flex-col items-center justify-center px-4 pt-16 overflow-hidden">
-
-        {/* Layered ambient background */}
-        <div className="pointer-events-none absolute inset-0 -z-10">
-          {/* Bottom-center: frank/amber bloom */}
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 70% 55% at 50% 75%, rgb(var(--frank) / 0.10) 0%, transparent 65%)",
-          }} />
-          {/* Top-left: feel/indigo bloom */}
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 50% 45% at 10% 10%, rgb(var(--feel) / 0.07) 0%, transparent 60%)",
-          }} />
-          {/* Top-right: music/cyan bloom */}
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 45% 40% at 90% 15%, rgb(var(--music) / 0.06) 0%, transparent 55%)",
-          }} />
-        </div>
-
-        <div className="flex flex-col items-center gap-6 text-center max-w-3xl mx-auto">
-
-          {/* Eyebrow */}
-          <p className="landing-fade landing-fade-1 text-xs font-medium tracking-[0.18em] uppercase text-primary/80">
-            Your AI songwriting partner
-          </p>
-
+      {/* ── Sticky nav ───────────────────────────────────────────────────────── */}
+      <nav className="sticky top-0 z-50 w-full border-b border-line/60 bg-ground/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
           {/* Wordmark */}
-          <h1
-            className="landing-fade landing-fade-2 font-written italic tracking-tight text-foreground"
-            style={{
-              fontSize: "clamp(5rem, 14vw, 9rem)",
-              lineHeight: 1,
-              textShadow: "0 0 60px rgb(240 168 48 / 0.2)",
-            }}
-          >
-            Frank
-          </h1>
-
-          {/* Subtitle */}
-          <p className="landing-fade landing-fade-3 text-xl text-ink-2 max-w-md leading-relaxed">
-            You have the song.<br className="hidden sm:block" /> Frank handles the rest.
-          </p>
-
-          {/* CTA */}
-          <div className="landing-fade landing-fade-4 flex flex-col items-center gap-3 mt-2">
+          <div className="flex items-center gap-2">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-lg"
+              style={{ background: "rgb(var(--frank))", boxShadow: "0 0 12px rgba(245,158,11,0.3)" }}
+            >
+              <span className="font-written italic text-base leading-none text-ground select-none">f</span>
+            </div>
+            <span className="text-sm font-semibold tracking-tight text-ink">Frank</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3 ml-0.5">Studio</span>
+          </div>
+          {/* Nav links — smooth-scroll to page sections */}
+          <div className="hidden items-center gap-6 md:flex">
+            {([
+              ["Overview",    "overview"],
+              ["Rooms",       "rooms"],
+              ["How It Works","why-frank"],
+              ["Philosophy",  "philosophy"],
+              ["Listen",      "listen"],
+            ] as [string, string][]).map(([label, id]) => (
+              <button
+                key={label}
+                onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}
+                className="text-xs font-medium uppercase tracking-wide text-ink-2 transition-colors hover:text-ink"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Auth + CTA */}
+          <div className="flex items-center gap-3">
+            <Link href="/login" className="text-xs text-ink-2 hover:text-ink transition-colors">
+              Sign in
+            </Link>
             <button
               onClick={handleStart}
               disabled={loading}
-              className="cta-glow group relative rounded-full bg-frank px-12 py-4 text-base font-semibold text-ground disabled:opacity-60"
+              className="rounded-md px-4 py-2 text-xs font-semibold text-ground transition-all disabled:opacity-60"
+              style={{ background: "rgb(var(--frank))", boxShadow: "0 0 14px rgba(245,158,11,0.3)" }}
             >
-              <span className="flex items-center gap-2">
-                {buttonLabel}
-                {!loading && (
-                  <span
-                    className="inline-block transition-transform duration-200 group-hover:translate-x-1"
-                    aria-hidden="true"
-                  >
-                    →
-                  </span>
-                )}
-              </span>
+              {loading ? "Opening…" : "Open Studio"}
             </button>
-
-            {/* Error message */}
-            {error && (
-              <p className="text-sm text-[#E26A5F] max-w-xs">
-                {error}{" "}
-                <button
-                  onClick={handleStart}
-                  className="underline underline-offset-2 hover:no-underline"
-                >
-                  Try again
-                </button>
-              </p>
-            )}
-
-            <p className="text-xs text-muted-foreground/40 tracking-widest uppercase mt-1">
-              Free to start · No credit card
-            </p>
           </div>
         </div>
+      </nav>
 
-        {/* Scroll hint */}
-        <div className="landing-fade landing-fade-5 absolute bottom-8 flex flex-col items-center gap-1 text-ink-3/50">
-          <span className="text-xs tracking-widest uppercase">Scroll</span>
-          <span className="text-base" aria-hidden="true">↓</span>
-        </div>
-      </main>
-
-      {/* ── How it Works strip ──────────────────────────────────────────────── */}
-      <section className="py-24 px-4">
-        <div className="max-w-4xl mx-auto">
-          <p className="text-center text-xs tracking-[0.18em] uppercase text-ink-3 mb-12">
-            How it works
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                step: "01",
-                color: "rgb(var(--words))",
-                title: "Write",
-                body: "Start with a line, a title, or just a feeling. Frank listens and helps your lyrics take shape.",
-              },
-              {
-                step: "02",
-                color: "rgb(var(--music))",
-                title: "Compose",
-                body: "Describe a vibe or hum a melody. Frank builds chords, rhythm, and an arrangement around you.",
-              },
-              {
-                step: "03",
-                color: "rgb(var(--voice))",
-                title: "Record",
-                body: "Lay down your vocal. Frank tunes, layers, and mixes so you sound the way you hear yourself.",
-              },
-            ].map(({ step, color, title, body }) => (
-              <div
-                key={step}
-                className="relative rounded-xl border border-line bg-surface p-6 flex flex-col gap-4 shadow-l2 transition-shadow hover:shadow-frank-luminescence"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: color }}
-                    aria-hidden="true"
-                  />
-                  <span className="text-xs text-ink-3 tracking-widest font-medium">{step}</span>
-                </div>
-                <h2
-                  className="font-written italic text-3xl text-foreground"
-                  style={{ color }}
-                >
-                  {title}
-                </h2>
-                <p className="text-sm text-ink-2 leading-relaxed">{body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Photo + Quote — Row 1 (image left) ─────────────────────────────── */}
-      <section className="py-16 px-4">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <div className="relative aspect-square max-w-sm mx-auto w-full overflow-hidden rounded-2xl">
-            <Image
-              src="/landing-woman.png"
-              alt="A songwriter listening to music she just created with Frank"
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-          </div>
-          <div className="flex flex-col gap-6 max-w-md">
-            <div
-              className="w-8 h-1 rounded-full"
-              style={{ background: "rgb(var(--frank))" }}
-              aria-hidden="true"
-            />
-            <blockquote className="font-written italic text-2xl md:text-3xl text-foreground leading-snug">
-              "I had a melody in my head for three years. Frank helped me finish it in one afternoon."
-            </blockquote>
-            <p className="text-sm text-ink-3">
-              Maya R. — Singer-Songwriter, Lagos
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Photo + Quote — Row 2 (image right) ─────────────────────────────── */}
-      <section className="py-16 px-4">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <div className="flex flex-col gap-6 max-w-md md:order-first order-last">
-            <div
-              className="w-8 h-1 rounded-full"
-              style={{ background: "rgb(var(--music))" }}
-              aria-hidden="true"
-            />
-            <blockquote className="font-written italic text-2xl md:text-3xl text-foreground leading-snug">
-              "I'm not a producer. I'm just a guy who writes. Frank speaks my language."
-            </blockquote>
-            <p className="text-sm text-ink-3">
-              Jordan K. — Poet &amp; Lyricist, Toronto
-            </p>
-          </div>
-          <div className="relative aspect-square max-w-sm mx-auto w-full overflow-hidden rounded-2xl md:order-last order-first">
-            <Image
-              src="/landing-man.png"
-              alt="A songwriter writing in his notebook with Frank open on his laptop"
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Feature highlight strip ─────────────────────────────────────────── */}
-      <section className="py-24 px-4" style={{ background: "rgb(var(--raised) / 0.5)" }}>
-        <div className="max-w-4xl mx-auto">
-          <p className="text-center text-xs tracking-[0.18em] uppercase text-ink-3 mb-4">
-            Three rooms. One song.
-          </p>
-          <h2 className="font-written italic text-center text-4xl md:text-5xl text-foreground mb-14">
-            Everything a song needs,<br className="hidden sm:block" /> in one place.
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {[
-              {
-                label: "Words Room",
-                color: "rgb(var(--words))",
-                bg: "rgb(var(--words) / 0.07)",
-                icon: "✍️",
-                desc: "Write and edit lyrics with live rhyme detection, syllable stress markers, and structure suggestions.",
-              },
-              {
-                label: "Music Room",
-                color: "rgb(var(--music))",
-                bg: "rgb(var(--music) / 0.07)",
-                icon: "🎸",
-                desc: "Describe a vibe in plain English. Frank builds an arrangement around it.",
-              },
-              {
-                label: "Voice Room",
-                color: "rgb(var(--voice))",
-                bg: "rgb(var(--voice) / 0.07)",
-                icon: "🎤",
-                desc: "Record a melody, hum a hook, or just talk it out. Frank brings your voice into the song.",
-              },
-            ].map(({ label, color, bg, icon, desc }) => (
-              <div
-                key={label}
-                className="rounded-xl border border-line p-6 flex flex-col gap-4"
-                style={{ background: bg }}
-              >
-                <span className="text-2xl" role="img" aria-hidden="true">{icon}</span>
-                <h3
-                  className="font-semibold text-base"
-                  style={{ color }}
-                >
-                  {label}
-                </h3>
-                <p className="text-sm text-ink-2 leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Final CTA band ──────────────────────────────────────────────────── */}
-      <section className="relative py-28 px-4 overflow-hidden">
-        {/* Ambient glow behind the final CTA */}
+      {/* ── Hero ─────────────────────────────────────────────────────────────── */}
+      <section id="overview" className="relative overflow-hidden px-6 pb-0 pt-24 text-center">
+        {/* Ambient amber glow behind hero */}
         <div
           className="pointer-events-none absolute inset-0 -z-10"
           style={{
-            background: "radial-gradient(ellipse 60% 60% at 50% 50%, rgb(240 168 48 / 0.09) 0%, transparent 70%)",
+            background:
+              "radial-gradient(ellipse 70% 60% at 50% -10%, rgba(245,158,11,0.12) 0%, transparent 65%)",
           }}
         />
-        <div className="max-w-2xl mx-auto flex flex-col items-center gap-6 text-center">
-          <h2
-            className="font-written italic text-5xl md:text-6xl text-foreground"
-            style={{ textShadow: "0 0 40px rgb(240 168 48 / 0.15)" }}
-          >
-            Your next song is waiting.
-          </h2>
-          <p className="text-lg text-ink-2 max-w-sm leading-relaxed">
-            No music theory required.<br className="hidden sm:block" /> No studio needed. Just you and an idea.
+        {/* Eyebrow */}
+        <p className="mb-6 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-3">
+          Songwriter &bull; Production &bull; Master Calibration
+        </p>
+        {/* Headline */}
+        <h1 className="font-written text-5xl font-normal leading-tight text-ink md:text-6xl landing-fade landing-fade-1">
+          You have a song in your head.
+          <br />
+          <em style={{ color: "rgb(var(--frank))" }}>Let&apos;s get it out.</em>
+        </h1>
+        <p className="mx-auto mt-6 max-w-xl text-base text-ink-2 leading-relaxed landing-fade landing-fade-2">
+          Frank is your co-writer, session band, vocal producer, and tape mastering engineer. From a
+          hummed note or half-written notebook line to a finished 24-bit record — in five collaborative rooms.
+        </p>
+        {/* Error message */}
+        {error && (
+          <p className="mt-4 text-sm text-center" style={{ color: "rgb(var(--problem))" }}>
+            {error}
           </p>
-
-          {/* Second instance of the CTA — same handleStart, same logic */}
+        )}
+        {/* CTAs */}
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row landing-fade landing-fade-3">
           <button
             onClick={handleStart}
             disabled={loading}
-            className="cta-glow group relative mt-4 rounded-full bg-frank px-12 py-4 text-base font-semibold text-ground disabled:opacity-60"
+            className="cta-glow flex items-center gap-2 rounded-md px-6 py-3 text-sm font-semibold text-ground transition-all disabled:opacity-60"
+            style={{ background: "rgb(var(--frank))", boxShadow: "0 0 28px rgba(245,158,11,0.45)" }}
           >
-            <span className="flex items-center gap-2">
-              {buttonLabel}
-              {!loading && (
-                <span
-                  className="inline-block transition-transform duration-200 group-hover:translate-x-1"
-                  aria-hidden="true"
-                >
-                  →
-                </span>
-              )}
-            </span>
+            <span>▶</span>
+            <span>{buttonLabel}</span>
           </button>
+          <button
+            onClick={() => document.getElementById("listen")?.scrollIntoView({ behavior: "smooth" })}
+            className="rounded-md border border-line px-6 py-3 text-sm text-ink-2 transition-colors hover:border-line hover:text-ink"
+          >
+            Listen to Records Made in Frank
+          </button>
+        </div>
+        {/* Studio screenshot hero */}
+        <div
+          className="relative mx-auto mt-14 max-w-5xl overflow-hidden rounded-t-xl border border-line/60 landing-fade landing-fade-4"
+          style={{ boxShadow: "0 -4px 48px rgba(0,0,0,0.6)" }}
+        >
+          <Image
+            src="/stitch-hero.png"
+            alt="The Frank studio — Words room with a song in progress"
+            width={1440}
+            height={900}
+            className="w-full object-cover object-top"
+            priority
+            onError={(e) => {
+              // Fallback if the screenshot isn't there yet
+              const target = e.target as HTMLImageElement
+              target.style.display = "none"
+            }}
+          />
+          {/* Gradient fade at bottom of screenshot */}
+          <div
+            className="absolute inset-x-0 bottom-0 h-32"
+            style={{ background: "linear-gradient(to bottom, transparent, rgb(var(--ground)))" }}
+          />
         </div>
       </section>
 
-      {/* ── Footer ──────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-line py-8 px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-ink-3">
-        <span className="font-written italic text-sm text-foreground/50">Frank</span>
-        <div className="flex items-center gap-6">
-          <a href="/login" className="hover:text-foreground transition-colors">Sign in</a>
-          <a href="/signup" className="hover:text-foreground transition-colors">Sign up</a>
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-foreground transition-colors"
+      {/* ── A room with no faders ────────────────────────────────────────────── */}
+      <section id="rooms" className="px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">The Workflow</p>
+          <h2 className="mb-3 font-written text-4xl font-normal text-ink">
+            A room with no faders or cold numbers.
+          </h2>
+          <p className="mb-12 max-w-2xl text-sm text-ink-2 leading-relaxed">
+            Most audio workstations look like Boeing cockpits: 4,000 controls, tiny frequency graphs, and
+            confusing jargon that freezes your creative impulses before the first verse is even written.
+          </p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {[
+              {
+                n: "01", material: "WORDS", color: "rgb(var(--words))",
+                name: "The Lyricist's Desk",
+                body: "Type whatever is in your head. Frank finds structure and suggests rhymes that don't make you feel silly for writing them.",
+              },
+              {
+                n: "02", material: "FEELING", color: "rgb(var(--feel))",
+                name: "Vibe & Harmonic Direction",
+                body: "No dropdown menus for 128 synths. Tell Frank 'slow and warm' or 'urgent and bright' and he auditions three emotionally distinct harmonic directions in real time.",
+              },
+              {
+                n: "03", material: "MUSIC", color: "rgb(var(--music))",
+                name: "Plain-English Arrangement",
+                body: "A transparent bar-by-bar arrangement. Click on any cell, tell Frank the vibe or simply 'Fuller' and 'Calmer'. Sections build themselves.",
+              },
+              {
+                n: "04", material: "VOICE", color: "rgb(var(--voice))",
+                name: "Safe Vocal Booth & Comping",
+                body: "Sing directly into your microphone. Frank counts you in, keeps every take safe, tunes within ear-plausible ranges, and locks your signature without sounding engineered.",
+              },
+              {
+                n: "05", material: "BLEND", color: "rgb(var(--ink-2))",
+                name: "Tape Mastering & Stem Export",
+                body: "No decibels or fader readings. Simply say 'more compressed' or 'warmer bass'. Frank masters to professional -14LUFS and produces 24-bit WAV with isolated stems.",
+              },
+              {
+                n: "06", material: "FINISH", color: "rgb(var(--ink-2))",
+                name: "Master & Release",
+                body: "A last listen, then it's yours. Download your song in 24-bit, grab individual stems, or take Frank's one surprise idea before you go.",
+              },
+            ].map(({ n, material, color, name, body }) => (
+              <div key={n} className="rounded-md border border-line bg-surface p-5 flex flex-col gap-3 transition-colors hover:border-line hover:bg-raised">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] text-ink-3">Room {n} //</span>
+                  <span className="font-mono text-[10px]" style={{ color }}>{material}</span>
+                </div>
+                <h3 className="text-sm font-semibold text-ink">{name}</h3>
+                <p className="text-xs text-ink-2 leading-relaxed">{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Frank quote block ────────────────────────────────────────────────── */}
+      <section className="border-y border-line bg-surface px-6 py-16 text-center" id="philosophy">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-6 flex items-center justify-center gap-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-lg"
+              style={{ background: "rgb(var(--frank) / 0.15)", border: "1px solid rgb(var(--frank) / 0.3)" }}
+            >
+              <span className="font-written italic text-xl" style={{ color: "rgb(var(--frank))" }}>f</span>
+            </div>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">The Wire Plugin</span>
+          </div>
+          <blockquote className="font-written italic text-2xl leading-relaxed text-ink">
+            &ldquo;Frank is designed for how songs are actually born — on a piano bench at midnight,
+            in the car humming into a voice memo, or sitting with a notebook trying to find the line
+            that makes you cry.&rdquo;
+          </blockquote>
+        </div>
+      </section>
+
+      {/* ── Why Frank comparison ─────────────────────────────────────────────── */}
+      <section id="why-frank" className="border-t border-line px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <p className="mb-10 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">Why Frank</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {[
+              {
+                label: "Engineering Overload", tag: "TRADITIONAL PRO DAWS", bad: true,
+                items: [
+                  "Hundreds of samples, sample rates, side-chain routings, and buffers.",
+                  "The intimidating blank timeline with eleven panels before you write a word.",
+                  "Requires years of audio school before your sessions feel productive.",
+                  "Technical troubleshooting drains your creative momentum.",
+                ],
+              },
+              {
+                label: "Zero Creative Control", tag: "ALGO BEAT GENERATORS", bad: true,
+                items: [
+                  "Type a prompt and edit the result. You don't set the direction.",
+                  "Doesn't feel like your project — it's not your art.",
+                  "No persistent memory of your style across sessions.",
+                  "Platform watermarks embedded whenever you share a track.",
+                ],
+              },
+              {
+                label: "Collaborative Craft", tag: "FRANK STUDIO", bad: false,
+                items: [
+                  "Including the feeling & melody: Frank learns the orchestration with you.",
+                  "Complete vocal anatomy: edit every lyric, bar by bar in real time.",
+                  "Learned vocal texture — compact, polished — without pitch correction artifacts.",
+                  "24-bit master in one exportable stereo mix plus isolated stems.",
+                ],
+              },
+            ].map(({ label, tag, bad, items }) => (
+              <div
+                key={label}
+                className="rounded-md border p-5"
+                style={{
+                  borderColor: bad ? "rgb(var(--line))" : "rgb(var(--frank) / 0.4)",
+                  background: bad ? "rgb(var(--surface))" : "rgb(var(--frank) / 0.05)",
+                  boxShadow: bad ? undefined : "0 0 24px rgba(245,158,11,0.1)",
+                }}
+              >
+                <p
+                  className="mb-1 font-mono text-[10px] uppercase tracking-widest"
+                  style={{ color: bad ? "rgb(var(--ink-3))" : "rgb(var(--frank))" }}
+                >
+                  {tag}
+                </p>
+                <h3 className="mb-4 text-sm font-semibold text-ink">{label}</h3>
+                <ul className="flex flex-col gap-2">
+                  {items.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-ink-2">
+                      <span className="mt-0.5 shrink-0" style={{ color: bad ? "rgb(var(--problem))" : "rgb(var(--ok))" }}>
+                        {bad ? "✕" : "✓"}
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Testimonials ────────────────────────────────────────────────────── */}
+      <section id="listen" className="border-t border-line px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">Born With Frank</p>
+          <h2 className="mb-10 font-written text-4xl font-normal text-ink">Real Songs. Real Songwriters.</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {[
+              {
+                tag: "FOLK", title: "Late Night Train", by: "ClaraM • Brooklyn, NY", time: "3:24",
+                quote: "\"Hummed on a voice note at 3 am after revisiting my grandparents' house. Frank gave me the upright piano and what it could feel like. I can still hear the original.\"",
+                stats: "4:04 • Dm • 3 TAKES BEFORE SCORED",
+              },
+              {
+                tag: "SILVER POP", title: "Silver Lake Fog", by: "Marco • Los Angeles, CA", time: "3:04",
+                quote: "\"Started with 4 lines in my Notes app. Frank suggested 70 BPM grooves and dreamy Rhodes studies that filled the room on a Sunday morning.\"",
+                stats: "4:17 • Eb+ • 2 TAKES BEFORE SCORED",
+              },
+              {
+                tag: "DUSTY AMERICANA", title: "Highway Motel", by: "Marcus Thorne • Austin, TX", time: "4:12",
+                quote: "\"I sang into a cheap headphone mic. Frank tuned it without making me sound like a robot and added a lower-pitched descant harmony that I never would have thought of.\"",
+                stats: "4:17 • G+ • 3 TAKES BEFORE SCORED",
+              },
+            ].map(({ tag, title, by, time, quote, stats }) => (
+              <div key={title} className="rounded-md border border-line bg-surface p-5 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">{tag}</span>
+                  <span className="font-mono text-[10px] text-ink-3">{time}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
+                    style={{ background: "rgb(var(--frank) / 0.15)", border: "1px solid rgb(var(--frank) / 0.2)" }}
+                  >
+                    <span className="text-xs" style={{ color: "rgb(var(--frank))" }}>▶</span>
+                  </div>
+                  <div>
+                    <p className="font-written italic text-sm font-medium text-ink">{title}</p>
+                    <p className="font-mono text-[10px] text-ink-3">{by}</p>
+                  </div>
+                </div>
+                <p className="text-xs italic text-ink-2">{quote}</p>
+                <p className="font-mono text-[10px] text-ink-3 border-t border-line/40 pt-2 mt-auto">{stats}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── The more you write ─────────────────────────────────────────────── */}
+      <section className="border-t border-line bg-surface px-6 py-24">
+        <div className="mx-auto max-w-6xl grid grid-cols-1 gap-12 md:grid-cols-2 items-start">
+          <div>
+            <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-ink-3">Session Continuity</p>
+            <h2 className="mb-4 font-written text-4xl font-normal text-ink leading-tight">
+              The more you write, the deeper Frank listens.
+            </h2>
+            <p className="mb-6 text-sm text-ink-2 leading-relaxed">
+              A real producer knows what key flatters your voice, what tempo you gravitate toward at night,
+              and what instrumentally motivates you to finish. Frank builds this across sessions — encrypted
+              privately to you.
+            </p>
+            <ul className="flex flex-col gap-2">
+              {[
+                "Remembers your comfortable vocal range ±12 to ±8",
+                "Honors your recurring lyric themes and translates them into a beat cycle.",
+                "Learns your natural tuning without training publicly or sharing any files.",
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2 text-xs text-ink-2">
+                  <span style={{ color: "rgb(var(--ok))" }}>→</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          {/* Taste profile card */}
+          <div className="rounded-md border border-line bg-ground p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "rgb(var(--frank))" }}>
+                Songwriter Taste Profile // Session #37654
+              </p>
+              <span className="font-mono text-[10px] text-ink-3">Encrypted</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {[
+                { label: "Vocal Arrangement", color: "rgb(var(--words))", text: "Prefers intimate, near-mic vocal delivery with gentle lower-octave harmonies in choruses." },
+                { label: "Sonic Atmosphere", color: "rgb(var(--music))", text: "Gravitates toward analog warmth, subtle vinyl dust, upright felt piano, and sparse midnight pulse rhythms." },
+                { label: "Tempo & Groove", color: "rgb(var(--feel))", text: "Comfortable with relaxed walking paces between 76 and 84 BPM, favoring unhurried cadences." },
+                { label: "Mastering Target", color: "rgb(var(--ok))", text: "Balanced streaming loudness with healthy -1.4dB true peak ceiling to avoid digital clipping." },
+              ].map(({ label, color, text }) => (
+                <div key={label} className="rounded-md border border-line bg-surface p-3">
+                  <p className="mb-1 font-mono text-[10px] uppercase tracking-wider" style={{ color }}>{label}</p>
+                  <p className="text-xs text-ink-2">{text}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex items-start gap-2 rounded-md border border-line bg-surface p-3">
+              <div
+                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded"
+                style={{ background: "rgb(var(--frank) / 0.15)", border: "1px solid rgb(var(--frank) / 0.3)" }}
+              >
+                <span className="font-written italic text-xs" style={{ color: "rgb(var(--frank))" }}>f</span>
+              </div>
+              <p className="text-xs text-ink-2">
+                &ldquo;I know you dislike high pop sheen on your vocals. Whenever you hit record, I will
+                automatically default to our vintage ribbon mic calibration.&rdquo;
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Final CTA ───────────────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden border-t border-line px-6 py-28 text-center">
+        <div
+          className="pointer-events-none absolute inset-0 -z-10"
+          style={{ background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(245,158,11,0.08) 0%, transparent 70%)" }}
+        />
+        <div className="mx-auto flex max-w-2xl flex-col items-center gap-6">
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-xl"
+            style={{ background: "rgb(var(--frank))", boxShadow: "0 0 24px rgba(245,158,11,0.4)" }}
           >
-            GitHub
-          </a>
+            <span className="font-written italic text-2xl text-ground">f</span>
+          </div>
+          <h2 className="font-written text-4xl font-normal text-ink md:text-5xl">
+            The best time to make your song is while it&apos;s still in your head.
+          </h2>
+          <p className="text-base text-ink-2 leading-relaxed">
+            No hardware to connect. No expensive gear or production manuals. Just sit down, speak to Frank,
+            and hear your idea turn into music.
+          </p>
+          <div className="flex flex-col items-center gap-3 sm:flex-row">
+            <button
+              onClick={handleStart}
+              disabled={loading}
+              className="cta-glow flex items-center gap-2 rounded-md px-6 py-3 text-sm font-semibold text-ground transition-all disabled:opacity-60"
+              style={{ background: "rgb(var(--frank))", boxShadow: "0 0 28px rgba(245,158,11,0.45)" }}
+            >
+              <span>▶</span>
+              <span>Open Frank Studio — Free Session</span>
+            </button>
+            <button
+              onClick={() => document.getElementById("rooms")?.scrollIntoView({ behavior: "smooth" })}
+              className="rounded-md border border-line px-6 py-3 text-sm text-ink-2 transition-colors hover:text-ink"
+            >
+              Explore All 6 Rooms
+            </button>
+          </div>
+          <p className="font-mono text-[11px] uppercase tracking-widest text-ink-3">
+            Works in Chrome • Safari • No Installation • Export 24-bit Stems Anytime
+          </p>
+        </div>
+      </section>
+
+      {/* ── Footer ───────────────────────────────────────────────────────────── */}
+      <footer className="border-t border-line/30 bg-ground">
+        <div className="mx-auto max-w-7xl px-6 py-16">
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-12">
+            {/* Brand */}
+            <div className="lg:col-span-4 flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-lg"
+                  style={{ background: "rgb(var(--frank))", boxShadow: "0 0 12px rgba(245,158,11,0.2)" }}
+                >
+                  <span className="font-written italic text-base leading-none text-ground">f</span>
+                </div>
+                <span className="text-sm font-semibold text-ink">Frank Studio</span>
+              </div>
+              <p className="font-written italic text-sm text-ink-2 max-w-xs">
+                &ldquo;You bring the feeling humming in your head. Frank brings the late-night console,
+                the tape machine, and the patient ears to bring it out.&rdquo;
+              </p>
+              <div className="flex gap-2">
+                <span
+                  className="rounded border border-line bg-raised px-2 py-1 font-mono text-[10px]"
+                  style={{ color: "rgb(var(--frank))" }}
+                >
+                  Desktop Workstation v2.4
+                </span>
+                <span
+                  className="rounded border border-line bg-raised px-2 py-1 font-mono text-[10px]"
+                  style={{ color: "rgb(var(--music))" }}
+                >
+                  48kHz // 24-BIT
+                </span>
+              </div>
+            </div>
+            {/* Rooms */}
+            <div className="lg:col-span-3 flex flex-col gap-2">
+              <span
+                className="font-mono text-[11px] uppercase tracking-widest font-bold"
+                style={{ color: "rgb(var(--frank))" }}
+              >
+                The Production Rooms
+              </span>
+              {[
+                ["Room 1: Words", "Lyricist Deck"],
+                ["Room 2: Feeling", "Vibe & Chords"],
+                ["Room 3: Music", "Arrangement"],
+                ["Room 4: Voice", "Mic Booth"],
+                ["Room 5: Blend", "Mixer Rack"],
+                ["Room 6: Finish", "Tape Master"],
+              ].map(([room, label]) => (
+                <div key={room} className="flex items-center justify-between border-b border-line/10 py-1">
+                  <span className="text-xs text-ink-2">{room}</span>
+                  <span className="font-mono text-[10px] text-ink-3">{label}</span>
+                </div>
+              ))}
+            </div>
+            {/* Architecture */}
+            <div className="lg:col-span-3 flex flex-col gap-2">
+              <span
+                className="font-mono text-[11px] uppercase tracking-widest font-bold"
+                style={{ color: "rgb(var(--frank))" }}
+              >
+                Studio Architecture
+              </span>
+              {["How it Works", "The Analog Duality Manifesto", "Listening Session Tape", "Quick Capture Mode", "Hardware & Latency Specs"].map((l) => (
+                <span key={l} className="py-1 text-xs text-ink-2 hover:text-ink cursor-pointer transition-colors">{l}</span>
+              ))}
+            </div>
+            {/* Access */}
+            <div className="lg:col-span-2 flex flex-col gap-2">
+              <span
+                className="font-mono text-[11px] uppercase tracking-widest font-bold"
+                style={{ color: "rgb(var(--frank))" }}
+              >
+                Session Access
+              </span>
+              <Link href="/login" className="py-1 text-xs text-ink-2 hover:text-ink transition-colors">
+                Open Frank Studio
+              </Link>
+              <Link href="/signup" className="py-1 text-xs text-ink-2 hover:text-ink transition-colors">
+                Create an Account
+              </Link>
+              <span className="py-1 text-xs text-ink-2 cursor-pointer hover:text-ink transition-colors">
+                Creator Ethics & Royalties
+              </span>
+            </div>
+          </div>
+          {/* Bottom bar */}
+          <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-line/30 pt-6 md:flex-row">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ background: "rgb(var(--music))" }} />
+              <span className="font-mono text-[11px] text-ink-3">
+                FRANK STUDIO ENGINE © 2025 // ALL ANALOG RIGHTS RESERVED
+              </span>
+            </div>
+            <div className="flex gap-6 font-mono text-[11px] text-ink-3">
+              <span>NO SYNTHETIC NOISE</span>
+              <span>•</span>
+              <span>TACTILE CREATIVE AGENCY</span>
+            </div>
+          </div>
         </div>
       </footer>
-
     </div>
   )
 }

@@ -16,15 +16,41 @@ from app.db.client import get_supabase
 from app.services.jobs.staleness import ACTIVE_STATUSES, with_retries
 
 
-async def create_job(project_id: str, job_type: str) -> dict:
+async def create_job(project_id: str, job_type: str, idempotency_key: str | None = None) -> dict:
     """Create a pending job and return it."""
     supabase = get_supabase()
+    row = {"project_id": project_id, "job_type": job_type, "status": "pending"}
+    if idempotency_key:
+        row["idempotency_key"] = idempotency_key
+    result = supabase.table("async_jobs").insert(row).execute()
+    return result.data[0]
+
+
+async def find_active_job(project_id: str, idempotency_key: str) -> dict | None:
     result = (
-        supabase.table("async_jobs")
-        .insert({"project_id": project_id, "job_type": job_type, "status": "pending"})
+        get_supabase()
+        .table("async_jobs")
+        .select("*")
+        .eq("project_id", project_id)
+        .eq("idempotency_key", idempotency_key)
+        .in_("status", list(ACTIVE_STATUSES))
+        .order("created_at", desc=True)
+        .limit(1)
         .execute()
     )
-    return result.data[0]
+    return (result.data or [None])[0]
+
+
+async def cancel_job(job_id: str, error: str = "You stopped that one. Nothing was lost.") -> bool:
+    result = (
+        get_supabase()
+        .table("async_jobs")
+        .update({"status": "failed", "error": error})
+        .eq("id", job_id)
+        .in_("status", list(ACTIVE_STATUSES))
+        .execute()
+    )
+    return bool(result.data)
 
 
 async def mark_processing(job_id: str) -> None:

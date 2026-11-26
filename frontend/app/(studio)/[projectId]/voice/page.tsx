@@ -398,13 +398,15 @@ export default function VoiceRoomPage() {
   return (
     <div className="flex h-full">
       <div className="room-voice flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-voice ring-1 ring-voice/30" />
-            <h1 className="font-written italic text-3xl leading-tight" style={{ color: "rgb(var(--voice))" }}>Voice</h1>
-            <span className="text-sm text-ink-3">Record your voice</span>
-          </div>
-          <div className="flex items-center gap-4">
+        {/* Room header — Stitch design */}
+        <div className="border-b border-line/50 pb-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: "rgb(var(--voice))" }} />
+              <h1 className="text-xl font-bold text-ink">Voice</h1>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 04</span>
+            </div>
+            <div className="flex items-center gap-4">
           {!showHeadphoneCheck && (
             <button onClick={() => setShowHeadphoneCheck(true)} className="text-sm text-ink-2 hover:text-ink">
               Check my headphones
@@ -420,8 +422,11 @@ export default function VoiceRoomPage() {
               <Timer className="h-4 w-4" aria-hidden="true" /> Check the timing again
             </button>
           )}
+            </div>
           </div>
+          <p className="mt-1 text-sm text-ink-2">Frank counts you in, smooths out any shaky notes you want, and keeps every take safe.</p>
         </div>
+
 
         {showHeadphoneCheck && (
           <HeadphoneCheck
