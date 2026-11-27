@@ -39,6 +39,7 @@ import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
 import { useSongStore } from "@/store/song"
 import { formatTime, useAudio, usePlayback } from "@/store/audio"
+import { previewSections, type PreviewSection } from "@/lib/songShape"
 import type { MusicalFingerprint } from "@/types/project"
 import type { ConversationMessage, ConversationAction, VersionCandidate } from "@/types/api"
 
@@ -48,15 +49,17 @@ type Work =
   | { kind: "working"; saying: string; where: { section: number; part?: string } | null }
   | { kind: "failed"; saying: string; retry: () => void }
 
-/** The running order shown while there is no music yet: the shape the music will take. */
-const GHOST = ["Intro", "Verse", "Chorus", "Verse", "Chorus", "Outro"]
-
 export default function MusicPage() {
   const params = useParams()
   const router = useRouter()
   const projectId = params.projectId as string
   const { activeState, updateActiveState, revision } = useProjectStore()
   const record = useSongStore((s) => s.record)
+  const loadSong = useSongStore((s) => s.load)
+  const preview = previewSections(record)
+  const structureContext = record?.facets?.structure
+    ? { source: "song_record", structure: record.facets.structure }
+    : undefined
 
   const greetedRef = useRef(false)
   const [fingerprint, setFingerprint] = useState<Partial<MusicalFingerprint> | null>(null)
@@ -118,6 +121,7 @@ export default function MusicPage() {
   // On entry AND whenever the shared state refreshes: reload the fingerprint and versions so the room reflects
   // anything made elsewhere. Honours the active pointer rather than assuming the newest. Greets only once.
   useEffect(() => {
+    void loadSong(projectId)
     Promise.all([getFingerprint(projectId), listBeatVersions(projectId)])
       .then(([fp, vs]) => {
         setFingerprint(fp?.fingerprint ?? null)
@@ -138,7 +142,7 @@ export default function MusicPage() {
       })
       .catch(() => setLoaded(true))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, revision])
+  }, [projectId, revision, loadSong])
 
   /** Run a job that makes a new version, saying what is happening on the stage (in place) and in the panel. */
   async function runJob(
@@ -174,7 +178,7 @@ export default function MusicPage() {
   }
 
   function buildMusic() {
-    void runJob(() => generateBeat(projectId, fingerprint ?? {}), "Building your music from the feeling. This takes about a minute.", null)
+    void runJob(() => generateBeat(projectId, fingerprint ?? {}, structureContext), "Building your music from the feeling. This takes about a minute.", null)
   }
 
   function change(ops: BeatOperation[], where: { section: number; part?: string }, saying: string) {
@@ -185,7 +189,11 @@ export default function MusicPage() {
     const p = action.params as Record<string, unknown>
     switch (action.type) {
       case "generate_full_beat":
-        await runJob(() => generateBeat(projectId, fingerprint ?? {}), "Building your music. This takes about a minute.", null)
+        await runJob(
+          () => generateBeat(projectId, fingerprint ?? {}, (p.structure_context as Record<string, unknown>) ?? structureContext),
+          "Building your music. This takes about a minute.",
+          null,
+        )
         break
       case "beat_operations":
         await runJob(
@@ -218,8 +226,10 @@ export default function MusicPage() {
       const beatState = {
         sections: activeVersion?.params.sections ?? [],
         versions: versions.map((v) => ({ id: v.id, label: v.label ?? "Beat" })),
+        structure: record?.facets?.structure ?? null,
       }
       const res = await sendBeatMessage(projectId, message, beatState, historyRef.current.slice(0, -1))
+      void loadSong(projectId)
       setTurns((t) => [...t, { id: crypto.randomUUID(), role: "assistant", content: res.message }])
       historyRef.current.push({ role: "assistant", content: res.message })
       setIsThinking(false)
@@ -422,7 +432,7 @@ export default function MusicPage() {
                   )}
                 </p>
               </div>
-              <span className="stitch-chip">{sections.length} sections</span>
+              <span className="stitch-chip">{hasBeat ? sections.length : preview.length} sections</span>
             </div>
 
             {hasBeat ? (
@@ -440,7 +450,7 @@ export default function MusicPage() {
                 }}
               />
             ) : (
-              <GhostArrangement making={work.kind === "working"} />
+              <GhostArrangement making={work.kind === "working"} sections={preview} />
             )}
             {hasBeat && (
               <p className="mt-3 text-sm text-ink-2">
@@ -481,27 +491,27 @@ export default function MusicPage() {
 }
 
 /** The shape the music will take, before there is any: named sections, empty rows, a sweep while it's made. */
-function GhostArrangement({ making }: { making: boolean }) {
+function GhostArrangement({ making, sections }: { making: boolean; sections: PreviewSection[] }) {
   return (
-    <div aria-hidden="true" className="grid gap-x-1 gap-y-1.5" style={{ gridTemplateColumns: `112px repeat(${GHOST.length}, minmax(80px, 1fr))` }}>
+    <div aria-hidden="true" className="grid gap-x-1 gap-y-1.5" style={{ gridTemplateColumns: `112px repeat(${Math.max(1, sections.length)}, minmax(80px, 1fr))` }}>
       <div />
-      {GHOST.map((g, i) => (
+      {sections.map((s, i) => (
         <span key={`g${i}`} className="px-2 py-1.5 text-sm text-ink-3">
-          {g}
+          {s.name}
         </span>
       ))}
       {["Drums", "Bass", "Keys"].map((part) => (
-        <GhostRow key={part} part={part} making={making} />
+        <GhostRow key={part} part={part} making={making} count={Math.max(1, sections.length)} />
       ))}
     </div>
   )
 }
 
-function GhostRow({ part, making }: { part: string; making: boolean }) {
+function GhostRow({ part, making, count }: { part: string; making: boolean; count: number }) {
   return (
     <>
       <span className="flex items-center text-sm text-ink-3">{part}</span>
-      {GHOST.map((_, i) => (
+      {Array.from({ length: count }, (_, i) => (
         <span key={i} className={making ? "sweep h-9 rounded-[2px]" : "h-9 rounded-[2px] border border-dashed border-ink-3/50"} />
       ))}
     </>

@@ -4,6 +4,8 @@ from app.services.llm.groq_client import chat_structured
 from app.services.song.record import system_with_brief
 from app.services.team import conversation_store as convo
 from app.services.llm.prompts import IDEA_ROOM_SYSTEM, build_idea_room_messages
+from app.services.song import store as song_store
+from app.services.song.sections import parse_section_order, structure_from_order
 
 router = APIRouter(prefix="/projects/{project_id}/conversation", tags=["conversation"])
 
@@ -19,6 +21,17 @@ async def idea_conversation(
     history = [{"role": m.role, "content": m.content} for m in body.history]
     if not history:   # after a reload the page has nothing; the stored conversation is the memory
         history = convo.recent_messages(await convo.history(project_id, "idea"))
+
+    stated_order = parse_section_order(body.message)
+    if len(stated_order) >= 2:
+        await song_store.write_facet(
+            project_id,
+            "structure",
+            structure_from_order(stated_order),
+            author="user",
+            operation="set_section_order",
+            label="Section order from the words room",
+        )
 
     messages = build_idea_room_messages(
         current_lyrics=body.current_lyrics,

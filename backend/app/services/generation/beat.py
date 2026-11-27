@@ -28,6 +28,7 @@ from app.services.generation import chord_tables, composer, fingerprint as fp_ut
 from app.services.generation.renderer import SAMPLE_RATE, TAIL_SECONDS, SynthSession
 from app.services.generation.rng import derive_seed
 from app.services.generation.styles import StyleChoice, pick_style
+from app.services.song.sections import canonical_section_name
 
 # A standard song arrangement. Each entry is (section_name, bars).
 DEFAULT_ARRANGEMENT = [
@@ -126,59 +127,60 @@ def seconds_of_bars(bars: int, bpm: float) -> float:
 
 def fit_arrangement(arrangement: list, bpm: float, min_seconds: float) -> list:
     """
-    The arrangement made long enough for `min_seconds` of singing: another verse and chorus go in before the
-    ending (the song simply has more of itself), and once the song has as many sections as it may, the ending
-    grows. A song that is already long enough is returned as it is.
+    The arrangement made long enough for `min_seconds` of singing: existing sections grow first, and their bars
+    are only repeated when a single section cannot stretch far enough. No section is invented.
     """
-    arr = [tuple(e) for e in arrangement]
+    arr = [list(e) for e in arrangement]
     need = min_seconds + LENGTH_MARGIN_S
     total = lambda a: seconds_of_bars(sum(int(e[1]) for e in a), bpm)  # noqa: E731
     if min_seconds <= 0 or total(arr) >= need:
-        return arr
-    verse = next((e for e in arr if e[0] == "verse"), ("verse", 8))
-    chorus = next((e for e in arr if e[0] == "chorus"), ("chorus", 8))
-    nxt = [verse, chorus]
+        return [tuple(e) for e in arr]
+    grow = [i for i, e in enumerate(arr) if e[0] not in ("intro", "outro")] or list(range(len(arr)))
     turn = 0
-    while total(arr) < need and len(arr) < MAX_SECTIONS_FOR_LENGTH:
-        at = max((i for i, e in enumerate(arr) if e[0] == "outro"), default=len(arr))
-        arr.insert(at, nxt[turn % 2])
+    while total(arr) < need and any(arr[i][1] < MAX_SECTION_BARS for i in grow):
+        i = grow[turn % len(grow)]
+        if arr[i][1] < MAX_SECTION_BARS:
+            arr[i][1] = min(MAX_SECTION_BARS, int(arr[i][1]) + 4)
         turn += 1
-    if total(arr) < need and arr:
-        last = list(arr[-1])
-        short_bars = int(-(-(need - total(arr)) * bpm // 240))
-        last[1] = min(MAX_SECTION_BARS, int(last[1]) + max(1, short_bars))
-        arr[-1] = tuple(last)
-    return arr
+    if total(arr) < need:
+        for entry in arr:
+            if entry[1] < MAX_SECTION_BARS:
+                entry[1] = min(MAX_SECTION_BARS, int(entry[1]) + 4)
+            if total(arr) >= need:
+                break
+    return [tuple(e) for e in arr]
 
 
 def extend_sections(sections: list[SectionPlan], bpm: float, min_seconds: float) -> tuple[list[SectionPlan], bool]:
-    """The same for a beat that already exists: copies of its own verse and chorus, then a longer ending.
-    Sections already there keep their notes; each copy gets its own identity. Returns (sections, changed)."""
+    """
+    The same for a beat that already exists: the sections already there grow in their own order, and their bars
+    are only repeated when a section cannot stretch far enough. No section is invented. Returns (sections, changed).
+    """
     import copy
 
     out = copy.deepcopy(sections)
     need = min_seconds + LENGTH_MARGIN_S
     total = lambda: seconds_of_bars(sum(x.bars for x in out), bpm)  # noqa: E731
-    if min_seconds <= 0 or total() >= need:
+    if min_seconds <= 0 or not out or total() >= need:
         return out, False
     for x in out:
         if x.uid is None:
             x.uid = x.index
-    next_uid = max(x.uid for x in out) + 1000
-    templates = [t for t in (next((x for x in out if x.name == "verse"), None),
-                             next((x for x in reversed(out) if x.name == "chorus"), None)) if t is not None]
+    grow = [x for x in out if x.name not in ("intro", "outro")] or out
     turn = 0
-    while templates and total() < need and len(out) < MAX_SECTIONS_FOR_LENGTH:
-        at = max((i for i, x in enumerate(out) if x.name == "outro"), default=len(out))
-        twin = copy.deepcopy(templates[turn % len(templates)])
-        twin.uid, twin.stems = next_uid, {}
-        next_uid += 1000
-        out.insert(at, twin)
+    while total() < need and any(x.bars < MAX_SECTION_BARS for x in grow):
+        x = grow[turn % len(grow)]
+        if x.bars < MAX_SECTION_BARS:
+            x.bars = min(MAX_SECTION_BARS, x.bars + 4)
+            x.stems = {}
         turn += 1
-    if total() < need and out:
-        short_bars = int(-(-(need - total()) * bpm // 240))
-        out[-1].bars = min(MAX_SECTION_BARS, out[-1].bars + max(1, short_bars))
-        out[-1].stems = {}
+    if total() < need:
+        for x in out:
+            if x.bars < MAX_SECTION_BARS:
+                x.bars = min(MAX_SECTION_BARS, x.bars + 4)
+                x.stems = {}
+            if total() >= need:
+                break
     for i, x in enumerate(out):
         x.index = i
     _stamp_repeats(out)
@@ -251,35 +253,28 @@ def energy_multiplier(s: SectionPlan, feeling: Optional[str] = None) -> float:
 
 
 LINE_BARS = 2                 # a sung line takes about two bars
-INTRO_BARS, OUTRO_BARS = 4, 4
 
 
 def arrangement_from_structure(structure: Optional[dict]) -> Optional[list[tuple[str, int, Optional[str]]]]:
     """
-    The arrangement the person's own words imply (song-engine requirement 1.1, task 3.1): their sections in their
-    order, each about two bars per line rounded up to whole four-bar phrases (4 to 16 bars), with an intro before and
-    an ending after. If the words end on a verse, the chorus comes back once more before the ending, the way a song
-    ends on its hook. Returns None when there is no usable structure (the style's template is used instead).
+    The arrangement the person's own words give: their sections in their exact order, each about two bars per
+    line rounded up to whole four-bar phrases (4 to 16 bars). Nothing is added and nothing is reordered; returns
+    None when there is no usable structure (the style's template is used instead).
     """
     if not isinstance(structure, dict):
         return None
     out: list[tuple[str, int, Optional[str]]] = []
     for sec in structure.get("sections") or []:
         try:
-            name = str(sec["name"]).lower()
+            name = canonical_section_name(sec.get("name"))
             lines = int(sec["last_line"]) - int(sec["first_line"]) + 1
         except (KeyError, TypeError, ValueError):
             continue
-        if name not in SECTION_ENERGY or lines < 1 or name in ("intro", "outro"):
+        if name not in SECTION_ENERGY or lines < 1:
             continue
         bars = min(16, max(4, -(-lines * LINE_BARS // 4) * 4))
         out.append((name, bars, sec.get("feeling")))
-    if not out:
-        return None
-    choruses = [e for e in out if e[0] == "chorus"]
-    if choruses and out[-1][0] != "chorus":
-        out.append(choruses[-1])
-    return [("intro", INTRO_BARS, None)] + out + [("outro", OUTRO_BARS, None)]
+    return out or None
 
 
 def section_spans(sections: list[SectionPlan], bpm: float) -> list[tuple[int, int]]:

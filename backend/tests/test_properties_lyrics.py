@@ -84,6 +84,13 @@ def test_stanza_structure_covers_the_page_and_follows_the_blank_lines(stanzas):
     assert [b - a + 1 for a, b in spans] == [len(s) for s in stanzas]
 
 
+def test_written_headings_keep_their_names_and_order():
+    text = "[Verse]\none\n[Pre-chorus]\ntwo\n[Chorus]\nthree\n[Bridge]\nfour\n[Chorus]\nfive\n[Outro]\nsix"
+    sections = ly.guess_sections(text)
+    assert [s.name for s in sections] == ["verse", "pre-chorus", "chorus", "bridge", "chorus", "outro"]
+    assert covers_exactly(sections, len(ly.lines_of(text)))
+
+
 @settings(deadline=None)   # the first calls warm caches; timing is not what is tested
 @given(stanza, stanza, st.integers(2, 4))
 def test_a_stanza_that_comes_back_is_called_the_chorus(chorus, verse, times):

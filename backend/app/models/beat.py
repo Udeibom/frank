@@ -6,6 +6,7 @@ from app.models.conversation import ConversationMessage, ConversationAction
 class GenerateBeatRequest(BaseModel):
     fingerprint: dict[str, Any] = {}
     duration_hint: Optional[int] = None
+    structure_context: Optional[dict[str, Any]] = None
 
 
 class EditSectionRequest(BaseModel):

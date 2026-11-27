@@ -3,7 +3,7 @@
  * Pure functions, so the rules for "what is lit where" are in one place and can be checked.
  */
 
-import type { SongRecord } from "@/types/song"
+import type { SongRecord, StructureFacet } from "@/types/song"
 
 export type LaneState = "in_use" | "tried" | "none"
 
@@ -15,6 +15,11 @@ export interface StripSection {
   weight: number
   /** Whether the user's words cover this section. */
   words: boolean
+}
+
+export interface PreviewSection {
+  name: string
+  weight: number
 }
 
 export interface StripModel {
@@ -34,7 +39,7 @@ interface BeatSummary {
   sections?: { index?: number; name?: string; bars?: number }[]
 }
 
-const HEADING = /^\s*[[(]?\s*(intro|verse|pre-?chorus|chorus|hook|refrain|bridge|outro)\b[^\])]*[\])]?\s*:?\s*$/i
+const HEADING = /^\s*[\[(]?\s*(intro|verse|pre[\s-]?chorus|chorus|hook|refrain|bridge|outro)\b[^\])]*[\])]?\s*:?\s*$/i
 
 /** The kinds of section the person has written under a heading, in order ("verse", "chorus", ...). Words with no headings give []. */
 export function lyricHeadings(lyrics: string | null): string[] {
@@ -42,17 +47,30 @@ export function lyricHeadings(lyrics: string | null): string[] {
   const found: string[] = []
   for (const line of lyrics.split("\n")) {
     const m = HEADING.exec(line)
-    if (m) found.push(m[1].toLowerCase().replace("-", ""))
+    if (m) found.push(m[1].toLowerCase().replace(/[\s-]/g, ""))
   }
   return found
 }
 
 function kindOf(name: string): string {
-  const n = name.toLowerCase().replace("-", "")
+  const n = name.toLowerCase().replace(/[\s-]/g, "")
   for (const k of ["intro", "verse", "prechorus", "chorus", "hook", "refrain", "bridge", "outro"]) {
     if (n.startsWith(k)) return k === "hook" || k === "refrain" ? "chorus" : k
   }
   return n
+}
+
+function prettyName(kind: string): string {
+  if (kind === "prechorus") return "Pre-chorus"
+  return kind.charAt(0).toUpperCase() + kind.slice(1)
+}
+
+export function previewSections(record: SongRecord | null): PreviewSection[] {
+  const structure = record?.facets?.structure as StructureFacet | null | undefined
+  if (structure?.sections?.length) {
+    return structure.sections.map((s) => ({ name: prettyName(kindOf(s.name)), weight: 1 }))
+  }
+  return lyricHeadings(record?.lyrics ?? null).map((h) => ({ name: prettyName(h), weight: 1 }))
 }
 
 export function buildStripModel(record: SongRecord | null, directionsTried: boolean): StripModel {
@@ -62,7 +80,8 @@ export function buildStripModel(record: SongRecord | null, directionsTried: bool
   const hasVoice = Boolean(record?.vocal)
   const keptFeeling = Boolean(record?.fingerprint)
 
-  const headings = lyricHeadings(record?.lyrics ?? null).map((h) => (h === "hook" || h === "refrain" ? "chorus" : h))
+  const preview = previewSections(record)
+  const headings = preview.map((s) => kindOf(s.name))
   const wordsCover = (name: string) => hasWords && (headings.length === 0 || headings.includes(kindOf(name)))
 
   let sections: StripSection[] = []
@@ -75,11 +94,11 @@ export function buildStripModel(record: SongRecord | null, directionsTried: bool
       weight: Math.max(1, s.bars ?? 1),
       words: wordsCover(s.name ?? ""),
     }))
-  } else if (hasWords && headings.length > 0) {
-    sections = headings.map((h, i) => ({
+  } else if (hasWords && preview.length > 0) {
+    sections = preview.map((s, i) => ({
       key: `w${i}`,
-      name: h.charAt(0).toUpperCase() + h.slice(1),
-      weight: 1,
+      name: s.name,
+      weight: s.weight,
       words: true,
     }))
   }

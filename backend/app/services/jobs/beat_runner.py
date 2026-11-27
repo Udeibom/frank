@@ -24,6 +24,7 @@ from app.db import jobs as jobs_db
 from app.services.jobs.heavy import HEAVY, log_memory
 from app.db import beat as beat_db
 from app.db import projects as projects_db
+from app.db import song as song_db
 from app.services.storage.files import upload_audio
 from app.services.generation import beat as beat_engine
 from app.services.generation import renderer
@@ -32,6 +33,7 @@ from app.services.generation import lead as lead_mod
 from app.services.generation.rng import derive_seed
 from app.services.intake.melody import CONFIDENT
 from app.services.song import record as song_record
+from app.services.song.sections import section_headings
 from app.services.generation.styles import pick_style
 
 log = logging.getLogger("frank.beat")
@@ -48,7 +50,8 @@ def _lead_used(version: dict) -> bool:
 
 
 def _arrangement_params(
-    sections: list[beat_engine.SectionPlan], fp: dict, seed: int, lead: lead_mod.Lead | None = None
+    sections: list[beat_engine.SectionPlan], fp: dict, seed: int, lead: lead_mod.Lead | None = None,
+    structure_provenance: dict | None = None,
 ) -> dict:
     """Serialize the arrangement into JSON for beat_versions.params."""
     style = pick_style(fp)
@@ -57,6 +60,7 @@ def _arrangement_params(
         # Where bar 1 falls in the singer's recording, for music built from their singing (core-path spec 15, 8)
         "start_s": float(fp.get("music_start_s") or 0.0),
         "engine": beat_engine.ENGINE_VERSION,
+        "structure_provenance": structure_provenance or {"source": "stored_arrangement"},
         "mix_chain": True,
         "seed": seed,
         "lead": lead.to_dict() if lead else None,
@@ -82,7 +86,7 @@ def _arrangement_params(
 
 def _render_and_persist_sync(
     project_id: str, fingerprint: dict, label: str, seed: int, lead: lead_mod.Lead | None = None,
-    structure: dict | None = None, min_seconds: float = 0.0,
+    structure: dict | None = None, min_seconds: float = 0.0, structure_provenance: dict | None = None,
 ) -> dict:
     """
     The entire heavy job, run in ONE worker thread: render the beat, encode MP3,
@@ -99,7 +103,7 @@ def _render_and_persist_sync(
     log_memory("beat: rendered")
     fp = beat_engine.fp_utils.normalize(fingerprint)
     return _persist_sync(project_id, sections, mixes, full, fp, label, seed, lead, song_gain=report.get("song_gain"),
-                         section_gains=report.get("section_gains"))
+                         section_gains=report.get("section_gains"), structure_provenance=structure_provenance)
 
 
 def _rerender_and_persist_sync(
@@ -134,6 +138,7 @@ def _persist_sync(
     operations: list[dict] | None = None,
     song_gain: float | None = None,
     section_gains: list[float] | None = None,
+    structure_provenance: dict | None = None,
 ) -> dict:
     """
     Upload the assembled render + one mixed file per section, and write records.
@@ -146,7 +151,7 @@ def _persist_sync(
     full_mp3 = to_mp3_bytes(full_audio)
     render_url = upload_audio("beats", full_mp3, extension="mp3", name_prefix="beat")
 
-    params = _arrangement_params(sections, fp, seed, lead)
+    params = _arrangement_params(sections, fp, seed, lead, structure_provenance)
     if changes:
         params["changes"] = changes            # what this version changed, in plain words
         params["operations"] = operations or []
@@ -217,8 +222,43 @@ async def _fingerprint_and_lead(project_id: str, fingerprint: dict) -> tuple[dic
     return fp, lead
 
 
+async def _structure_for_generation(project_id: str, context: dict | None = None) -> tuple[dict | None, dict]:
+    """The words' current structure and where it came from, or None with the default marker."""
+    context = dict(context or {})
+    try:
+        active_id = (await song_db.get_active_map(project_id)).get("structure")
+        wanted_id = context.get("facet_version_id") or active_id
+        if wanted_id:
+            versions = await song_db.get_versions(project_id, [wanted_id])
+            if versions and beat_engine.arrangement_from_structure(versions[0].content):
+                provenance = {**context, "facet": "structure", "facet_version_id": wanted_id}
+                if wanted_id == active_id:
+                    provenance.setdefault("source", "active_structure_facet")
+                return dict(versions[0].content), provenance
+        if active_id and active_id != wanted_id:
+            versions = await song_db.get_versions(project_id, [active_id])
+            if versions and beat_engine.arrangement_from_structure(versions[0].content):
+                return dict(versions[0].content), {
+                    "facet": "structure", "facet_version_id": active_id, "source": "active_structure_facet",
+                }
+    except Exception:  # noqa: BLE001  a missing record never stops a beat
+        pass
+    try:
+        from app.services.intake import lyrics as lyrics_mod
+
+        record = await song_record.get_record(project_id)
+        if record.lyrics and record.lyrics.strip():
+            sections = [s.model_dump() for s in lyrics_mod.guess_sections(record.lyrics)]
+            if sections:
+                source = "lyrics_headings" if section_headings(record.lyrics) else "lyrics_stanzas"
+                return {"sections": sections}, {"source": source}
+    except Exception:  # noqa: BLE001  unread words never stop a beat
+        pass
+    return None, {"source": "default_arrangement"}
+
+
 async def run_full_beat_job(
-    job_id: str, project_id: str, fingerprint: dict
+    job_id: str, project_id: str, fingerprint: dict, structure_context: dict | None = None
 ) -> None:
     """Generate a complete beat and make it the active beat version."""
     try:
@@ -230,11 +270,7 @@ async def run_full_beat_job(
         # A new version gets a new seed, so asking for another one gives a different song, while
         # the same fingerprint and the same count always give the same song (repeatable).
         seed = derive_seed(json.dumps(fingerprint, sort_keys=True, default=str), count)
-        # The person's words decide the song's shape when they have been read (song-engine task 3.1).
-        try:
-            structure = await song_record.active_facet(project_id, "structure")
-        except Exception:  # noqa: BLE001  a missing record never stops a beat
-            structure = None
+        structure, structure_provenance = await _structure_for_generation(project_id, structure_context)
 
         # As long as their singing, when they have recorded (core-path spec 15, requirement 3.1)
         from app.services.audio.duration import active_voice_seconds
@@ -243,7 +279,8 @@ async def run_full_beat_job(
         # Entire heavy job (render + encode + upload + records) in one thread
         async with _one_at_a_time:
             version = await asyncio.to_thread(
-                _render_and_persist_sync, project_id, fingerprint, label, seed, lead, structure, voice_s
+                _render_and_persist_sync, project_id, fingerprint, label, seed, lead, structure, voice_s,
+                structure_provenance
             )
 
         await projects_db.update_project_active_state(

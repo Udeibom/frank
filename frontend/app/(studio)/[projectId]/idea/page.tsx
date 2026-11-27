@@ -24,6 +24,7 @@ import { sendIdeaMessage } from "@/lib/api/conversation"
 import { updateProject } from "@/lib/api/projects"
 import { lyricHeadings } from "@/lib/songShape"
 import { useProjectStore } from "@/store/project"
+import { useSongStore } from "@/store/song"
 import type { LyricsVersion } from "@/types/project"
 import type { ConversationMessage } from "@/types/api"
 
@@ -45,7 +46,7 @@ function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-const SECTION_HEADING = /^\s*[[(]?\s*(intro|verse|pre-?chorus|chorus|hook|refrain|bridge|outro)\b/i
+const SECTION_HEADING = /^\s*[\[(]?\s*(intro|verse|pre[\s-]?chorus|chorus|hook|refrain|bridge|outro)\b/i
 
 interface SectionSpan {
   name: string
@@ -71,7 +72,7 @@ function sectionSpans(words: string): SectionSpan[] {
     const heading = SECTION_HEADING.exec(line)
     if (heading) {
       flush()
-      const kind = heading[1].toLowerCase().replace("-", "")
+      const kind = heading[1].toLowerCase().replace(/[\s-]/g, "")
       current = {
         name: capitalise(line),
         start: lyricLine + 1,
@@ -91,6 +92,7 @@ export default function WordsPage() {
   const params = useParams()
   const projectId = params.projectId as string
   const { activeState, currentProject, updateProjectTitle } = useProjectStore()
+  const loadSong = useSongStore((s) => s.load)
 
   const [versions, setVersions] = useState<LyricsVersion[]>([])
   const [editorContent, setEditorContent] = useState("")
@@ -191,6 +193,7 @@ export default function WordsPage() {
         selectedText: selectedTextRef.current,
         history: historyRef.current.slice(0, -1),
       })
+      void loadSong(projectId)
       const suggestion = res.actions.find((a) => a.type === "suggest_lyrics")
       setTurns((t) => [
         ...t,

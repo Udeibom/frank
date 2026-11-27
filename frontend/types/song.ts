@@ -38,6 +38,18 @@ export interface SongRecord {
   decisions: SongDecision[]
 }
 
+export interface StructureSection {
+  name: string
+  first_line?: number
+  last_line?: number
+}
+
+export interface StructureFacet {
+  sections?: StructureSection[]
+  from_user_message?: boolean
+  [key: string]: unknown
+}
+
 export interface SongFacetVersion {
   id: string
   facet: SongFacetName

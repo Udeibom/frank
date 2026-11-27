@@ -44,6 +44,7 @@ export interface BeatVersion {
     fingerprint?: Partial<MusicalFingerprint>
     sections?: BeatSection[]
     lead_info?: LeadInfo
+    structure_provenance?: Record<string, unknown>
     changes?: string[]
   }
   created_at: string
@@ -57,9 +58,11 @@ export interface BeatConversationResult {
 export async function generateBeat(
   projectId: string,
   fingerprint: Partial<MusicalFingerprint>,
+  structureContext?: Record<string, unknown>,
 ): Promise<{ job_id: string }> {
   return api.post<{ job_id: string }>(`/projects/${projectId}/beat/generate`, {
     fingerprint,
+    structure_context: structureContext,
   })
 }
 
@@ -110,7 +113,11 @@ export async function muteStem(
 export async function sendBeatMessage(
   projectId: string,
   message: string,
-  beatState: { sections?: BeatSection[] },
+  beatState: {
+    sections?: BeatSection[]
+    versions?: { id: string; label: string }[]
+    structure?: Record<string, unknown> | null
+  },
   history: ConversationMessage[],
 ): Promise<BeatConversationResult> {
   return api.post<BeatConversationResult>(

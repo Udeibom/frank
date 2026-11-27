@@ -29,25 +29,19 @@ from pydantic import BaseModel, ValidationError, field_validator
 from app.models.song import (
     MODES,
     SECTION_FEELINGS,
-    SECTION_NAMES,
     TEMPO_FEELS,
     LyricSection,
     LyricsFeeling,
     LyricsHints,
     LyricsReading,
 )
+from app.services.song.sections import canonical_section_name, section_headings
 
 MAX_CHARS = 8000          # a song is a couple of thousand characters; this is generous
 MIN_LINES = 2
 CONFIDENT = 0.6           # sure enough to decide the mood (dark or warm), which shapes the whole sound
 HINT_CONFIDENCE = 0.4     # sure enough to offer a soft starting point for energy, busyness and pace.
                           # These only ever fill a gap and are refined in the Feel Lab, so the bar is lower.
-_ALIASES = {
-    "refrain": "chorus", "hook": "chorus", "pre chorus": "pre-chorus", "prechorus": "pre-chorus",
-    "pre-chorus": "pre-chorus", "verse": "verse", "chorus": "chorus", "bridge": "bridge",
-    "intro": "intro", "outro": "outro", "ending": "outro", "opening": "intro",
-}
-
 Ask = Callable[[str, str], str]   # (system prompt, user message) -> raw model text
 
 
@@ -91,18 +85,34 @@ def _normal(line: str) -> str:
 
 def guess_sections(text: str) -> list[LyricSection]:
     """
-    Structure from the page alone: each stanza is a section, and a stanza that comes back
-    (the same lines again) is the chorus. Used when the model cannot be asked, or answers badly.
+    Structure from the page alone: written headings keep their own names and order; otherwise each stanza is a
+    section, and a stanza that comes back (the same lines again) is the chorus. Used when the model cannot be
+    asked, or answers badly.
     """
     lines = lines_of(text)
-    stanzas = stanzas_of(text)
     if not lines:
         return []
+    physical_to_line: dict[int, int] = {}
+    n = 0
+    for index, raw in enumerate(text.splitlines(), 1):
+        if raw.strip():
+            n += 1
+        physical_to_line[index] = n
+    headings = [(name, physical_to_line[physical]) for name, physical in section_headings(text)]
+    if headings:
+        out: list[LyricSection] = []
+        for i, (name, start) in enumerate(headings):
+            end = headings[i + 1][1] - 1 if i + 1 < len(headings) else len(lines)
+            if end >= start:
+                out.append(LyricSection(name=name, first_line=start, last_line=end))
+        if out:
+            return out
+    stanzas = stanzas_of(text)
     if len(stanzas) <= 1:
         return [LyricSection(name="verse", first_line=1, last_line=len(lines))]
     keys = [tuple(_normal(lines[i - 1]) for i in range(a, b + 1)) for a, b in stanzas]
     repeated = {k for k in keys if keys.count(k) > 1}
-    out: list[LyricSection] = []
+    out = []
     for (a, b), key in zip(stanzas, keys):
         out.append(LyricSection(name="chorus" if key in repeated else "verse", first_line=a, last_line=b))
     return out
@@ -112,10 +122,7 @@ def guess_sections(text: str) -> list[LyricSection]:
 
 def _name(raw: object) -> str:
     """A section name the rest of Frank understands: 'Verse 2' becomes 'verse', anything unknown 'verse'."""
-    key = re.sub(r"\s+", " ", str(raw or "").strip().lower())
-    key = re.sub(r"\s*\d+\s*$", "", key)          # "verse 2" -> "verse"
-    mapped = _ALIASES.get(key, key)
-    return mapped if mapped in SECTION_NAMES else "verse"
+    return canonical_section_name(raw) or "verse"
 
 
 def repair_sections(raw: list[LyricSection], line_count: int) -> list[LyricSection]:
@@ -423,8 +430,9 @@ Reply with ONE JSON object and nothing else:
 }
 
 Rules:
-- Lines are numbered. Sections must cover every line exactly once, in order. A stanza that comes back
-  is usually the chorus.
+- Lines are numbered. Sections must cover every line exactly once, in order. A written heading names its
+  section and must be kept exactly as written, including "pre-chorus". A stanza that comes back without a
+  heading is usually the chorus. Never add an intro, outro or extra chorus that is not in the words.
 - "feeling" on each section says how THAT stretch feels. "sorrowful" is loss, grief, longing, regret,
   loneliness or heaviness. "angry" is anger, defiance, bitterness, rebellion or not caring. "warm" is
   joy, thanks, love, hope or celebration. "mixed" is a dark feeling and a warm one at the same time.

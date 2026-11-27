@@ -28,6 +28,8 @@ from app.db import jobs as jobs_db
 from app.db import beat as beat_db
 from app.db import projects as projects_db
 from app.db import voice as voice_db
+from app.services.song import store as song_store
+from app.services.song.sections import parse_section_order, structure_from_order
 
 router = APIRouter(prefix="/projects/{project_id}/beat", tags=["beat"])
 
@@ -46,7 +48,7 @@ async def generate_beat(
 ) -> JobResponse:
     """Start full beat generation as a background job."""
     job = await jobs_db.create_job(project_id, job_type="generate_beat")
-    await dispatch.start(background, job, run_full_beat_job, project_id, body.fingerprint)
+    await dispatch.start(background, job, run_full_beat_job, project_id, body.fingerprint, body.structure_context)
     return JobResponse(job_id=job["id"])
 
 
@@ -123,6 +125,18 @@ async def beat_conversation(
     early = await _version_reply(project_id, "beat", body.message)
     if early:
         return BeatConversationResponse(**early)
+    stated_order = parse_section_order(body.message)
+    stated_structure_id = None
+    if len(stated_order) >= 2:
+        stated = await song_store.write_facet(
+            project_id,
+            "structure",
+            structure_from_order(stated_order),
+            author="user",
+            operation="set_section_order",
+            label="Section order from the beat room",
+        )
+        stated_structure_id = stated.id
     messages = build_beat_room_messages(body.beat_state, history, body.message)
     system = await convo.with_earlier(project_id, "beat", await system_with_brief(project_id, BEAT_ROOM_SYSTEM, "beat_maker"))
     try:
@@ -140,6 +154,12 @@ async def beat_conversation(
         for a in result.get("actions", [])
         if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS
     ]
+    if stated_structure_id:
+        for a in actions:
+            if a.type == "generate_full_beat":
+                a.params["structure_context"] = {
+                    "facet": "structure", "facet_version_id": stated_structure_id, "source": "user_message",
+                }
     from app.services.refine.resolve import wants_refine
 
     if wants_refine(body.message) and not any(a.type == "refine" for a in actions):

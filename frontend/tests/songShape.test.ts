@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest"
 import fc from "fast-check"
-import { buildStripModel, lyricHeadings, sectionAt, sectionStart, type StripSection } from "@/lib/songShape"
+import { buildStripModel, lyricHeadings, previewSections, sectionAt, sectionStart, type StripSection } from "@/lib/songShape"
 import { pollDelay } from "@/lib/api/jobs"
 import { formatTime } from "@/store/audio"
 import type { SongRecord } from "@/types/song"
@@ -84,6 +84,22 @@ describe("song strip", () => {
         }
       }),
     )
+  })
+
+  it("a structure stated by the person is previewed in its own order", () => {
+    const record = {
+      facets: { structure: { sections: [{ name: "verse" }, { name: "pre-chorus" }, { name: "chorus" }, { name: "bridge" }, { name: "chorus" }, { name: "outro" }] } },
+    } as unknown as SongRecord
+    expect(previewSections(record).map((s) => s.name)).toEqual([
+      "Verse", "Pre-chorus", "Chorus", "Bridge", "Chorus", "Outro",
+    ])
+  })
+
+  it("written headings are previewed without an invented intro or ending", () => {
+    const record = {
+      lyrics: "[Verse]\nhello\n[Pre-chorus]\nalmost\n[Chorus]\nnow\n[Outro]\ngoodbye",
+    } as unknown as SongRecord
+    expect(previewSections(record).map((s) => s.name)).toEqual(["Verse", "Pre-chorus", "Chorus", "Outro"])
   })
 })
 
