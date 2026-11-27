@@ -48,7 +48,10 @@ async def generate_beat(
 ) -> JobResponse:
     """Start full beat generation as a background job."""
     job = await jobs_db.create_job(project_id, job_type="generate_beat")
-    await dispatch.start(background, job, run_full_beat_job, project_id, body.fingerprint, body.structure_context)
+    args: list[Any] = [project_id, body.fingerprint]
+    if body.structure_context is not None:
+        args.append(body.structure_context)
+    await dispatch.start(background, job, run_full_beat_job, *args)
     return JobResponse(job_id=job["id"])
 
 
