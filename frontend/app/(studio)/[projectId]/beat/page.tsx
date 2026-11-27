@@ -329,9 +329,11 @@ export default function MusicPage() {
           </div>
         </div>
 
-        <FrankNote aside={aside} answers={answers} material="music" problem={work.kind === "failed"} busy={busy} appearance="room" roleLabel="Producer Note">
-          {note}
-        </FrankNote>
+        <div className="mx-auto w-full max-w-[1020px]">
+          <FrankNote aside={aside} answers={answers} material="music" problem={work.kind === "failed"} busy={busy} appearance="room" roleLabel="Producer Note">
+            {note}
+          </FrankNote>
+        </div>
 
         {showAsk && (
           <form

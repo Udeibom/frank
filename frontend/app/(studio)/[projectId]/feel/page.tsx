@@ -293,9 +293,11 @@ export default function FeelingPage() {
           </div>
         </div>
 
-        <FrankNote aside={aside} answers={answers} material="feel" appearance="room" roleLabel="Producer Note">
-          {note}
-        </FrankNote>
+        <div className="mx-auto w-full max-w-[1020px]">
+          <FrankNote aside={aside} answers={answers} material="feel" appearance="room" roleLabel="Producer Note">
+            {note}
+          </FrankNote>
+        </div>
 
         {showAsk && (
           <form

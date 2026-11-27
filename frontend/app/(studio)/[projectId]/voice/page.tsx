@@ -436,9 +436,11 @@ export default function VoiceRoomPage() {
           />
         )}
 
-        <FrankNote answers={answers} material="voice" busy={busy} appearance="room" roleLabel="Producer Note">
-          {note}
-        </FrankNote>
+        <div className="mx-auto w-full max-w-[1020px]">
+          <FrankNote answers={answers} material="voice" busy={busy} appearance="room" roleLabel="Producer Note">
+            {note}
+          </FrankNote>
+        </div>
 
         {showDelayCheck && beat && (
           <DelayCheck
