@@ -32,7 +32,7 @@ export function VoiceMemoButton({
   onError,
   appearance = "chat",
 }: VoiceMemoButtonProps) {
-  const look = appearance === "stage" ? "h-10 border-line bg-raised px-4 text-base text-ink hover:border-ink-3 hover:bg-raised" : "w-full justify-start"
+  const look = appearance === "stage" ? "h-11 rounded-lg border border-line bg-surface-high px-5 text-label-md text-on-surface hover:bg-surface-highest" : "w-full justify-start"
   const recorder = useRecorder()
   const [transcribing, setTranscribing] = useState(false)
   // Tracks that the user pressed stop and wants the memo transcribed
@@ -103,8 +103,8 @@ export function VoiceMemoButton({
       onClick={handleStart}
       className={appearance === "stage" ? look : "w-full justify-start text-muted-foreground"}
     >
-      <Mic className="h-4 w-4" />
-      Hum or speak an idea
+      <Mic className={appearance === "stage" ? "h-4 w-4 text-words" : "h-4 w-4"} />
+      Record voice memo — speak or sing and Frank will transcribe it
     </Button>
   )
 }

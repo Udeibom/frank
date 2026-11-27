@@ -72,15 +72,20 @@ function stressMarks(stresses: string): string {
 }
 
 function buildDecorations(doc: PMNode, analysed: LyricLineSound[] | null): DecorationSet {
-  if (!analysed) return DecorationSet.empty
   const paragraphs: { node: PMNode; pos: number }[] = []
   doc.forEach((node, pos) => paragraphs.push({ node, pos }))
-  const matched = matchLines(paragraphs.map((p) => p.node.textContent), analysed)
+  const matched = analysed ? matchLines(paragraphs.map((p) => p.node.textContent), analysed) : []
   const decos: Decoration[] = []
   paragraphs.forEach(({ node, pos }, i) => {
+    const text = node.textContent
+    const section = HEADING.exec(text)
+    if (section) {
+      const raw = section[1].toLowerCase().replace("-", "")
+      const kind = raw === "hook" || raw === "refrain" ? "chorus" : raw
+      decos.push(Decoration.node(pos, pos + node.nodeSize, { "data-section-heading": "true", "data-section-kind": kind }))
+    }
     const line = matched[i]
     if (!line) return
-    const text = node.textContent
     if (line.rhyme_group !== null) {
       decos.push(Decoration.node(pos, pos + node.nodeSize, { "data-rhyme": String(line.rhyme_group % 6) }))
     }
@@ -188,7 +193,7 @@ export function LyricsEditor({ projectId, initialContent, onSelectionChange, onC
     content: textToDoc(initialContent),
     editorProps: {
       attributes: {
-        class: "frank-lyrics min-h-[420px] w-full font-written text-xl leading-[1.6] text-ink focus-visible:outline-none",
+        class: "frank-lyrics min-h-[420px] w-full font-written text-xl leading-[1.6] text-on-surface focus-visible:outline-none",
         "aria-label": "Your words",
         spellcheck: "true",
         role: "textbox",
@@ -250,22 +255,31 @@ export function LyricsEditor({ projectId, initialContent, onSelectionChange, onC
 
   return (
     <div className="flex flex-col">
-      <div className="mb-2 flex h-6 items-center justify-between gap-3">
-        <p role="status" aria-live="polite" className={saveState === "failed" ? "text-sm text-problem" : "text-sm text-ink-3"}>
-          {status}
-        </p>
-        <button
-          type="button"
-          onClick={() => setShowRhythm((v) => !v)}
-          aria-pressed={showRhythm}
-          className="rounded-full border border-line px-3 py-0.5 text-xs text-ink-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-words"
-        >
-          {showRhythm ? "Hide the rhythm" : "Show the rhythm"}
-        </button>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-line/40 pb-3">
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 rounded-full ${saveState === "failed" ? "bg-problem" : saveState === "saving" ? "bg-caution" : "bg-tertiary shadow-[0_0_6px_rgba(84,221,252,0.8)]"}`}
+          />
+          <p role="status" aria-live="polite" className={saveState === "failed" ? "text-sm text-problem" : "text-sm text-on-surface-variant"}>
+            {status || "Saved just now"}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-code uppercase tracking-wider text-on-surface-variant/60">Plain Text Mode</span>
+          <button
+            type="button"
+            onClick={() => setShowRhythm((v) => !v)}
+            aria-pressed={showRhythm}
+            className="rounded-lg bg-surface-container px-3 py-1 text-label-md text-on-surface-variant hover:bg-surface-high hover:text-on-surface"
+          >
+            {showRhythm ? "Hide the rhythm" : "Show the rhythm"}
+          </button>
+        </div>
       </div>
       <div className="relative" data-rhythm={showRhythm ? "on" : "off"}>
         {editor && !content && (
-          <p aria-hidden className="pointer-events-none absolute left-0 top-0 whitespace-pre-line text-base leading-relaxed text-ink-3">
+          <p aria-hidden className="pointer-events-none absolute left-0 top-0 whitespace-pre-line text-base leading-relaxed text-on-surface-variant/50">
             {"Start writing.\n\nA line, a feeling, a whole chorus. Mark a section by giving it its own line: Verse, Chorus, Bridge."}
           </p>
         )}
@@ -279,14 +293,14 @@ export function LyricsEditor({ projectId, initialContent, onSelectionChange, onC
         </ul>
       )}
       {rhymes && (rhymes.rhymes.length > 0 || rhymes.near.length > 0) && (
-        <div className="mt-4 rounded-lg border border-line bg-surface p-3 text-sm" aria-live="polite">
-          <p className="text-ink-2">
-            Words that rhyme with <span className="font-written text-ink">{rhymes.word}</span>
+        <div className="mt-4 rounded-lg border border-line bg-surface-low p-3 text-sm" aria-live="polite">
+          <p className="text-on-surface-variant">
+            Words that rhyme with <span className="font-written text-on-surface">{rhymes.word}</span>
           </p>
-          <p className="mt-1 text-ink">{rhymes.rhymes.slice(0, 10).join(", ")}</p>
+          <p className="mt-1 text-on-surface">{rhymes.rhymes.slice(0, 10).join(", ")}</p>
           {rhymes.near.length > 0 && (
-            <p className="mt-2 text-ink-3">
-              Nearly rhyme: <span className="text-ink-2">{rhymes.near.slice(0, 8).join(", ")}</span>
+            <p className="mt-2 text-on-surface-variant/70">
+              Nearly rhyme: <span className="text-on-surface-variant">{rhymes.near.slice(0, 8).join(", ")}</span>
             </p>
           )}
         </div>

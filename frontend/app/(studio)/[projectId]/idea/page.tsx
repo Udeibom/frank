@@ -10,6 +10,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useParams } from "next/navigation"
+import { ListMusic } from "lucide-react"
 import { WordsFeel } from "@/components/studio/WordsFeel"
 import { LyricsEditor } from "@/components/studio/LyricsEditor"
 import { LyricsVersionHistory } from "@/components/studio/LyricsVersionHistory"
@@ -42,6 +43,48 @@ function suggestedTitle(words: string): string | null {
 
 function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+const SECTION_HEADING = /^\s*[[(]?\s*(intro|verse|pre-?chorus|chorus|hook|refrain|bridge|outro)\b/i
+
+interface SectionSpan {
+  name: string
+  range: string
+  chorus: boolean
+}
+
+function sectionSpans(words: string): SectionSpan[] {
+  const result: SectionSpan[] = []
+  let current: { name: string; start: number; end: number; chorus: boolean } | null = null
+  let lyricLine = 0
+  const flush = () => {
+    if (!current) return
+    result.push({
+      name: current.name,
+      range: current.start === current.end ? `Line ${current.start}` : `Lines ${current.start}–${current.end}`,
+      chorus: current.chorus,
+    })
+  }
+  for (const raw of words.split("\n")) {
+    const line = raw.trim()
+    if (!line) continue
+    const heading = SECTION_HEADING.exec(line)
+    if (heading) {
+      flush()
+      const kind = heading[1].toLowerCase().replace("-", "")
+      current = {
+        name: capitalise(line),
+        start: lyricLine + 1,
+        end: lyricLine,
+        chorus: kind === "chorus" || kind === "hook" || kind === "refrain",
+      }
+      continue
+    }
+    lyricLine += 1
+    if (current) current.end = lyricLine
+  }
+  flush()
+  return result
 }
 
 export default function WordsPage() {
@@ -174,8 +217,13 @@ export default function WordsPage() {
   }
 
   const activeVersionId = activeState?.active_lyrics_id ?? versions[0]?.id ?? null
-  const sections = lyricHeadings(liveWords)
+  const sections = sectionSpans(liveWords)
   const hasWords = liveWords.trim().length > 0
+  const missingSections = [
+    { label: "Pre-chorus", found: sections.some((s) => /pre-?chorus/i.test(s.name)) },
+    { label: "Bridge", found: sections.some((s) => /bridge/i.test(s.name)) },
+    { label: "Outro", found: sections.some((s) => /outro/i.test(s.name)) },
+  ].filter((s) => !s.found)
 
   // ─── What Frank is saying on the stage ───
   let note: React.ReactNode
@@ -199,85 +247,105 @@ export default function WordsPage() {
   }
 
   return (
-    <div className="flex h-full">
-      <div className="room-words flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
-        {/* Room header — Stitch design */}
-        <div className="border-b border-line/50 pb-5">
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: "rgb(var(--words))" }} />
-            <h1 className="text-xl font-bold text-ink">Words</h1>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 01</span>
-          </div>
-          <p className="mt-1 text-sm text-ink-2">Write your song in plain language. Frank listens, catches rhymes, and never overwrites without asking.</p>
-        </div>
-
-
-        <FrankNote answers={answers} material="words">
-          {note}
-        </FrankNote>
-
-        <div className="flex min-w-0 gap-12">
-          {/* The page */}
-          <div className="min-w-0 max-w-[640px] flex-1">
-            {loaded ? (
-              <div className="rounded-xl border border-line/50 bg-raised px-8 py-6 shadow-l2">
-                <LyricsEditor
-                  projectId={projectId}
-                  initialContent={editorContent}
-                  onContentChange={handleContentChange}
-                  onSelectionChange={(text) => (selectedTextRef.current = text)}
-                  onVersionSaved={handleVersionSaved}
-                />
-              </div>
-            ) : (
-              <p className="text-base text-ink-2" role="status">
-                Opening your words…
-              </p>
-            )}
-            <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-line pt-5">
-              <ReadWordsButton projectId={projectId} getWords={() => currentLyricsRef.current} onSay={(m) => sayAsFrank(m)} appearance="stage" />
-              <VoiceMemoButton
-                projectId={projectId}
-                appearance="stage"
-                onTranscription={(text) =>
-                  sayAsFrank("Here's what I heard. Want to use any of it?", <SuggestionBlock content={text} onAdd={(c) => addToEditor(c)} />)
-                }
-                onError={(message) => sayAsFrank(message)}
-              />
+    <div className="words-design flex h-full">
+      <div className="room-words flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-6">
+        <header className="mx-auto flex w-full max-w-[1020px] flex-col justify-between gap-4 border-b border-line/50 pb-4 md:flex-row md:items-end">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-words shadow-[0_0_8px_rgba(244,63,94,0.4)]" />
+              <h1 className="font-written text-3xl font-normal tracking-tight text-on-surface">Words</h1>
+              <span className="text-code rounded bg-surface-high px-1 py-0.5 uppercase text-on-surface-variant">Room 01</span>
             </div>
-            <div className="mt-5">
-              <WordsFeel projectId={projectId} getWords={() => currentLyricsRef.current} onSay={(m) => sayAsFrank(m)} />
-            </div>
+            <p className="text-sm text-on-surface-variant">Write your song in plain language. Frank listens, catches rhymes, and never overwrites without asking.</p>
           </div>
+        </header>
 
-          {/* The margin */}
-          <aside aria-label="About your words" className="hidden w-[260px] shrink-0 flex-col gap-8 lg:flex">
-            <section aria-labelledby="sections-heading" className="flex flex-col gap-3">
-              <h2 id="sections-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
-                Sections
-              </h2>
-              {sections.length ? (
-                <ol className="flex flex-col gap-2">
-                  {sections.map((s, i) => (
-                    <li key={`${s}-${i}`} className="flex items-center gap-2.5">
-                      <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: "rgb(var(--words) / 0.7)" }} />
-                      <span className="font-written italic text-base text-ink">{capitalise(s === "prechorus" ? "pre-chorus" : s)}</span>
-                    </li>
-                  ))}
-                </ol>
+        <div className="mx-auto flex w-full max-w-[1020px] flex-col gap-6">
+          <FrankNote answers={answers} material="words" appearance="room" roleLabel="Lyric Companion">
+            {note}
+          </FrankNote>
+
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="flex min-w-0 flex-col gap-5">
+              {loaded ? (
+                <div className="rounded-xl border border-line/40 bg-surface-low p-6 shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+                  <LyricsEditor
+                    projectId={projectId}
+                    initialContent={editorContent}
+                    onContentChange={handleContentChange}
+                    onSelectionChange={(text) => (selectedTextRef.current = text)}
+                    onVersionSaved={handleVersionSaved}
+                  />
+                </div>
               ) : (
-                <p className="text-sm text-ink-2">
-                  {hasWords ? "Give a section its own line (Verse, Chorus) and it shows up here." : "Your sections will show up here."}
+                <p className="text-base text-on-surface-variant" role="status">
+                  Opening your words…
                 </p>
               )}
-            </section>
-            <LyricsVersionHistory
-              versions={versions}
-              activeVersionId={activeVersionId}
-              onRestore={handleRestore}
-              onLabelUpdated={(id, label) => setVersions((vs) => vs.map((v) => (v.id === id ? { ...v, label } : v)))}
-            />
-          </aside>
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <ReadWordsButton projectId={projectId} getWords={() => currentLyricsRef.current} onSay={(m) => sayAsFrank(m)} appearance="stage" />
+                <VoiceMemoButton
+                  projectId={projectId}
+                  appearance="stage"
+                  onTranscription={(text) =>
+                    sayAsFrank("Here's what I heard. Want to use any of it?", <SuggestionBlock content={text} onAdd={(c) => addToEditor(c)} />)
+                  }
+                  onError={(message) => sayAsFrank(message)}
+                />
+              </div>
+              <WordsFeel projectId={projectId} getWords={() => currentLyricsRef.current} onSay={(m) => sayAsFrank(m)} />
+            </div>
+
+            <aside aria-label="About your words" className="hidden w-[280px] shrink-0 flex-col gap-6 lg:flex">
+              <section aria-labelledby="sections-heading" className="flex flex-col gap-3 rounded-xl bg-surface-low p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+                <div className="flex items-center justify-between pb-1">
+                  <h2 id="sections-heading" className="text-label-sm font-semibold uppercase tracking-[0.06em] text-on-surface-variant">
+                    Detected Sections
+                  </h2>
+                  <ListMusic className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {sections.length ? (
+                    sections.map((s, i) => (
+                      <div
+                        key={`${s.name}-${i}`}
+                        className={`flex items-center justify-between rounded-lg p-2 ${s.chorus ? "bg-surface-high shadow-[0_0_8px_rgba(245,158,11,0.15)]" : "bg-surface-container hover:bg-surface-high"}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`h-2 w-2 rounded-full ${s.chorus ? "bg-frank" : "bg-words"}`} />
+                          <span className={`text-label-md ${s.chorus ? "font-semibold text-frank-text" : "text-on-surface"}`}>{s.name}</span>
+                        </div>
+                        <span className={`text-code ${s.chorus ? "text-frank-text" : "text-on-surface-variant"}`}>{s.range}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-on-surface-variant">
+                      {hasWords ? "Give a section its own line (Verse, Chorus) and it shows up here." : "Your sections will show up here."}
+                    </p>
+                  )}
+                  {missingSections.length > 0 && (
+                    <div className="flex flex-col gap-1.5 pt-2 opacity-60">
+                      {missingSections.map((s) => (
+                        <div key={s.label} className="flex items-center justify-between px-2 py-1">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-surface-highest" />
+                            <span className="text-sm text-on-surface-variant">{s.label}</span>
+                          </div>
+                          <span className="font-mono text-[10px] text-on-surface-variant">Not yet</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+              <LyricsVersionHistory
+                versions={versions}
+                activeVersionId={activeVersionId}
+                onRestore={handleRestore}
+                onLabelUpdated={(id, label) => setVersions((vs) => vs.map((v) => (v.id === id ? { ...v, label } : v)))}
+              />
+            </aside>
+          </div>
         </div>
       </div>
 
@@ -310,10 +378,10 @@ function SuggestionBlock({
   const [resolved, setResolved] = useState<"added" | "ignored" | null>(null)
   if (resolved === "ignored") return null
   return (
-    <div className="rounded-md bg-raised p-3">
-      {sectionLabel && <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">{sectionLabel}</p>}
-      <p className="whitespace-pre-wrap font-written text-[17px] leading-[25px] text-words">{content}</p>
-      <div className="mt-2.5 flex items-center gap-3">
+    <div className="rounded-lg border border-frank/20 bg-surface-high p-3 shadow-[0_0_16px_rgba(245,158,11,0.2)]">
+      {sectionLabel && <p className="mb-1.5 text-label-sm font-semibold uppercase tracking-[0.06em] text-on-surface-variant">{sectionLabel}</p>}
+      <p className="whitespace-pre-wrap font-written text-xl leading-[30px] text-frank-text">“{content}”</p>
+      <div className="mt-2.5 flex items-center gap-2">
         {resolved === "added" ? (
           <span className="text-sm text-words">Added to your words</span>
         ) : (
@@ -323,11 +391,11 @@ function SuggestionBlock({
                 onAdd(content, sectionLabel)
                 setResolved("added")
               }}
-              className="rounded-md border border-line px-3 py-1 text-sm text-ink hover:border-ink-3"
+              className="rounded bg-frank px-3 py-1 text-label-sm font-semibold text-on-primary"
             >
               Add to my words
             </button>
-            <button onClick={() => setResolved("ignored")} className="text-sm text-ink-2 hover:text-ink">
+            <button onClick={() => setResolved("ignored")} className="rounded bg-surface-highest px-3 py-1 text-label-sm text-on-surface-variant">
               Leave it
             </button>
           </>

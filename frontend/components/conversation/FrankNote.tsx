@@ -32,20 +32,22 @@ interface FrankNoteProps {
   problem?: boolean
   busy?: boolean
   className?: string
+  appearance?: "compact" | "room"
+  roleLabel?: string
 }
 
-export function FrankNote({ children, aside, answers = [], material, problem, busy, className }: FrankNoteProps) {
+export function FrankNote({ children, aside, answers = [], material, problem, busy, className, appearance = "compact", roleLabel }: FrankNoteProps) {
   const borderColor = problem ? "border-problem" : material ? RULE[material] : "border-frank/50"
+  const room = appearance === "room"
   return (
     <section
       aria-label="Frank"
       aria-live="polite"
       aria-busy={busy}
       className={cn(
-        "relative flex items-start justify-between gap-5 overflow-hidden rounded-r-lg border-l-[3px] bg-surface px-5 py-4 shadow-l2",
-        "border border-line/40",
-        borderColor,
-        // Amber pulse on the left border while idle (not error, not busy)
+        "relative flex items-start justify-between gap-5 overflow-hidden",
+        room ? "w-full rounded-xl border border-line/40 bg-surface-low p-4 shadow-[0_4px_20px_rgba(0,0,0,0.3)]" : "rounded-r-lg border-l-[3px] bg-surface px-5 py-4 shadow-l2",
+        room ? "border border-line/40" : cn("border border-line/40", borderColor),
         !problem && !busy && "frank-note-border",
         className,
       )}
@@ -59,35 +61,39 @@ export function FrankNote({ children, aside, answers = [], material, problem, bu
       )}
 
       <div className="flex min-w-0 flex-1 flex-col gap-1 max-w-xl">
-        {/* Frank avatar label */}
-        <div className="flex items-center gap-2 mb-1">
+        <div className={room ? "flex items-center gap-3" : "flex items-center gap-2 mb-1"}>
           <span
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold italic select-none"
-            style={{
-              background: "rgb(var(--frank) / 0.15)",
-              color: "rgb(var(--frank))",
-            }}
+            className={room ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-frank-container text-xl font-bold italic text-on-primary shadow-[0_0_12px_rgba(245,158,11,0.25)] select-none" : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold italic select-none"}
+            style={room ? undefined : { background: "rgb(var(--frank) / 0.15)", color: "rgb(var(--frank))" }}
             aria-hidden="true"
           >
             f
           </span>
-          <span className="text-label-md font-semibold uppercase tracking-[0.1em] text-ink-3">Frank</span>
+          <div className={room ? "flex items-center gap-2" : undefined}>
+            <span className={room ? "text-label-md font-semibold text-frank-text" : "text-label-md font-semibold uppercase tracking-[0.1em] text-ink-3"}>Frank</span>
+            {room && <span className="h-1 w-1 rounded-full bg-frank-container" />}
+            {room && roleLabel && <span className="text-code text-on-surface-variant">{roleLabel}</span>}
+          </div>
         </div>
-        <p className="text-base leading-[21px] font-[500] text-ink">{children}</p>
-        {aside && <p className="mt-1 text-sm text-ink-2">{aside}</p>}
+        <p className={room ? "mt-0.5 text-base leading-[21px] text-on-surface" : "text-base leading-[21px] font-[500] text-ink"}>{children}</p>
+        {aside && <p className={room ? "mt-1 text-sm text-on-surface-variant" : "mt-1 text-sm text-ink-2"}>{aside}</p>}
       </div>
       {answers.length > 0 && (
-        <div className="flex shrink-0 flex-wrap gap-2 pt-1">
+        <div className={room ? "flex shrink-0 flex-wrap items-center gap-2 self-center" : "flex shrink-0 flex-wrap gap-2 pt-1"}>
           {answers.map((a) => (
             <button
               key={a.label}
               onClick={a.onClick}
               disabled={a.disabled}
               className={cn(
-                "whitespace-nowrap rounded-full border px-5 py-2 text-sm font-medium transition-all duration-150 disabled:opacity-60",
+                room ? "whitespace-nowrap rounded-lg px-4 py-1.5 text-label-md font-semibold transition-all duration-150 disabled:opacity-60" : "whitespace-nowrap rounded-full border px-5 py-2 text-sm font-medium transition-all duration-150 disabled:opacity-60",
                 a.primary
-                  ? "border-frank bg-frank text-ground hover:bg-frank-shade hover:-translate-y-px"
-                  : "border-line bg-raised text-ink hover:border-ink-3 hover:bg-raised/70",
+                  ? room
+                    ? "bg-frank text-on-primary hover:bg-frank-shade hover:shadow-[0_0_16px_rgba(245,158,11,0.25)]"
+                    : "border-frank bg-frank text-ground hover:bg-frank-shade hover:-translate-y-px"
+                  : room
+                    ? "bg-surface-high text-on-surface hover:bg-surface-highest"
+                    : "border-line bg-raised text-ink hover:border-ink-3 hover:bg-raised/70",
               )}
             >
               {a.label}

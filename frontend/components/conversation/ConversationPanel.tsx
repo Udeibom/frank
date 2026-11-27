@@ -70,6 +70,7 @@ export function ConversationPanel({
   const [open, setOpen] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
   const rule = RULE[material ?? (room ? ROOM_MATERIAL[room] : "words")]
+  const wordsRoom = room === "idea"
 
   // Frank reads its notes aloud (frankenstein spec 14, 4.5): off by default, remembered on this computer, and only
   // when nothing else is playing, so it never talks over the song.
@@ -140,10 +141,12 @@ export function ConversationPanel({
     )
   }
 
-  // User lines: written face + room colour rule
-  const lineUser = cn("border-l-2 pl-3 font-written text-[17px] leading-[25px]", rule)
-  // Frank lines: subtle amber tint left border
-  const lineFrank = "border-l-2 border-frank/40 pl-3 py-1.5 rounded-r-md bg-frank/[0.04] text-base leading-[21px] font-[500] text-ink"
+  const lineUser = wordsRoom
+    ? cn("border-l-2 pl-3 font-written text-base leading-6", rule)
+    : cn("border-l-2 pl-3 font-written text-[17px] leading-[25px]", rule)
+  const lineFrank = wordsRoom
+    ? "rounded-lg border-l-2 border-frank/40 bg-surface-high p-3 text-sm font-medium leading-5 text-on-surface"
+    : "border-l-2 border-frank/40 pl-3 py-1.5 rounded-r-md bg-frank/[0.04] text-base leading-[21px] font-[500] text-ink"
 
   return (
     <>
@@ -151,26 +154,29 @@ export function ConversationPanel({
       <div aria-hidden="true" className="hidden w-14 shrink-0 max-[1200px]:block" />
       <aside
         aria-label="Frank"
-        className="flex w-[340px] shrink-0 flex-col border-l border-line bg-surface max-[1200px]:fixed max-[1200px]:bottom-0 max-[1200px]:right-0 max-[1200px]:top-12 max-[1200px]:z-30 max-[1200px]:shadow-l3"
+        className={cn(
+          "flex w-[340px] shrink-0 flex-col border-l border-line bg-surface max-[1200px]:fixed max-[1200px]:bottom-0 max-[1200px]:right-0 max-[1200px]:top-12 max-[1200px]:z-30 max-[1200px]:shadow-l3",
+          wordsRoom && "bg-surface-low",
+        )}
       >
-        {/* Panel header */}
-        <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
+        <div className={wordsRoom ? "flex items-center justify-between gap-3 bg-surface-high px-4 py-3" : "flex items-start justify-between gap-3 border-b border-line px-4 py-3"}>
           <div className="min-w-0 flex items-center gap-2">
-            {/* Frank avatar */}
             <span
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold italic select-none"
-              style={{ background: "rgb(var(--frank) / 0.15)", color: "rgb(var(--frank))" }}
+              className={wordsRoom ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-frank text-sm font-bold italic text-on-primary select-none" : "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold italic select-none"}
+              style={wordsRoom ? undefined : { background: "rgb(var(--frank) / 0.15)", color: "rgb(var(--frank))" }}
               aria-hidden="true"
             >
               f
             </span>
             <div className="min-w-0">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">Frank</h2>
-              <p className="text-xs text-ink-3 truncate max-w-[180px]">
-                {record && (!projectId || record.project_id === projectId)
-                  ? knows.summary
-                  : "Reading your song…"}
-              </p>
+              <h2 className={wordsRoom ? "text-label-md text-on-surface" : "text-xs font-semibold uppercase tracking-[0.06em] text-ink-3"}>Frank</h2>
+              {!wordsRoom && (
+                <p className="text-xs text-ink-3 truncate max-w-[180px]">
+                  {record && (!projectId || record.project_id === projectId)
+                    ? knows.summary
+                    : "Reading your song…"}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -181,31 +187,40 @@ export function ConversationPanel({
                 window.localStorage.setItem("frank.speaks", next ? "yes" : "no")
               }}
               aria-pressed={speaks}
-              className="rounded-sm px-1.5 py-1 text-[10px] text-ink-3 hover:text-ink"
+              className={wordsRoom ? "rounded-sm p-1 text-on-surface-variant hover:text-on-surface" : "rounded-sm px-1.5 py-1 text-[10px] text-ink-3 hover:text-ink"}
             >
               {speaks ? "Reading aloud" : "Read aloud"}
             </button>
             <button
               onClick={() => setOpen(false)}
               aria-label="Hide the conversation with Frank"
-              className="rounded-sm p-1 text-ink-3 hover:text-ink"
+              className={wordsRoom ? "rounded-sm p-1 text-on-surface-variant hover:text-on-surface" : "rounded-sm p-1 text-ink-3 hover:text-ink"}
             >
               <ChevronsRight className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
+        {wordsRoom && (
+          <div className="bg-surface-container px-4 py-3">
+            <p className="mb-1 text-label-sm font-semibold uppercase tracking-[0.06em] text-frank-text">What Frank knows</p>
+            <p className="line-clamp-2 text-sm leading-relaxed text-on-surface-variant">
+              {record && (!projectId || record.project_id === projectId)
+                ? knows.summary
+                : "Reading your song…"}
+            </p>
+          </div>
+        )}
 
-        {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5" aria-live="polite" aria-relevant="additions">
+        <div ref={scrollRef} className={wordsRoom ? "flex-1 overflow-y-auto px-4 py-4" : "flex-1 overflow-y-auto px-4 py-5"} aria-live="polite" aria-relevant="additions">
           {earlier.length > 0 && (
             <div className="mb-5 flex flex-col gap-4" role="group" aria-label="Earlier conversation">
-              <p className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">Earlier</p>
+              <p className={wordsRoom ? "text-code uppercase tracking-widest text-on-surface-variant" : "text-xs font-semibold uppercase tracking-[0.06em] text-ink-3"}>Earlier</p>
               {earlier.map((t, i) => (
-                <p key={`earlier-${i}`} className={t.role === "user" ? lineUser : cn(lineFrank, "text-ink-2")}>
+                <p key={`earlier-${i}`} className={t.role === "user" ? lineUser : cn(lineFrank, wordsRoom ? "text-on-surface" : "text-ink-2")}>
                   {t.content}
                 </p>
               ))}
-              <p className="border-t border-line pt-3 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">Now</p>
+              <p className={wordsRoom ? "border-t border-line pt-3 text-code uppercase tracking-widest text-on-surface-variant" : "border-t border-line pt-3 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3"}>Now</p>
             </div>
           )}
           {turns.length === 0 && !isThinking && earlier.length === 0 ? (
@@ -256,7 +271,7 @@ export function ConversationPanel({
         </div>
 
         {/* Input */}
-        <form onSubmit={handleSubmit} className="border-t border-line p-4">
+        <form onSubmit={handleSubmit} className={wordsRoom ? "border-t border-line bg-surface-container p-4" : "border-t border-line p-4"}>
           {inputAccessory && <div className="mb-3">{inputAccessory}</div>}
           <div className="flex items-end gap-2">
             <textarea
@@ -270,14 +285,14 @@ export function ConversationPanel({
               }}
               placeholder={placeholder}
               rows={2}
-              className="max-h-32 min-h-[56px] flex-1 resize-none rounded-xl bg-raised px-3 py-3 text-base text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-frank/40 transition-shadow"
+              className={wordsRoom ? "max-h-32 min-h-[56px] flex-1 resize-none rounded-lg bg-surface-low px-3 py-3 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-frank/40 transition-shadow" : "max-h-32 min-h-[56px] flex-1 resize-none rounded-xl bg-raised px-3 py-3 text-base text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-frank/40 transition-shadow"}
               aria-label="Message to Frank"
             />
             <button
               type="submit"
               disabled={!input.trim() || isThinking}
               aria-label="Send message"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-frank text-ground transition-all hover:bg-frank/90 hover:scale-105 disabled:bg-raised disabled:text-ink-3 disabled:scale-100"
+              className={wordsRoom ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-frank text-on-primary transition-all hover:bg-frank/90 hover:scale-105 disabled:bg-surface-high disabled:text-on-surface-variant disabled:scale-100" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-frank text-ground transition-all hover:bg-frank/90 hover:scale-105 disabled:bg-raised disabled:text-ink-3 disabled:scale-100"}
             >
               <Send className="h-4 w-4" aria-hidden="true" />
             </button>

@@ -9,7 +9,7 @@ import { useState } from "react"
 import type { LyricsVersion } from "@/types/project"
 import { updateLyricsLabel } from "@/lib/api/lyrics"
 import { lyricHeadings } from "@/lib/songShape"
-import { Check, Pencil } from "lucide-react"
+import { Check, History, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface LyricsVersionHistoryProps {
@@ -48,37 +48,43 @@ export function LyricsVersionHistory({ versions, activeVersionId, onRestore, onL
   }
 
   return (
-    <section aria-labelledby="drafts-heading" className="flex flex-col gap-2">
-      <h2 id="drafts-heading" className="text-label-md font-semibold uppercase tracking-[0.06em] text-ink-3">
-        Drafts
-      </h2>
+    <section aria-labelledby="drafts-heading" className="flex flex-col gap-3 rounded-xl bg-surface-low p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+      <div className="flex items-center justify-between pb-1">
+        <h2 id="drafts-heading" className="text-label-sm font-semibold uppercase tracking-[0.06em] text-on-surface-variant">
+          Earlier Drafts
+        </h2>
+        <History className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />
+      </div>
       {versions.length === 0 ? (
-        <p className="text-sm text-ink-2">Each time you pause, what you wrote is kept here as a draft.</p>
+        <p className="text-sm text-on-surface-variant">Each time you pause, what you wrote is kept here as a draft.</p>
       ) : (
-        <ol className="flex flex-col">
-          {versions.map((v) => {
+        <ol className="flex flex-col gap-2">
+          {versions.map((v, index) => {
             const current = v.id === activeVersionId
             const open = openId === v.id
             return (
-              <li key={v.id} className="border-b border-line py-2.5 last:border-b-0">
-                <button
-                  onClick={() => setOpenId(open ? null : v.id)}
-                  aria-expanded={open}
-                  className="w-full rounded-sm text-left"
-                >
-                  <span className="line-clamp-1 font-written italic text-[17px] leading-[25px] text-words">{firstLine(v.content)}</span>
-                  <span className="font-mono text-code text-ink-3">{v.label ? v.label : when(v.created_at)}</span>
-                </button>
-                <div className="mt-1 flex items-center gap-3">
+              <li
+                key={v.id}
+                className={`rounded-lg p-2 ${current ? "bg-surface-high" : "bg-surface-container hover:bg-surface-high"}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-label-md font-bold ${current ? "text-frank-text" : "text-on-surface"}`}>Draft {versions.length - index}</span>
+                    {current && <span className="text-code text-frank-text">Active</span>}
+                  </div>
                   {current ? (
-                    <span className="flex items-center gap-1 text-sm text-words">
-                      <Check className="h-3.5 w-3.5" aria-hidden="true" /> On the page
-                    </span>
+                    <Check className="h-3.5 w-3.5 text-frank-text" aria-label="On the page" />
                   ) : (
-                    <button onClick={() => onRestore(v)} className="text-sm text-ink-2 underline underline-offset-4 hover:text-frank transition-colors">
-                      Bring this back
+                    <button onClick={() => onRestore(v)} className="text-code text-frank-text hover:underline">
+                      Restore
                     </button>
                   )}
+                </div>
+                <button onClick={() => setOpenId(open ? null : v.id)} aria-expanded={open} className="mt-1 w-full rounded-sm text-left">
+                  <span className="block text-sm text-on-surface-variant">{v.label ? `${when(v.created_at)} · ${v.label}` : when(v.created_at)}</span>
+                  <span className="line-clamp-1 font-written italic text-sm text-on-surface-variant/80">{firstLine(v.content)}</span>
+                </button>
+                <div className="mt-1 flex items-center gap-3">
                   {editingId === v.id ? (
                     <input
                       autoFocus
@@ -92,7 +98,7 @@ export function LyricsVersionHistory({ versions, activeVersionId, onRestore, onL
                       }}
                       aria-label="Name this draft"
                       placeholder="Name this draft"
-                      className="min-w-0 flex-1 rounded-md border border-line bg-raised px-2 py-0.5 text-sm text-ink placeholder:text-ink-3 focus-visible:border-frank/60"
+                      className="min-w-0 flex-1 rounded-md border border-line bg-surface-container px-2 py-0.5 text-sm text-on-surface placeholder:text-on-surface-variant focus-visible:border-frank/60"
                     />
                   ) : (
                     <button
@@ -100,14 +106,15 @@ export function LyricsVersionHistory({ versions, activeVersionId, onRestore, onL
                         setDraft(v.label ?? "")
                         setEditingId(v.id)
                       }}
-                      className="flex items-center gap-1 text-sm text-ink-2 hover:text-ink"
+                      aria-label="Name this draft"
+                      className="flex items-center gap-1 text-xs text-on-surface-variant hover:text-on-surface"
                     >
                       <Pencil className="h-3 w-3" aria-hidden="true" /> Name it
                     </button>
                   )}
                 </div>
                 {open && (
-                  <pre className={cn("mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-sm bg-raised p-3 font-written text-[17px] leading-[25px] text-words")}>
+                  <pre className={cn("mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-sm bg-surface-lowest p-3 font-written text-[17px] leading-[25px] text-words")}>
                     {v.content}
                   </pre>
                 )}

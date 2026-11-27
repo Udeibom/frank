@@ -78,14 +78,14 @@ export function ReadWordsButton({ projectId, getWords, onSay, appearance = "chat
         onClick={handleClick}
         disabled={working}
         aria-busy={working}
-        className={appearance === "stage" ? "h-10 border-line bg-raised px-4 text-base text-ink hover:border-ink-3 hover:bg-raised" : "w-full justify-start text-muted-foreground"}
+        className={appearance === "stage" ? "h-11 rounded-lg border border-frank bg-frank px-5 text-label-md font-semibold text-on-primary shadow-[0_0_16px_rgba(245,158,11,0.2)] hover:bg-frank-shade" : "w-full justify-start text-muted-foreground"}
       >
         {working ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
         ) : (
           <BookOpen className="h-4 w-4" aria-hidden="true" />
         )}
-        Tell me what you hear in my words
+        Read my words
       </Button>
       <p role="status" aria-live="polite" className={appearance === "stage" ? "sr-only" : "px-3 text-xs text-muted-foreground"}>
         {working ? "Reading your words… this usually takes a few seconds." : ""}

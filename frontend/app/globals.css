@@ -57,6 +57,25 @@
     --input: var(--line);
     --ring: var(--frank);
     --radius: 0.5rem;   /* 8px — calibrated roundedness level 2 */
+    --surface-lowest: 1 15 31;
+    --surface-low: 13 28 45;
+    --surface-container: 18 33 49;
+    --surface-high: 28 43 60;
+    --surface-highest: 39 54 71;
+    --on-surface: 212 228 250;
+    --on-surface-variant: 216 195 173;
+    --on-primary: 71 42 0;
+    --frank-text: 255 193 116;
+    --tertiary: 84 221 252;
+  }
+  .words-design {
+    --ground: 5 20 36;
+    --surface: 5 20 36;
+    --raised: 18 33 49;
+    --line: 83 68 52;
+    --ink: 212 228 250;
+    --ink-2: 216 195 173;
+    --ink-3: 148 163 184;
   }
   html {
     scroll-behavior: smooth;
@@ -253,6 +272,31 @@
 
 /* Words room editor (frankenstein spec 14, 5.1): one paragraph per line, rhythm marks only when asked for. */
 .frank-lyrics p { margin: 0; min-height: 1.6em; position: relative; }
+.frank-lyrics ::selection { background: rgb(var(--frank) / 0.2); }
+.frank-lyrics p[data-section-heading="true"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 1.4em;
+  margin-top: 12px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--words));
+}
+.frank-lyrics p[data-section-heading="true"]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgb(var(--words));
+  box-shadow: 0 0 6px rgb(var(--words) / 0.4);
+}
+.frank-lyrics p[data-section-heading="true"][data-section-kind="chorus"] { color: rgb(var(--frank-text)); }
+.frank-lyrics p[data-section-heading="true"][data-section-kind="chorus"]::before { background: rgb(var(--frank)); box-shadow: 0 0 6px rgb(var(--frank) / 0.4); }
 [data-rhythm="off"] .frank-stress, [data-rhythm="off"] .frank-beats { display: none; }
 .frank-stress { font-family: var(--font-mono, monospace); font-size: 9px; letter-spacing: 1px; vertical-align: super; margin-left: 2px; color: rgb(var(--ink-3)); }
 .frank-beats  { font-family: var(--font-mono, monospace); font-size: 12px; margin-left: 12px; color: rgb(var(--ink-3)); white-space: nowrap; }
