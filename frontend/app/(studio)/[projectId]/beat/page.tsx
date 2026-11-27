@@ -25,7 +25,6 @@ import {
   sendBeatMessage,
   listBeatVersions,
   setActiveBeatVersion,
-  updateSection,
   previewWithVocal,
   describeLead,
   applyBeatOperations,
@@ -39,6 +38,7 @@ import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
 import { useSongStore } from "@/store/song"
 import { formatTime, useAudio, usePlayback } from "@/store/audio"
+import { addBeatEdit, beatEditWhere, beatOps, isBeatApplyRequest, type StagedBeatEdit } from "@/lib/beatEdits"
 import { previewSections, type PreviewSection } from "@/lib/songShape"
 import type { MusicalFingerprint } from "@/types/project"
 import type { ConversationMessage, ConversationAction, VersionCandidate } from "@/types/api"
@@ -70,8 +70,13 @@ export default function MusicPage() {
   const [work, setWork] = useState<Work>({ kind: "idle" })
   const [loaded, setLoaded] = useState(false)
   const [stageText, setStageText] = useState("")
+  const [stagedEdits, setStagedEdits] = useState<StagedBeatEdit[]>([])
 
   const historyRef = useRef<ConversationMessage[]>([])
+
+  useEffect(() => {
+    setStagedEdits([])
+  }, [activeVersion?.id])
 
   // Refine loop: "something feels wrong" -> directions to hear (spec 08)
   const [refineKey, setRefineKey] = useState(0)
@@ -149,7 +154,7 @@ export default function MusicPage() {
     startJob: () => Promise<{ job_id: string }>,
     saying: string,
     where: { section: number; part?: string } | null,
-  ) {
+  ): Promise<boolean> {
     const retry = () => void runJob(startJob, saying, where)
     setWork({ kind: "working", saying, where })
     try {
@@ -169,11 +174,13 @@ export default function MusicPage() {
           {v?.label ?? "New version"}: {changes.length ? changes.join(" ") : "ready"}
         </ChangeLine>,
       )
+      return true
     } catch (err) {
       // The server's reason is already in plain words ("The drums aren't playing there...").
       const reason = err instanceof Error && err.message ? err.message : "Frank hit a snag making that. Want to try again?"
       setWork({ kind: "failed", saying: reason, retry })
       say(reason)
+      return false
     }
   }
 
@@ -181,11 +188,33 @@ export default function MusicPage() {
     void runJob(() => generateBeat(projectId, fingerprint ?? {}, structureContext), "Building your music from the feeling. This takes about a minute.", null)
   }
 
-  function change(ops: BeatOperation[], where: { section: number; part?: string }, saying: string) {
-    void runJob(() => applyBeatOperations(projectId, ops), saying, where)
+  function stageEdit(ops: BeatOperation[], where: { section: number; part?: string }, saying: string) {
+    if (!ops.length) return
+    setStagedEdits((edits) => addBeatEdit(edits, { id: crypto.randomUUID(), ops, where, words: saying }))
   }
 
-  async function dispatchAction(action: ConversationAction) {
+  function stageRename(sectionIndex: number, label: string, saying: string) {
+    stageEdit([{ op: "rename_section", section: sectionIndex, label }], { section: sectionIndex }, saying)
+  }
+
+  function clearStaged() {
+    setStagedEdits([])
+  }
+
+  async function applyChanges(): Promise<boolean> {
+    const edits = [...stagedEdits]
+    if (!edits.length || work.kind === "working") return false
+    setStagedEdits([])
+    const ok = await runJob(
+      () => applyBeatOperations(projectId, beatOps(edits)),
+      `Applying ${edits.length} change${edits.length === 1 ? "" : "s"}. This takes a minute or two.`,
+      edits[0].where,
+    )
+    if (!ok) setStagedEdits(edits)
+    return ok
+  }
+
+  async function dispatchAction(action: ConversationAction, message = "") {
     const p = action.params as Record<string, unknown>
     switch (action.type) {
       case "generate_full_beat":
@@ -195,13 +224,18 @@ export default function MusicPage() {
           null,
         )
         break
-      case "beat_operations":
-        await runJob(
-          () => applyBeatOperations(projectId, (p.operations as BeatOperation[]) ?? []),
-          "Working on that. This usually takes a minute or two.",
-          null,
-        )
+      case "beat_operations": {
+        const ops = (p.operations as BeatOperation[]) ?? []
+        if (ops.length) {
+          setStagedEdits((edits) => addBeatEdit(edits, {
+            id: crypto.randomUUID(),
+            ops,
+            where: beatEditWhere(ops[0]),
+            words: message || "Change waiting to apply",
+          }))
+        }
         break
+      }
       case "restore_version":
         await handleSetActive(String(p.version_id))
         break
@@ -211,10 +245,12 @@ export default function MusicPage() {
       case "compare_versions":
         setCandidates((p.candidates as VersionCandidate[]) ?? [])
         break
-      case "set_section_label":
-        await updateSection(projectId, Number(p.section_index), { label: String(p.label) })
-        await loadVersions()
+      case "set_section_label": {
+        const index = Number(p.section_index)
+        const label = String(p.label)
+        if (Number.isInteger(index)) stageRename(index, label, message || `Rename that section to “${label}”`)
         break
+      }
     }
   }
 
@@ -222,6 +258,11 @@ export default function MusicPage() {
     setTurns((t) => [...t, { id: crypto.randomUUID(), role: "user", content: message }])
     historyRef.current.push({ role: "user", content: message })
     setIsThinking(true)
+    if (isBeatApplyRequest(message) && stagedEdits.length > 0) {
+      await applyChanges()
+      setIsThinking(false)
+      return
+    }
     try {
       const beatState = {
         sections: activeVersion?.params.sections ?? [],
@@ -233,7 +274,7 @@ export default function MusicPage() {
       setTurns((t) => [...t, { id: crypto.randomUUID(), role: "assistant", content: res.message }])
       historyRef.current.push({ role: "assistant", content: res.message })
       setIsThinking(false)
-      for (const action of res.actions) await dispatchAction(action)
+      for (const action of res.actions) await dispatchAction(action, res.message)
     } catch {
       setIsThinking(false)
       setTurns((t) => [...t, { id: crypto.randomUUID(), role: "assistant", content: "Frank zoned out for a second. Say that again?" }])
@@ -292,6 +333,13 @@ export default function MusicPage() {
     note = work.saying
     aside = hasBeat ? "The music you had is untouched." : undefined
     answers = [{ label: "Try again", onClick: work.retry }]
+  } else if (hasBeat && stagedEdits.length > 0) {
+    note = `${stagedEdits.length} change${stagedEdits.length === 1 ? "" : "s"} waiting. Nothing has been made yet — tell Frank when to apply.`
+    aside = stagedEdits.map((edit) => edit.words).join(" · ")
+    answers = [
+      { label: "Go ahead, Frank", primary: true, onClick: () => void applyChanges() },
+      { label: "Clear changes", onClick: clearStaged },
+    ]
   } else if (hasBeat) {
     const follows = Boolean((activeVersion?.params.fingerprint as { follows_voice?: boolean } | undefined)?.follows_voice)
     note = follows
@@ -442,23 +490,36 @@ export default function MusicPage() {
                 busy={busy}
                 working={work.kind === "working" ? work.where : null}
                 onPlayFrom={playFrom}
-                onChange={change}
-                onRename={async (idx, label) => {
-                  await updateSection(projectId, idx, { label })
-                  await loadVersions()
-                  say("", <ChangeLine material="music">Renamed a section: {label}</ChangeLine>)
-                }}
+                stagedEdits={stagedEdits}
+                onStageEdit={stageEdit}
+                onStageRename={stageRename}
               />
             ) : (
               <GhostArrangement making={work.kind === "working"} sections={preview} />
             )}
             {hasBeat && (
               <p className="mt-3 text-sm text-ink-2">
-                Press a section name to play from there, make it fuller or calmer, or rename it.
+                Choose the changes you want, then tell Frank to go ahead. Press a section name to play from there.
                 {sections.length > 0 && ` ${sections.length} sections, from ${sectionWords(sections, 0)} to ${sectionWords(sections, sections.length - 1)}.`}
               </p>
             )}
           </section>
+
+          {hasBeat && stagedEdits.length > 0 && (
+            <section aria-labelledby="waiting-changes-heading" className="stitch-panel max-w-[1020px] p-5">
+              <div className="flex items-center justify-between gap-4 border-b border-line/50 pb-4">
+                <h2 id="waiting-changes-heading" className="stitch-kicker text-frank-text">Waiting to apply</h2>
+                <span className="stitch-chip">{stagedEdits.length} change{stagedEdits.length === 1 ? "" : "s"}</span>
+              </div>
+              <ul className="mt-3 space-y-1 text-sm text-on-surface">
+                {stagedEdits.map((edit) => <li key={edit.id}>{edit.words}</li>)}
+              </ul>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button type="button" onClick={() => void applyChanges()} disabled={busy} className="stitch-primary h-10 px-5 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none">Go ahead, Frank</button>
+                <button type="button" onClick={clearStaged} disabled={busy} className="stitch-secondary h-10 px-5 text-sm disabled:text-ink-3">Clear changes</button>
+              </div>
+            </section>
+          )}
 
           {versions.length > 0 && (
             <div className="stitch-panel max-w-2xl p-5">

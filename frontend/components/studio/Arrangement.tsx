@@ -12,6 +12,7 @@ import { Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ChoiceMenu, type Choice } from "@/components/ui/choice-menu"
 import { PART_NAMES } from "@/lib/api/finish"
+import { isBeatCellStaged, isBeatSectionStaged, stagedSectionLabel, type StagedBeatEdit } from "@/lib/beatEdits"
 import type { BeatOperation, BeatSection } from "@/lib/api/beat"
 
 /** The order parts are listed in (backend generation/ops.py PARTS). */
@@ -27,8 +28,9 @@ interface ArrangementProps {
   /** The cell or section being changed right now, to show where the work is. */
   working: { section: number; part?: string } | null
   onPlayFrom: (sectionPosition: number) => void
-  onChange: (ops: BeatOperation[], where: { section: number; part?: string }, saying: string) => void
-  onRename: (sectionIndex: number, label: string) => void
+  stagedEdits: StagedBeatEdit[]
+  onStageEdit: (ops: BeatOperation[], where: { section: number; part?: string }, saying: string) => void
+  onStageRename: (sectionIndex: number, label: string, saying: string) => void
 }
 
 /** "the first verse", "the chorus": how a person would say which section. */
@@ -41,7 +43,7 @@ export function sectionWords(sections: BeatSection[], i: number): string {
   return `the ${["first", "second", "third", "fourth", "fifth", "sixth"][Math.min(n, 5)]} ${s.name}`
 }
 
-export function Arrangement({ sections, progress, busy, working, onPlayFrom, onChange, onRename }: ArrangementProps) {
+export function Arrangement({ sections, progress, busy, working, onPlayFrom, stagedEdits, onStageEdit, onStageRename }: ArrangementProps) {
   const [renaming, setRenaming] = useState<number | null>(null)
   const [draft, setDraft] = useState("")
 
@@ -64,7 +66,7 @@ export function Arrangement({ sections, progress, busy, working, onPlayFrom, onC
       return [
         {
           label: `Add ${name.toLowerCase()} here`,
-          onSelect: () => onChange([{ op: "add_part", part, section: i }], { section: i, part }, `Adding ${name.toLowerCase()} to ${where}…`),
+          onSelect: () => onStageEdit([{ op: "add_part", part, section: i }], { section: i, part }, `Adding ${name.toLowerCase()} to ${where}…`),
         },
       ]
     }
@@ -72,35 +74,35 @@ export function Arrangement({ sections, progress, busy, working, onPlayFrom, onC
       {
         label: "Busier",
         hint: "More going on",
-        onSelect: () => onChange([{ op: "busier", part, section: i }], { section: i, part }, `Making ${name.toLowerCase()} busier in ${where}…`),
+        onSelect: () => onStageEdit([{ op: "busier", part, section: i }], { section: i, part }, `Making ${name.toLowerCase()} busier in ${where}…`),
       },
       {
         label: "Simpler",
         hint: "More space around it",
-        onSelect: () => onChange([{ op: "sparser", part, section: i }], { section: i, part }, `Making ${name.toLowerCase()} simpler in ${where}…`),
+        onSelect: () => onStageEdit([{ op: "sparser", part, section: i }], { section: i, part }, `Making ${name.toLowerCase()} simpler in ${where}…`),
       },
       ...(part === "drums"
         ? [
             {
               label: "Looser",
               hint: "Leans and pushes, like a person playing",
-              onSelect: () => onChange([{ op: "looser", section: i }], { section: i, part }, `Loosening the drums in ${where}…`),
+              onSelect: () => onStageEdit([{ op: "looser", section: i }], { section: i, part }, `Loosening the drums in ${where}…`),
             },
             {
               label: "Tighter",
               hint: "Right on the beat",
-              onSelect: () => onChange([{ op: "tighter", section: i }], { section: i, part }, `Tightening the drums in ${where}…`),
+              onSelect: () => onStageEdit([{ op: "tighter", section: i }], { section: i, part }, `Tightening the drums in ${where}…`),
             },
           ]
         : []),
       {
         label: "Try another idea",
         hint: `A different way it ${verb}`,
-        onSelect: () => onChange([{ op: "try_another", part, section: i }], { section: i, part }, `Trying another idea for ${name.toLowerCase()} in ${where}…`),
+        onSelect: () => onStageEdit([{ op: "try_another", part, section: i }], { section: i, part }, `Trying another idea for ${name.toLowerCase()} in ${where}…`),
       },
       {
         label: "Leave it out here",
-        onSelect: () => onChange([{ op: "remove_part", part, section: i }], { section: i, part }, `Taking ${name.toLowerCase()} out of ${where}…`),
+        onSelect: () => onStageEdit([{ op: "remove_part", part, section: i }], { section: i, part }, `Taking ${name.toLowerCase()} out of ${where}…`),
       },
     ]
   }
@@ -109,13 +111,13 @@ export function Arrangement({ sections, progress, busy, working, onPlayFrom, onC
     const where = sectionWords(sections, i)
     return [
       { label: "Play from here", onSelect: () => onPlayFrom(i) },
-      { label: "Fuller", hint: "Hits harder", onSelect: () => onChange([{ op: "bigger", section: i }], { section: i }, `Making ${where} fuller…`) },
-      { label: "Calmer", hint: "Sits back", onSelect: () => onChange([{ op: "smaller", section: i }], { section: i }, `Calming ${where} down…`) },
-      { label: "Add a drum fill at the end", onSelect: () => onChange([{ op: "add_fill", section: i }], { section: i }, `Adding a fill at the end of ${where}…`) },
+      { label: "Fuller", hint: "Hits harder", onSelect: () => onStageEdit([{ op: "bigger", section: i }], { section: i }, `Making ${where} fuller…`) },
+      { label: "Calmer", hint: "Sits back", onSelect: () => onStageEdit([{ op: "smaller", section: i }], { section: i }, `Calming ${where} down…`) },
+      { label: "Add a drum fill at the end", onSelect: () => onStageEdit([{ op: "add_fill", section: i }], { section: i }, `Adding a fill at the end of ${where}…`) },
       {
         label: "Rename",
         onSelect: () => {
-          setDraft(sections[i].label)
+          setDraft(stagedSectionLabel(sections, stagedEdits, i))
           setRenaming(i)
         },
       },
@@ -132,46 +134,51 @@ export function Arrangement({ sections, progress, busy, working, onPlayFrom, onC
       >
         {/* Section names */}
         <div />
-        {sections.map((s, i) => (
-          <div key={`h${s.index}-${i}`} className={cn("min-w-0 rounded-[2px]", i === playingIndex && "bg-raised")}>
-            {renaming === i ? (
-              <input
-                autoFocus
-                value={draft}
-                maxLength={40}
-                aria-label={`New name for ${sectionWords(sections, i)}`}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={() => {
-                  onRename(s.index, draft.trim() || s.label)
-                  setRenaming(null)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur()
-                  if (e.key === "Escape") setRenaming(null)
-                }}
-                className="w-full rounded-sm bg-raised px-2 py-1.5 text-sm text-ink"
-              />
-            ) : (
-              <ChoiceMenu
-                label={s.label}
-                choices={sectionChoices(i)}
-                trigger={({ toggle, ref, ...aria }) => (
-                  <button
-                    ref={ref}
-                    {...aria}
-                    onClick={toggle}
-                    disabled={busy}
-                    aria-label={`${s.label}: choices`}
-                    className="group relative flex w-full min-w-0 items-center rounded-sm px-2 py-1.5 text-left text-sm font-medium text-ink hover:bg-raised disabled:cursor-default"
-                  >
-                    <span className="truncate">{s.label}</span>
-                    <Pencil aria-hidden="true" className="absolute right-1.5 h-3 w-3 text-ink-3 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
-                  </button>
-                )}
-              />
-            )}
-          </div>
-        ))}
+        {sections.map((s, i) => {
+          const label = stagedSectionLabel(sections, stagedEdits, i)
+          const staged = isBeatSectionStaged(stagedEdits, i)
+          return (
+            <div key={`h${s.index}-${i}`} className={cn("min-w-0 rounded-[2px]", i === playingIndex && "bg-raised", staged && "ring-1 ring-frank/60")}>
+              {renaming === i ? (
+                <input
+                  autoFocus
+                  value={draft}
+                  maxLength={40}
+                  aria-label={`New name for ${sectionWords(sections, i)}`}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={() => {
+                    const name = draft.trim() || label
+                    onStageRename(s.index, name, `Rename ${sectionWords(sections, i)} to “${name}”`)
+                    setRenaming(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur()
+                    if (e.key === "Escape") setRenaming(null)
+                  }}
+                  className="w-full rounded-sm bg-raised px-2 py-1.5 text-sm text-ink"
+                />
+              ) : (
+                <ChoiceMenu
+                  label={label}
+                  choices={sectionChoices(i)}
+                  trigger={({ toggle, ref, ...aria }) => (
+                    <button
+                      ref={ref}
+                      {...aria}
+                      onClick={toggle}
+                      disabled={busy}
+                      aria-label={`${label}: choices`}
+                      className="group relative flex w-full min-w-0 items-center rounded-sm px-2 py-1.5 text-left text-sm font-medium text-ink hover:bg-raised disabled:cursor-default"
+                    >
+                      <span className="truncate">{label}</span>
+                      <Pencil aria-hidden="true" className="absolute right-1.5 h-3 w-3 text-ink-3 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
+                    </button>
+                  )}
+                />
+              )}
+            </div>
+          )
+        })}
 
         {/* One row per part */}
         {parts.map((part) => (
@@ -182,6 +189,7 @@ export function Arrangement({ sections, progress, busy, working, onPlayFrom, onC
             playingIndex={playingIndex}
             busy={busy}
             working={working}
+            stagedEdits={stagedEdits}
             choices={cellChoices}
           />
         ))}
@@ -214,6 +222,7 @@ function PartRow({
   playingIndex,
   busy,
   working,
+  stagedEdits,
   choices,
 }: {
   part: string
@@ -221,6 +230,7 @@ function PartRow({
   playingIndex: number
   busy: boolean
   working: { section: number; part?: string } | null
+  stagedEdits: StagedBeatEdit[]
   choices: (part: string, i: number, plays: boolean) => Choice[]
 }) {
   const name = PART_NAMES[part] ?? part
@@ -230,6 +240,7 @@ function PartRow({
       {sections.map((s, i) => {
         const plays = s.layers.includes(part)
         const here = working && working.section === i && (!working.part || working.part === part)
+        const staged = isBeatCellStaged(stagedEdits, i, part)
         return (
           <ChoiceMenu
             key={`${part}-${s.index}-${i}`}
@@ -241,12 +252,13 @@ function PartRow({
                 {...aria}
                 onClick={toggle}
                 disabled={busy}
-                aria-label={`${name} in ${sectionWords(sections, i)}: ${plays ? "plays" : "doesn't play"}. Choices`}
+                aria-label={`${name} in ${sectionWords(sections, i)}: ${plays ? "plays" : "doesn't play"}${staged ? ", change waiting" : ""}. Choices`}
                 className={cn(
                   "h-9 w-full rounded-[2px] transition-colors disabled:cursor-default",
                   plays ? "bg-music/70 hover:bg-music" : "border border-dashed border-ink-3/60 hover:border-ink-2",
                   i === playingIndex && plays && "bg-music",
                   here && "sweep",
+                  staged && "ring-1 ring-frank/70",
                 )}
               />
             )}

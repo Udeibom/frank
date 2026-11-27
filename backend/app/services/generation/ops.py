@@ -132,6 +132,12 @@ class RemoveSection(_Op):
     section: int
 
 
+class RenameSection(_Op):
+    op: Literal["rename_section"]
+    section: int
+    label: str = Field(min_length=1, max_length=40)
+
+
 class Slower(_Op):
     """The whole song slower (core-path spec 15, requirement 2.2). Changes the speed, not only the drums."""
     op: Literal["slower"]
@@ -145,7 +151,7 @@ class Faster(_Op):
 
 Operation = Annotated[
     Union[Busier, Sparser, Looser, Tighter, Bigger, Smaller, AddPart, RemovePart, SwapSound, AddFill, Reseed, AnotherSong, Resize, Move,
-          Repeat, RemoveSection, Slower, Faster],
+          Repeat, RemoveSection, RenameSection, Slower, Faster],
     Field(discriminator="op"),
 ]
 _ADAPTER = TypeAdapter(list[Operation])
@@ -324,6 +330,15 @@ def _apply(op, sections: list[SectionPlan], seed: int) -> tuple[int, str]:
         sections.remove(s)
         _renumber(sections)
         return seed, f"I took {label} out of the song."
+    if isinstance(op, RenameSection):
+        s = _where(sections, op.section)[0]
+        label = op.label.strip()
+        if not label:
+            raise OpError("Give that section a name first.")
+        if s.label == label:
+            raise OpError(f"{_name(sections, s).capitalize()} is already called “{label}”.")
+        s.label = label
+        return seed, f"I called {_name(sections, s)} “{label}”."
     if isinstance(op, (Slower, Faster)):
         raise OpError("I can only change the speed of the whole beat, from the Music room.")
     raise OpError("I don't know how to make that change yet.")
@@ -406,6 +421,7 @@ part is one of: drums, bass, keys, melody, pad, strings, arp.
 - {"op": "move", "section": N, "to": M}
 - {"op": "repeat", "section": N}                   play it one more time right after
 - {"op": "remove_section", "section": N}
+- {"op": "rename_section", "section": N, "label": "NAME"}   rename only that section
 - {"op": "slower", "amount": "a_little" or "a_lot"}   the WHOLE SONG at a slower speed (the only way to slow it)
 - {"op": "faster", "amount": "a_little" or "a_lot"}   the whole song at a faster speed
 When the person talks about speed, pace, "too fast", "too slow", "rushed" or "dragging", use slower or faster.
@@ -425,6 +441,9 @@ def apply_audible(
     from app.services.generation.beat import score_of
 
     new, new_seed, changes = apply_operations(sections, seed, raw)
+    audible = [o for o in parse(raw) if not isinstance(o, RenameSection)]
+    if not audible:
+        return new, new_seed, changes, []
     before, after = score_of(sections, fp, seed, lead), score_of(new, fp, new_seed, lead)
     if before == after:
         raise OpError("That's already how it sounds there, so nothing would change. Want to try something else?")

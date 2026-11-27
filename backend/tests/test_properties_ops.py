@@ -73,6 +73,7 @@ def test_the_input_plan_is_never_modified_and_a_bad_edit_changes_nothing():
     [], [{"op": "explode"}], [{"op": "busier", "part": "trombone"}], [{"op": "resize", "section": 0, "bars": 0}],
     [{"op": "swap_sound", "part": "keys", "sound": "theremin"}], [{"op": "busier", "part": "keys", "section": 1, "extra": 1}],
     [{"op": "add_fill", "section": 5}],     # the bridge has no drums at this energy
+    [{"op": "rename_section", "section": 0, "label": ""}], [{"op": "rename_section", "section": 99, "label": "Ending"}],
 ])
 def test_invalid_edits_are_refused_in_plain_words(raw):
     with pytest.raises(ops.OpError) as e:
@@ -127,7 +128,7 @@ def test_every_change_sentence_is_plain():
     import re
     jargon = re.compile(r"\b(bpm|tempo|stem|midi|reverb|eq|db|hz|preset|program|seed)\b", re.I)
     sections = plan()
-    raw = [{"op": "busier", "part": "bass", "section": None}, {"op": "bigger", "section": 2}, {"op": "swap_sound", "part": "keys", "sound": "organ", "section": 1},
+    raw = [{"op": "rename_section", "section": 0, "label": "Opening"}, {"op": "busier", "part": "bass", "section": None}, {"op": "bigger", "section": 2}, {"op": "swap_sound", "part": "keys", "sound": "organ", "section": 1},
            {"op": "add_fill", "section": 1}, {"op": "try_another", "part": None, "section": 3}, {"op": "resize", "section": 0, "bars": 2},
            {"op": "move", "section": 1, "to": 3}, {"op": "repeat", "section": 2}, {"op": "remove_section", "section": 0}, {"op": "another_song"}]
     _, _, changes = ops.apply_operations(sections, SEED, raw)
@@ -160,6 +161,24 @@ def test_a_list_of_sections_names_them_in_plain_words():
     assert changes == ["I made the bass simpler in every chorus."]
     with pytest.raises(ops.OpError):
         ops.apply_operations(sections, SEED, [{"op": "bigger", "section": [0, 99]}])
+
+
+def test_a_rename_can_wait_with_other_changes():
+    before = plan()
+    raw = [{"op": "rename_section", "section": 1, "label": "Lift"}, {"op": "bigger", "section": 1}]
+    after, seed, changes = ops.apply_operations(before, SEED, raw)
+    assert after[1].label == "Lift"
+    assert changes[0].startswith("I called ")
+    assert score(after, seed) != score(before)
+    assert before[1].label != "Lift"
+
+
+def test_a_rename_on_its_own_does_not_count_as_no_audible_change():
+    before = plan()
+    after, _, changes, changed = ops.apply_audible(before, SEED, [{"op": "rename_section", "section": 1, "label": "Lift"}], FP)
+    assert after[1].label == "Lift"
+    assert changed == []
+    assert changes and changes[0].startswith("I called ")
 
 
 def test_an_edit_that_changes_nothing_audible_says_so():

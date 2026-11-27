@@ -392,6 +392,40 @@ def _has_takes(project_id: str) -> bool:
         return False
 
 
+async def _rename_active_sections(project_id: str, operations: list[dict]) -> tuple[dict, list[str]]:
+    from app.db.client import get_supabase
+
+    from app.services.generation import ops as ops_mod
+
+    state = await projects_db.get_project_active_state(project_id)
+    version_id = state.get("active_beat_version_id") if state else None
+    if not version_id:
+        raise ops_mod.OpError("There's no music here to rename yet.")
+    version = await beat_db.get_beat_version(version_id)
+    if not version:
+        raise ops_mod.OpError("I can't find that version of the beat.")
+    params = version.get("params") or {}
+    sections = params.get("sections") or []
+    changes: list[str] = []
+    for op in ops_mod.parse(operations):
+        if not isinstance(op, ops_mod.RenameSection):
+            continue
+        if not 0 <= op.section < len(sections):
+            raise ops_mod.OpError("That part of the song doesn't exist any more.")
+        label = op.label.strip()
+        if not label:
+            raise ops_mod.OpError("Give that section a name first.")
+        old = sections[op.section].get("label") or str(sections[op.section].get("name", "section")).capitalize()
+        if old == label:
+            raise ops_mod.OpError(f"{old} is already called “{label}”.")
+        sections[op.section]["label"] = label
+        changes.append(f"I called {old} “{label}”.")
+    params["sections"] = sections
+    get_supabase().table("beat_versions").update({"params": params}).eq("id", version_id).execute()
+    version["params"] = params
+    return version, changes
+
+
 async def run_operations_job(job_id: str, project_id: str, operations: list[dict]) -> None:
     """
     Apply typed edit operations (generation/ops.py) to the active beat and render the result as a NEW version.
@@ -406,6 +440,16 @@ async def run_operations_job(job_id: str, project_id: str, operations: list[dict
         try:
             # Speed first (core-path spec 15, 2.2): it changes the whole song, not one part.
             fp, rest, changes = ops_mod.apply_speed(fp, operations)
+            remaining = ops_mod.parse(rest) if rest else []
+            if remaining and all(isinstance(o, ops_mod.RenameSection) for o in remaining) and len(rest) == len(operations):
+                version, renamed = await _rename_active_sections(project_id, rest)
+                changes += renamed
+                await jobs_db.mark_complete(
+                    job_id,
+                    {"beat_version_id": version["id"], "render_url": version.get("render_url"), "label": version.get("label"),
+                     "lead_used": _lead_used(version), "changes": changes},
+                )
+                return
             if rest:
                 sections, seed, more, _ = ops_mod.apply_audible(sections, seed, rest, fp, lead)
                 changes += more
