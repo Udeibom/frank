@@ -27,6 +27,7 @@ const config: Config = {
         "frank-shade": channel("frank-shade"),
         "frank-glow": channel("frank-glow"),
         "frank-text": channel("frank-text"),
+        "frank-container": channel("frank-container"),
         "surface-lowest": channel("surface-lowest"),
         "surface-low": channel("surface-low"),
         "surface-container": channel("surface-container"),

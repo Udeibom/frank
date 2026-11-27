@@ -66,9 +66,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ground text-ink">
+    <div className="songs-design min-h-screen text-ink">
       {/* Top bar — matches Stitch songs/screen.png header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line/60 bg-ground/95 px-6 py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line/70 bg-ground/95 px-6 py-3 backdrop-blur">
         <div className="flex items-center gap-2">
           <div
             className="flex h-7 w-7 items-center justify-center rounded-md"
@@ -101,25 +101,14 @@ export default function DashboardPage() {
         {/* Page heading */}
         <div className="mb-8 flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-ink">Your Songs</h1>
-            <p className="mt-1 text-sm text-ink-2">Pick up where you left off, or start something new.</p>
+            <h1 className="stitch-title text-ink">Your Songs</h1>
+            <p className="mt-2 text-sm text-ink-2">Pick up where you left off, or start something new.</p>
           </div>
           <button
             onClick={handleNewProject}
             disabled={creating}
             id="new-song-btn"
-            className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition-all disabled:opacity-60 hover:text-ground"
-            style={{ borderColor: "rgb(var(--frank))", color: "rgb(var(--frank))" }}
-            onMouseEnter={(e) => {
-              const b = e.currentTarget
-              b.style.background = "rgb(var(--frank))"
-              b.style.color = "rgb(var(--ground))"
-            }}
-            onMouseLeave={(e) => {
-              const b = e.currentTarget
-              b.style.background = ""
-              b.style.color = "rgb(var(--frank))"
-            }}
+            className="stitch-primary flex items-center gap-2 px-5 py-3 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             {creating ? "Opening…" : "New Song"}
@@ -128,14 +117,14 @@ export default function DashboardPage() {
 
         {/* Song list */}
         {loading ? (
-          <div className="flex flex-col gap-2" role="status" aria-label="Loading your songs">
+          <div className="flex flex-col gap-3" role="status" aria-label="Loading your songs">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 rounded-md border border-line bg-surface animate-pulse" />
+              <div key={i} className="stitch-panel h-20 animate-pulse" />
             ))}
           </div>
         ) : projects.length === 0 ? (
           /* Empty state */
-          <div className="flex flex-col items-center gap-5 rounded-md border border-dashed border-line py-20 text-center">
+          <div className="stitch-panel flex flex-col items-center gap-5 rounded-2xl border-dashed py-20 text-center">
             <div
               className="flex h-16 w-16 items-center justify-center rounded-xl"
               style={{
@@ -162,8 +151,7 @@ export default function DashboardPage() {
             <button
               onClick={handleNewProject}
               disabled={creating}
-              className="flex items-center gap-2 rounded-md px-6 py-3 text-sm font-semibold text-ground transition-all disabled:opacity-60"
-              style={{ background: "rgb(var(--frank))", boxShadow: "0 0 20px rgba(245,158,11,0.3)" }}
+              className="stitch-primary flex items-center gap-2 px-6 py-3 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
             >
               <Plus className="h-4 w-4" />
               {creating ? "Opening…" : "Start a Song"}
@@ -181,7 +169,7 @@ export default function DashboardPage() {
               </span>
             </div>
             {/* Song rows */}
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-3">
               {projects.map((project) => {
                 const statusLabel = STATUS_LABELS[project.status] ?? "In progress"
                 const statusColor = STATUS_COLORS[project.status] ?? "rgb(var(--music))"
@@ -189,25 +177,25 @@ export default function DashboardPage() {
                   <button
                     key={project.id}
                     onClick={() => router.push(`/${project.id}/idea`)}
-                    className="group flex w-full items-center gap-4 rounded-md border border-line/60 bg-surface px-5 py-4 text-left transition-all hover:border-line hover:bg-raised"
+                    className="stitch-panel group flex w-full items-center gap-5 rounded-2xl px-6 py-5 text-left transition-all hover:border-frank/40 hover:bg-surface-highest"
                   >
-                    {/* Amber play icon */}
                     <div
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-all"
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all"
                       style={{
                         background: "rgb(var(--frank) / 0.12)",
-                        border: "1px solid rgb(var(--frank) / 0.2)",
+                        border: "1px solid rgb(var(--frank) / 0.25)",
+                        boxShadow: "inset 0 0 16px rgba(245,158,11,0.08)",
                       }}
                     >
                       <span className="text-xs" style={{ color: "rgb(var(--frank))" }}>▶</span>
                     </div>
                     {/* Title + date */}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-written italic text-base font-medium text-ink">
+                      <p className="truncate font-written italic text-xl text-on-surface">
                         {project.title}
                       </p>
-                      <p className="mt-0.5 font-mono text-[10px] text-ink-3">
-                        {formatRelativeDate(project.updated_at)}
+                      <p className="mt-1 font-mono text-[11px] uppercase tracking-wider text-ink-3">
+                        Last worked on {formatRelativeDate(project.updated_at)}
                       </p>
                     </div>
                     {/* Status pill */}
@@ -222,7 +210,7 @@ export default function DashboardPage() {
                       ● {statusLabel}
                     </div>
                     {/* Arrow */}
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line text-sm text-ink-3 transition-all group-hover:border-frank/40 group-hover:text-frank">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-lg text-ink-3 transition-all group-hover:border-frank/60 group-hover:text-frank">
                       ›
                     </div>
                   </button>
@@ -233,7 +221,7 @@ export default function DashboardPage() {
         )}
 
         {/* Taste drawer — persistent memory section */}
-        <section className="mt-16 rounded-md border border-line bg-surface p-6">
+        <section className="stitch-panel mt-16 rounded-2xl p-6">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div
@@ -265,10 +253,10 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {[
-              { label: "Vocal Arrangement", color: "rgb(var(--words))", text: "Prefers intimate, near-mic vocal delivery with gentle lower-octave harmonies in choruses." },
-              { label: "Sonic Atmosphere", color: "rgb(var(--music))", text: "Gravitates toward analog warmth, subtle vinyl dust, upright felt piano, and sparse midnight pulse rhythms." },
-              { label: "Tempo & Groove", color: "rgb(var(--feel))", text: "Comfortable with relaxed walking paces between 76 and 84 BPM, favoring unhurried cadences." },
-              { label: "Mastering Target", color: "rgb(var(--ok))", text: "Balanced streaming loudness with healthy -1.4dB true peak ceiling to avoid digital clipping." },
+              { label: "Vocal feel", color: "rgb(var(--words))", text: "Likes close, intimate singing with gentle lower harmonies in the choruses." },
+              { label: "Overall feel", color: "rgb(var(--music))", text: "Likes analog warmth, a little vinyl dust, soft piano, and a quiet late-night pulse." },
+              { label: "Song speed", color: "rgb(var(--feel))", text: "Comfortable with relaxed walking paces, favoring unhurried movement." },
+              { label: "Final sound", color: "rgb(var(--ok))", text: "Balanced so it sounds even in music apps, without harsh peaks." },
             ].map(({ label, color, text }) => (
               <div key={label} className="rounded-md border border-line bg-ground p-4">
                 <p className="mb-1 font-mono text-[10px] uppercase tracking-wider" style={{ color }}>{label}</p>

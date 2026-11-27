@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { Drum, Music } from "lucide-react"
 import { ConversationPanel, type ChatTurn } from "@/components/conversation/ConversationPanel"
 import { ChangeLine } from "@/components/conversation/ChangeLine"
 import { FrankNote } from "@/components/conversation/FrankNote"
@@ -280,25 +281,25 @@ export default function FeelingPage() {
 
   return (
     <div className="flex h-full">
-      <div className="room-feel flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8">
-        {/* Room header — Stitch design */}
-        <div className="border-b border-line/50 pb-5">
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: "rgb(var(--feel))" }} />
-            <h1 className="text-xl font-bold text-ink">Feeling</h1>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 02</span>
+      <div className="stitch-room room-feel flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-10 py-8">
+        <div className="flex items-end justify-between gap-4 border-b border-line/60 pb-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-feel shadow-[0_0_12px_rgb(var(--feel)/0.6)]" />
+              <h1 className="stitch-title text-ink">Feeling</h1>
+              <span className="stitch-chip">Room 02</span>
+            </div>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-on-surface-variant">Find how the song should feel. Listen to the moods Frank imagined for your words, or hum a tune directly.</p>
           </div>
-          <p className="mt-1 text-sm text-ink-2">Find how the song should feel. Listen to the sonic moods Frank imagined for your lyrics, or hum a tune directly.</p>
         </div>
 
-
-        <FrankNote aside={aside} answers={answers} material="feel">
+        <FrankNote aside={aside} answers={answers} material="feel" appearance="room" roleLabel="Producer Note">
           {note}
         </FrankNote>
 
         {showAsk && (
           <form
-            className="flex flex-col gap-3"
+            className="stitch-panel flex flex-col gap-4 p-5"
             onSubmit={(e) => {
               e.preventDefault()
               const text = stageText.trim()
@@ -307,9 +308,12 @@ export default function FeelingPage() {
               void handleSend(text)
             }}
           >
-            <label htmlFor="feeling-ask" className="text-sm font-medium text-ink-2">
-              How should it feel?
-            </label>
+            <div className="flex items-center justify-between gap-4">
+              <label htmlFor="feeling-ask" className="text-base font-medium text-on-surface">
+                How should it feel?
+              </label>
+              <span className="stitch-kicker text-ink-3">Your words, in your own way</span>
+            </div>
             <div className="flex items-end gap-3">
               <textarea
                 id="feeling-ask"
@@ -324,12 +328,12 @@ export default function FeelingPage() {
                 rows={3}
                 autoFocus
                 placeholder="Walking home alone after a party, slow and warm, a little lonely…"
-                className="min-h-[96px] max-w-xl flex-1 resize-none rounded-xl border border-line/60 bg-raised/40 px-5 py-4 font-written text-[17px] leading-[25px] text-words placeholder:font-sans placeholder:text-base placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-feel/40 transition-shadow"
+                className="min-h-[96px] max-w-xl flex-1 resize-none rounded-xl border border-line/60 bg-surface-lowest px-5 py-4 font-written text-[17px] leading-[25px] text-on-surface placeholder:font-sans placeholder:text-base placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-feel/40 transition-shadow"
               />
               <button
                 type="submit"
                 disabled={!stageText.trim() || isThinking}
-                className="h-10 rounded-md bg-frank px-5 text-base font-medium text-ground hover:bg-frank/90 disabled:bg-raised disabled:text-ink-3"
+                className="stitch-primary h-11 whitespace-nowrap px-5 text-base disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
               >
                 {isThinking ? "Listening…" : "Play me a first sound"}
               </button>
@@ -338,18 +342,22 @@ export default function FeelingPage() {
         )}
 
         <section aria-labelledby="bench-heading">
-          <h2 id="bench-heading" className="mb-3 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
-            Directions
-          </h2>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="bench-heading" className="stitch-kicker text-frank-text">The Listening Bench</h2>
+              <p className="mt-1 text-sm text-ink-2">Play each sound and tell Frank which feels closest.</p>
+            </div>
+            <span className="stitch-chip">{ordered.length} directions</span>
+          </div>
           {ordered.length === 0 ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
                   aria-hidden="true"
-                  className="relative flex min-h-[236px] flex-col justify-between overflow-hidden rounded-xl border border-frank/20 bg-raised p-4"
+                  className="stitch-panel relative flex min-h-[236px] flex-col justify-between overflow-hidden p-5"
                 >
-                  <div className="sweep absolute inset-0" style={{ "--sweep": "var(--frank)" } as React.CSSProperties} />
+                  <div className="sweep absolute inset-0" style={{ "--sweep": "var(--feel)" } as React.CSSProperties} />
                   <span className="font-written italic text-xl text-ink-3 relative z-10">Direction {i + 1}</span>
                   <span className="text-sm text-ink-3 relative z-10">{directionsLoaded ? "Frank will play it here" : "Looking for your directions…"}</span>
                 </div>
@@ -378,10 +386,21 @@ export default function FeelingPage() {
           )}
         </section>
 
-        <section aria-label="Show Frank instead of telling him" className="flex flex-wrap items-center gap-3 pb-4">
-          <span className="text-base text-ink-2">Or show me:</span>
-          <HumIntake projectId={projectId} onConfirmed={handleTuneConfirmed} onSay={sayAsFrank} appearance="stage" />
-          <RhythmIntake projectId={projectId} onConfirmed={handleRhythmConfirmed} onSay={sayAsFrank} appearance="stage" />
+        <section aria-labelledby="show-frank-heading" className="flex flex-col gap-3 pb-4">
+          <div>
+            <h2 id="show-frank-heading" className="stitch-kicker text-frank-text">Show Frank instead of telling him</h2>
+            <p className="mt-1 text-sm text-ink-2">Give Frank a melody or groove directly. No need to be a singer or drummer.</p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="stitch-bay flex flex-col gap-3 p-5">
+              <span className="flex items-center gap-2 text-base text-on-surface"><Music className="h-4 w-4 text-feel" aria-hidden="true" /> Hum your tune</span>
+              <HumIntake projectId={projectId} onConfirmed={handleTuneConfirmed} onSay={sayAsFrank} appearance="stage" />
+            </div>
+            <div className="stitch-bay flex flex-col gap-3 p-5">
+              <span className="flex items-center gap-2 text-base text-on-surface"><Drum className="h-4 w-4 text-frank" aria-hidden="true" /> Tap a rhythm</span>
+              <RhythmIntake projectId={projectId} onConfirmed={handleRhythmConfirmed} onSay={sayAsFrank} appearance="stage" />
+            </div>
+          </div>
         </section>
       </div>
 

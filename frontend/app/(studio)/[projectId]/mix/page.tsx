@@ -6,7 +6,7 @@
  * adjustment renders a new mix; nothing is overwritten.
  */
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
   ConversationPanel,
@@ -44,6 +44,8 @@ const DEFAULT_PARAMS: Partial<MixParams> = {
   beat_effects: [],
   section_gain_db: {},
 }
+
+const WAVE_BARS = [18, 26, 34, 22, 42, 58, 48, 30, 24, 52, 68, 46, 36, 60, 74, 54, 38, 28, 44, 64, 82, 58, 42, 30, 48, 72, 56, 40, 26, 34, 22, 16]
 
 export default function MixRoomPage() {
   const params = useParams()
@@ -324,41 +326,47 @@ export default function MixRoomPage() {
 
   return (
     <div className="flex h-full">
-      <div className="flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
-        {/* Room header — Stitch design */}
-        <div className="border-b border-line/50 pb-5">
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
-            <h1 className="text-xl font-bold text-ink">Blend</h1>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 05</span>
+      <div className="stitch-room flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
+        <div className="flex items-end justify-between gap-4 border-b border-line/60 pb-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-frank shadow-[0_0_12px_rgb(var(--frank)/0.6)]" />
+              <h1 className="stitch-title text-ink">Blend</h1>
+              <span className="stitch-chip">Room 05</span>
+            </div>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-on-surface-variant">Bring your voice and the music together.</p>
           </div>
-          <p className="mt-1 text-sm text-ink-2">Bring your voice and the music together.</p>
         </div>
 
-
-        <FrankNote aside={aside} answers={answers} problem={failed} busy={rendering}>
+        <FrankNote aside={aside} answers={answers} problem={failed} busy={rendering} appearance="room" roleLabel="Producer Note">
           {note}
         </FrankNote>
 
-        {/* Listening is the main thing here: one large control and, when there is an earlier blend, compare */}
         {(hasMix || rendering) && (
-          <section aria-labelledby="listen-heading" className="flex items-center gap-5 rounded-md border border-line/50 bg-surface p-5 shadow-l2">
-            {track ? <PlayButton track={track} size="stage" keepPosition /> : <span className="sweep h-12 w-12 rounded-full" aria-hidden="true" />}
-            <div className="min-w-0 flex-1">
-              <h2 id="listen-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
-                The song right now
-              </h2>
-              <p className="truncate text-base text-ink">
-                {activeVersion?.label ?? "The first blend"}
-                {activeVersion && <span className="ml-2 text-sm text-ink-2">{summarize(activeVersion)}</span>}
-              </p>
-            </div>
-            {previous && track && (
-              <div role="group" aria-label="Compare with the blend before" className="flex items-center gap-3 border-l border-line pl-5">
-                <span className="text-sm text-ink-2">Compare with before</span>
-                <PlayButton track={mixTrack(previous)} size="card" keepPosition />
+          <section aria-labelledby="listen-heading" className="stitch-panel flex flex-col gap-4 p-5">
+            <div className="flex items-center gap-5">
+              {track ? <PlayButton track={track} size="stage" keepPosition /> : <span className="sweep h-12 w-12 rounded-full" aria-hidden="true" />}
+              <div className="min-w-0 flex-1">
+                <h2 id="listen-heading" className="stitch-kicker text-frank-text">The song right now</h2>
+                <p className="mt-1 truncate font-written text-xl text-on-surface">
+                  {activeVersion?.label ?? "The first blend"}
+                  {activeVersion && <span className="ml-2 text-sm font-sans text-ink-2">{summarize(activeVersion)}</span>}
+                </p>
               </div>
-            )}
+              {previous && track && (
+                <div role="group" aria-label="Compare with the blend before" className="flex items-center gap-3 border-l border-line pl-5">
+                  <span className="text-sm text-ink-2">Compare with before</span>
+                  <PlayButton track={mixTrack(previous)} size="card" keepPosition />
+                </div>
+              )}
+            </div>
+            <div className="rounded-xl border border-line/50 bg-surface-lowest px-4 py-3">
+              <div className="stitch-waveform">
+                {WAVE_BARS.map((height, i) => (
+                  <span key={i} style={{ "--bar-height": `${height}%` } as CSSProperties} />
+                ))}
+              </div>
+            </div>
           </section>
         )}
 
@@ -393,7 +401,10 @@ export default function MixRoomPage() {
         )}
 
         {hasMix && (
-          <h2 className="-mb-3 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">More ways to shape it (all optional)</h2>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="stitch-kicker text-frank-text">Listening bays</h2>
+            <span className="text-sm text-ink-2">Every change is saved, so you can always go back.</span>
+          </div>
         )}
         {hasMix && (
           <div className="grid max-w-[1000px] gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -409,29 +420,33 @@ export default function MixRoomPage() {
           </div>
         )}
 
-        <div className="grid max-w-[1000px] gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid max-w-[1000px] gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           {(hasVocal || hasBeat) && (
-            <StemBalance
-              hasVocal={hasVocal}
-              hasBeat={hasBeat}
-              hasHarmony={hasHarmony}
-              harmonyEnabled={mixParamsRef.current.harmony_enabled ?? true}
-              onToggleHarmony={handleToggleHarmony}
-              parts={songParts?.parts}
-              partSettings={partTick >= 0 ? mixParamsRef.current.parts : undefined}
-              busy={rendering}
-              onPart={hasVocal && hasBeat ? changePart : undefined}
-            />
+            <div className="stitch-panel p-5">
+              <StemBalance
+                hasVocal={hasVocal}
+                hasBeat={hasBeat}
+                hasHarmony={hasHarmony}
+                harmonyEnabled={mixParamsRef.current.harmony_enabled ?? true}
+                onToggleHarmony={handleToggleHarmony}
+                parts={songParts?.parts}
+                partSettings={partTick >= 0 ? mixParamsRef.current.parts : undefined}
+                busy={rendering}
+                onPart={hasVocal && hasBeat ? changePart : undefined}
+              />
+            </div>
           )}
-          <MixVersions
-            versions={versions}
-            activeVersionId={activeVersion?.id ?? null}
-            onSetActive={handleSetActive}
-            onRename={async (id, label) => {
-              await renameVersion(projectId, "mix", id, label)
-              setVersions((vs) => vs.map((v) => (v.id === id ? { ...v, label } : v)))
-            }}
-          />
+          <div className="stitch-panel p-5">
+            <MixVersions
+              versions={versions}
+              activeVersionId={activeVersion?.id ?? null}
+              onSetActive={handleSetActive}
+              onRename={async (id, label) => {
+                await renameVersion(projectId, "mix", id, label)
+                setVersions((vs) => vs.map((v) => (v.id === id ? { ...v, label } : v)))
+              }}
+            />
+          </div>
         </div>
       </div>
 

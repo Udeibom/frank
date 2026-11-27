@@ -199,8 +199,8 @@ export default function ExportRoomPage() {
 
   if (loadError) {
     return (
-      <div className="flex h-full items-center justify-center px-8">
-        <FrankNote problem answers={[{ label: "Try again", onClick: () => window.location.reload() }]}>
+      <div className="stitch-room flex h-full items-center justify-center px-8">
+        <FrankNote problem appearance="room" answers={[{ label: "Try again", onClick: () => window.location.reload() }]}>
           Frank had trouble loading your song just now. Nothing is lost.
         </FrankNote>
       </div>
@@ -210,15 +210,16 @@ export default function ExportRoomPage() {
   if (!activeMix) {
     // Blocked: say what is missing and offer the way there.
     return (
-      <div className="flex h-full flex-col gap-7 px-10 py-8">
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
-          <h1 className="text-base font-medium text-ink">Finish</h1>
+      <div className="stitch-room flex h-full flex-col gap-6 px-10 py-8">
+        <div className="flex items-center gap-3 border-b border-line/60 pb-5">
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-frank shadow-[0_0_12px_rgb(var(--frank)/0.6)]" />
+          <h1 className="stitch-title text-ink">Finish</h1>
+          <span className="stitch-chip">Last step</span>
         </div>
-        <FrankNote answers={[{ label: "Go to Blend", onClick: () => router.push(`/${projectId}/mix`), primary: true }]}>
+        <FrankNote appearance="room" roleLabel="Producer Note" answers={[{ label: "Go to Blend", onClick: () => router.push(`/${projectId}/mix`), primary: true }]}>
           Once your voice and the music are blended, come back here to take your song with you.
         </FrankNote>
-        <div aria-hidden="true" className="flex h-[120px] items-center rounded-md border border-dashed border-ink-3/60 px-6">
+        <div aria-hidden="true" className="stitch-panel flex h-[120px] items-center rounded-2xl border-dashed px-6">
           <span className="text-base text-ink-3">Your finished song will be here, ready to hear and download.</span>
         </div>
       </div>
@@ -229,25 +230,27 @@ export default function ExportRoomPage() {
   const step = needsIntentCheck ? "ask" : !finished ? "finish" : "download"
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
-      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-8">
-        {/* Room header — Stitch design */}
-        <div className="border-b border-line/50 pb-5">
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ink-2" />
-            <h1 className="text-xl font-bold text-ink">Finish</h1>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 06</span>
+    <div className="stitch-room flex h-full flex-col overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
+      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6">
+        <div className="flex items-end justify-between gap-4 border-b border-line/60 pb-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-frank shadow-[0_0_12px_rgb(var(--frank)/0.6)]" />
+              <h1 className="stitch-title text-ink">Finish</h1>
+              <span className="stitch-chip">Last step</span>
+            </div>
+            <p className="mt-2 text-sm text-on-surface-variant">A last listen, then it&apos;s yours.</p>
           </div>
-          <p className="mt-1 text-sm text-ink-2">A last listen, then it&apos;s yours.</p>
         </div>
 
 
-        {/* The song: its name, its shape, one play control */}
-        <section aria-labelledby="song-name" className="flex flex-col gap-5 rounded-xl border border-line/50 bg-surface p-8 shadow-l2">
-          <div className="flex items-center gap-5">
+        <section aria-labelledby="song-name" className="stitch-panel relative flex flex-col gap-5 overflow-hidden p-8">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-frank/10 blur-3xl" />
+          <div className="relative flex items-center gap-5">
             <PlayButton track={track!} size="stage" keepPosition />
             <div className="min-w-0">
-              <h2 id="song-name" className="truncate font-written text-[34px] leading-[40px] text-ink">
+              <span className="stitch-chip">Ready to share</span>
+              <h2 id="song-name" className="mt-2 truncate font-written text-[34px] leading-[40px] text-on-surface">
                 {title}
               </h2>
               <p className="text-base text-ink-2">
@@ -296,6 +299,8 @@ export default function ExportRoomPage() {
         {/* One step at a time: does it match → finish it → download */}
         {step === "ask" && (
           <FrankNote
+            appearance="room"
+            roleLabel="Producer Note"
             answers={notYet ? [] : [
               { label: "Yes, that's it", onClick: () => void sayYes(), primary: true },
               { label: "Not yet", onClick: () => setNotYet(true) },
@@ -334,6 +339,8 @@ export default function ExportRoomPage() {
         )}
         {step === "finish" && (
           <FrankNote
+            appearance="room"
+            roleLabel="Producer Note"
             busy={Boolean(working)}
             aside={working ? undefined : "Frank makes it as loud and even as songs on streaming apps. You'll hear before and after."}
             answers={working ? [] : [{ label: "Finish it, ready to share", onClick: () => void finish(), primary: true }]}
@@ -343,6 +350,8 @@ export default function ExportRoomPage() {
         )}
         {step === "download" && (
           <FrankNote
+            appearance="room"
+            roleLabel="Producer Note"
             busy={Boolean(working)}
             answers={[
               {
@@ -358,20 +367,26 @@ export default function ExportRoomPage() {
           </FrankNote>
         )}
         {error && (
-          <FrankNote problem>
+          <FrankNote problem appearance="room">
             {error}
           </FrankNote>
         )}
 
         {step === "download" && (
           <div className="grid max-w-[1000px] gap-4 xl:grid-cols-2">
-            <NotesAndCredits projectId={projectId} onDownload={clickDownload} />
-            <MatchedFinish projectId={projectId} mixVersionId={activeMix.id} frankUrl={finished?.url ?? null} />
+            <div className="stitch-panel p-5">
+              <NotesAndCredits projectId={projectId} onDownload={clickDownload} />
+            </div>
+            <div className="stitch-panel p-5">
+              <MatchedFinish projectId={projectId} mixVersionId={activeMix.id} frankUrl={finished?.url ?? null} />
+            </div>
           </div>
         )}
 
         {surpriseState === "offer" && (
           <FrankNote
+            appearance="room"
+            roleLabel="One idea"
             answers={[
               { label: "Show me", onClick: () => void showSurprise() },
               { label: "No thanks", onClick: () => void skipSurprise() },
@@ -381,12 +396,12 @@ export default function ExportRoomPage() {
           </FrankNote>
         )}
         {surpriseState === "making" && (
-          <FrankNote busy>
+          <FrankNote busy appearance="room">
             Making my idea. This takes a few minutes; your song is already safe.
           </FrankNote>
         )}
         {surpriseState === "ready" && surprise && (
-          <section aria-label="Frank's idea" className="flex items-center gap-4 rounded-md border border-line bg-surface p-4">
+          <section aria-label="Frank's idea" className="stitch-panel flex items-center gap-4 p-5">
             <PlayButton track={{ id: `surprise:${surprise.beat_version_id}`, url: surprise.render_url, label: surprise.title, material: "music", onSong: true }} size="card" keepPosition />
             <div className="min-w-0 flex-1">
               <p className="font-written text-xl text-ink">{surprise.title}</p>
@@ -402,8 +417,8 @@ export default function ExportRoomPage() {
         )}
 
         {exports.length > 0 && (
-          <section aria-labelledby="past-heading" className="flex flex-col gap-2">
-            <h2 id="past-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+          <section aria-labelledby="past-heading" className="stitch-panel flex flex-col gap-2 p-5">
+            <h2 id="past-heading" className="stitch-kicker text-frank-text">
               Past downloads
             </h2>
             <ul className="flex flex-col">

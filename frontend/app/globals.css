@@ -66,7 +66,82 @@
     --on-surface-variant: 216 195 173;
     --on-primary: 71 42 0;
     --frank-text: 255 193 116;
+    --frank-container: 245 158 11;
     --tertiary: 84 221 252;
+  }
+  .stitch-room {
+    --ground: 5 20 36;
+    --surface: 5 20 36;
+    --raised: 18 33 49;
+    --line: 83 68 52;
+    --ink: 212 228 250;
+    --ink-2: 216 195 173;
+    --ink-3: 148 163 184;
+    --words: 255 180 171;
+    --feel: 189 194 255;
+    --music: 84 221 252;
+    --voice: 255 193 116;
+    --frank: 245 158 11;
+    --frank-shade: 217 119 6;
+    --frank-glow: 251 191 36;
+    --frank-text: 255 193 116;
+    --frank-container: 245 158 11;
+    --on-primary: 71 42 0;
+    --on-surface: 212 228 250;
+    --on-surface-variant: 216 195 173;
+    --surface-lowest: 1 15 31;
+    --surface-low: 13 28 45;
+    --surface-container: 18 33 49;
+    --surface-high: 28 43 60;
+    --surface-highest: 39 54 71;
+    --tertiary: 84 221 252;
+    --ok: 16 185 129;
+    --problem: 255 180 171;
+    background-color: rgb(var(--ground));
+  }
+  .songs-design {
+    --ground: 3 12 23;
+    --surface: 5 20 36;
+    --raised: 15 34 54;
+    --line: 27 50 76;
+    --ink: 212 228 250;
+    --ink-2: 127 147 168;
+    --ink-3: 78 100 121;
+    --frank-text: 255 193 116;
+    --frank-container: 245 158 11;
+    --on-primary: 71 42 0;
+    --on-surface: 212 228 250;
+    --on-surface-variant: 216 195 173;
+    --surface-lowest: 1 9 18;
+    --surface-low: 10 26 43;
+    --surface-container: 15 34 54;
+    --surface-high: 22 44 68;
+    --surface-highest: 30 56 84;
+    --tertiary: 84 221 252;
+    --problem: 255 180 171;
+    background-color: rgb(var(--ground));
+  }
+  .stitch-auth {
+    --ground: 3 12 23;
+    --surface: 5 20 36;
+    --raised: 18 33 49;
+    --line: 83 68 52;
+    --ink: 212 228 250;
+    --ink-2: 216 195 173;
+    --ink-3: 127 147 168;
+    --frank-text: 255 193 116;
+    --frank-container: 245 158 11;
+    --on-primary: 71 42 0;
+    --on-surface: 212 228 250;
+    --on-surface-variant: 216 195 173;
+    --surface-lowest: 1 15 31;
+    --surface-low: 13 28 45;
+    --surface-container: 18 33 49;
+    --surface-high: 28 43 60;
+    --surface-highest: 39 54 71;
+    --tertiary: 84 221 252;
+    --problem: 255 180 171;
+    background-color: rgb(var(--ground));
   }
   .words-design {
     --ground: 5 20 36;
@@ -254,6 +329,103 @@
   }
   .play-bloom[aria-pressed="true"] {
     box-shadow: 0 0 20px 4px rgb(var(--frank) / 0.35);
+  }
+}
+
+@layer components {
+  .stitch-title {
+    font-family: var(--font-written), Georgia, serif;
+    font-size: 2rem;
+    line-height: 2.5rem;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+  }
+  .stitch-kicker {
+    font-family: var(--font-mono), "Courier New", monospace;
+    font-size: 11px;
+    line-height: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .stitch-panel {
+    border-radius: 1rem;
+    border: 1px solid rgb(var(--line) / 0.7);
+    background-color: rgb(var(--surface-container));
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+  .stitch-bay {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--line) / 0.55);
+    background-color: rgb(var(--surface-low));
+  }
+  .stitch-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1px solid rgb(var(--line));
+    background-color: rgb(var(--raised) / 0.7);
+    padding: 0.25rem 0.625rem;
+    font-family: var(--font-mono), "Courier New", monospace;
+    font-size: 10px;
+    line-height: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(var(--ink-2));
+  }
+  .stitch-primary {
+    border-radius: 0.5rem;
+    background-color: rgb(var(--frank));
+    color: rgb(var(--on-primary));
+    font-weight: 600;
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+    transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
+  .stitch-primary:hover:not(:disabled) {
+    background-color: rgb(var(--frank-shade));
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+    transform: translateY(-1px);
+  }
+  .stitch-secondary {
+    border-radius: 0.5rem;
+    border: 1px solid rgb(var(--line));
+    background-color: rgb(var(--raised));
+    color: rgb(var(--ink));
+    transition: border-color 150ms ease, background-color 150ms ease;
+  }
+  .stitch-secondary:hover:not(:disabled) {
+    border-color: rgb(var(--ink-3));
+    background-color: rgb(var(--surface-high));
+  }
+  .stitch-waveform {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 64px;
+    width: 100%;
+    overflow: hidden;
+  }
+  .stitch-waveform span {
+    flex: 1 1 0;
+    min-width: 2px;
+    border-radius: 9999px;
+    background: linear-gradient(180deg, rgb(var(--frank-glow) / 0.8), rgb(var(--frank) / 0.45));
+    height: var(--bar-height);
+  }
+  .stitch-auth-card {
+    position: relative;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--line));
+    background-color: rgb(var(--surface-container));
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65);
+  }
+  .stitch-auth-rail {
+    position: absolute;
+    left: 1.5rem;
+    right: 1.5rem;
+    top: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgb(var(--frank)), transparent);
   }
 }
 

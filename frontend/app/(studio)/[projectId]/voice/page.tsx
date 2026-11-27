@@ -397,34 +397,35 @@ export default function VoiceRoomPage() {
 
   return (
     <div className="flex h-full">
-      <div className="room-voice flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
-        {/* Room header — Stitch design */}
-        <div className="border-b border-line/50 pb-5">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: "rgb(var(--voice))" }} />
-              <h1 className="text-xl font-bold text-ink">Voice</h1>
-              <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 04</span>
+      <div className="stitch-room room-voice flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
+        <div className="flex flex-col gap-4 border-b border-line/60 pb-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3">
+                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-voice shadow-[0_0_12px_rgb(var(--voice)/0.6)]" />
+                <h1 className="stitch-title text-ink">Voice</h1>
+                <span className="stitch-chip">Room 04</span>
+              </div>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-on-surface-variant">Frank counts you in, smooths out any shaky notes you want, and keeps every recording safe.</p>
             </div>
-            <div className="flex items-center gap-4">
-          {!showHeadphoneCheck && (
-            <button onClick={() => setShowHeadphoneCheck(true)} className="text-sm text-ink-2 hover:text-ink">
-              Check my headphones
-            </button>
-          )}
-          {beat && words && (
-            <button onClick={() => void wantSungGuide()} disabled={busy} className="text-sm text-ink-2 hover:text-ink disabled:text-ink-3">
-              {sungGuideUrl ? "Hear the guide sing it again" : "Hear it sung with my words"}
-            </button>
-          )}
-          {delayKnown && !showDelayCheck && (
-            <button onClick={() => setShowDelayCheck(true)} className="flex items-center gap-1.5 text-sm text-ink-2 hover:text-ink">
-              <Timer className="h-4 w-4" aria-hidden="true" /> Check the timing again
-            </button>
-          )}
+            <div className="flex flex-wrap items-center gap-2">
+              {!showHeadphoneCheck && (
+                <button onClick={() => setShowHeadphoneCheck(true)} className="stitch-secondary px-3 py-2 text-sm">
+                  Check my headphones
+                </button>
+              )}
+              {beat && words && (
+                <button onClick={() => void wantSungGuide()} disabled={busy} className="stitch-secondary px-3 py-2 text-sm disabled:text-ink-3">
+                  {sungGuideUrl ? "Hear the guide sing it again" : "Hear it sung with my words"}
+                </button>
+              )}
+              {delayKnown && !showDelayCheck && (
+                <button onClick={() => setShowDelayCheck(true)} className="stitch-secondary flex items-center gap-1.5 px-3 py-2 text-sm">
+                  <Timer className="h-4 w-4" aria-hidden="true" /> Check the timing again
+                </button>
+              )}
             </div>
           </div>
-          <p className="mt-1 text-sm text-ink-2">Frank counts you in, smooths out any shaky notes you want, and keeps every take safe.</p>
         </div>
 
 
@@ -435,7 +436,7 @@ export default function VoiceRoomPage() {
           />
         )}
 
-        <FrankNote answers={answers} material="voice" busy={busy}>
+        <FrankNote answers={answers} material="voice" busy={busy} appearance="room" roleLabel="Producer Note">
           {note}
         </FrankNote>
 
@@ -451,21 +452,21 @@ export default function VoiceRoomPage() {
           />
         )}
 
-        {/* The booth: your words in front of you, the recorder beside them */}
-        <div className="flex min-w-0 gap-10">
-          <section aria-labelledby="your-words" className="min-w-0 max-w-[520px] flex-1">
-            <h2 id="your-words" className="mb-3 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
-              Your words
-            </h2>
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)]">
+          <section aria-labelledby="your-words" className="stitch-panel flex min-w-0 flex-col p-5">
+            <div className="mb-4 flex items-center justify-between gap-3 border-b border-line/50 pb-4">
+              <h2 id="your-words" className="stitch-kicker text-frank-text">Your words</h2>
+              <span className="stitch-chip">Follows along while recording</span>
+            </div>
             {words ? (
-              <div className="max-h-[440px] overflow-y-auto rounded-md bg-surface p-5">
-                <p className="whitespace-pre-wrap font-written text-xl leading-[1.6] text-ink">{words}</p>
+              <div className="max-h-[440px] overflow-y-auto rounded-xl bg-surface-lowest p-5">
+                <p className="whitespace-pre-wrap font-written text-xl leading-[1.6] text-on-surface">{words}</p>
               </div>
             ) : (
-              <div className="rounded-md border border-dashed border-ink-3/60 p-5">
+              <div className="rounded-xl border border-dashed border-line/70 bg-surface-lowest/50 p-5">
                 <p className="text-base text-ink-2">
                   No words yet. Sing whatever you have, or write them first in{" "}
-                  <button onClick={() => router.push(`/${projectId}/idea`)} className="text-ink underline underline-offset-4 hover:text-frank">
+                  <button onClick={() => router.push(`/${projectId}/idea`)} className="text-on-surface underline underline-offset-4 hover:text-frank">
                     Words
                   </button>
                   .
@@ -473,7 +474,11 @@ export default function VoiceRoomPage() {
               </div>
             )}
           </section>
-          <section aria-label="Record" className="flex w-[360px] shrink-0 flex-col items-center rounded-md bg-surface p-6">
+          <section aria-label="Record" className="stitch-panel flex flex-col items-center p-5">
+            <div className="mb-4 flex w-full items-center justify-between border-b border-line/50 pb-4">
+              <span className="stitch-kicker text-frank-text">Studio recorder</span>
+              <span className="stitch-chip">Safe takes</span>
+            </div>
             <VocalRecorder
               beatUrl={beat?.render_url ?? null}
               beatVersionId={beat?.id ?? null}
@@ -489,11 +494,13 @@ export default function VoiceRoomPage() {
           </section>
         </div>
 
-        {/* Takes */}
-        <section aria-labelledby="takes-heading" className="flex max-w-[920px] flex-col gap-3">
-          <h2 id="takes-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
-            {roots.length ? `Your recordings (${roots.length})` : "Your recordings"}
-          </h2>
+        <section aria-labelledby="takes-heading" className="stitch-panel flex max-w-[920px] flex-col gap-3 p-5">
+          <div className="mb-1 flex items-center justify-between gap-3 border-b border-line/50 pb-4">
+            <h2 id="takes-heading" className="stitch-kicker text-frank-text">
+              Your recordings
+            </h2>
+            <span className="stitch-chip">{roots.length} saved</span>
+          </div>
           {comp && (
             <CompView
               comp={comp}

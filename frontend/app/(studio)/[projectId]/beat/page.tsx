@@ -317,25 +317,25 @@ export default function MusicPage() {
 
   return (
     <div className="flex h-full">
-      <div className="room-music flex min-w-0 flex-1 flex-col gap-7 overflow-y-auto px-10 py-8 [--sweep:var(--music)]">
-        {/* Room header — Stitch design */}
-        <div className="border-b border-line/50 pb-5">
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: "rgb(var(--music))" }} />
-            <h1 className="text-xl font-bold text-ink">Music</h1>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">Room 03</span>
+      <div className="stitch-room room-music flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-10 py-8 [--sweep:var(--music)]">
+        <div className="flex items-end justify-between gap-4 border-b border-line/60 pb-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-music shadow-[0_0_12px_rgb(var(--music)/0.6)]" />
+              <h1 className="stitch-title text-ink">Music</h1>
+              <span className="stitch-chip">Arrangement Room</span>
+            </div>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-on-surface-variant">Shape the sound, energy, and musical parts behind your song.</p>
           </div>
-          <p className="mt-1 text-sm text-ink-2">Shape the sound, energy, and musical parts behind your song.</p>
         </div>
 
-
-        <FrankNote aside={aside} answers={answers} material="music" problem={work.kind === "failed"} busy={busy}>
+        <FrankNote aside={aside} answers={answers} material="music" problem={work.kind === "failed"} busy={busy} appearance="room" roleLabel="Producer Note">
           {note}
         </FrankNote>
 
         {showAsk && (
           <form
-            className="flex flex-col gap-3"
+            className="stitch-panel flex flex-col gap-4 p-5"
             onSubmit={(e) => {
               e.preventDefault()
               const text = stageText.trim()
@@ -344,9 +344,12 @@ export default function MusicPage() {
               void handleSend(text)
             }}
           >
-            <label htmlFor="music-ask" className="text-sm font-medium text-ink-2">
-              How should it move?
-            </label>
+            <div className="flex items-center justify-between gap-4">
+              <label htmlFor="music-ask" className="text-base font-medium text-on-surface">
+                How should it move?
+              </label>
+              <span className="stitch-kicker text-ink-3">In your own words</span>
+            </div>
             <div className="flex items-end gap-3">
               <textarea
                 id="music-ask"
@@ -360,12 +363,12 @@ export default function MusicPage() {
                 }}
                 rows={2}
                 placeholder="Slow and warm, soft piano and gentle drums…"
-                className="min-h-[56px] max-w-xl flex-1 resize-none rounded-md bg-raised px-3 py-2.5 font-written text-[17px] leading-[25px] text-words placeholder:font-sans placeholder:text-base placeholder:text-ink-3"
+                className="min-h-[56px] max-w-xl flex-1 resize-none rounded-lg border border-line/60 bg-surface-lowest px-4 py-3 font-written text-[17px] leading-[25px] text-on-surface placeholder:font-sans placeholder:text-base placeholder:text-ink-3"
               />
               <button
                 type="submit"
                 disabled={!stageText.trim() || isThinking}
-                className="h-10 rounded-md border border-line bg-raised px-5 text-base text-ink hover:border-ink-3 disabled:text-ink-3"
+                className="stitch-primary h-11 px-5 text-base disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
               >
                 {isThinking ? "Listening…" : "Tell Frank"}
               </button>
@@ -400,15 +403,15 @@ export default function MusicPage() {
           />
         )}
 
-        <div className="flex min-w-0 flex-col gap-8">
-          <section aria-labelledby="arrangement-heading" className="min-w-0">
-            <div className="mb-3 flex items-center gap-3">
+        <div className="flex min-w-0 flex-col gap-6">
+          <section aria-labelledby="arrangement-heading" className="stitch-panel min-w-0 p-5">
+            <div className="mb-5 flex items-center gap-4 border-b border-line/50 pb-4">
               {track && <PlayButton track={track} size="stage" />}
-              <div className="min-w-0">
-                <h2 id="arrangement-heading" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+              <div className="min-w-0 flex-1">
+                <h2 id="arrangement-heading" className="stitch-kicker text-frank-text">
                   The arrangement
                 </h2>
-                <p className="truncate text-base text-ink">
+                <p className="mt-1 truncate font-written text-xl text-on-surface">
                   {activeVersion?.label ?? "No music yet"}
                   {playback.isCurrent && playback.duration > 0 && (
                     <span className="ml-2 text-sm tabular-nums text-ink-2">
@@ -417,6 +420,7 @@ export default function MusicPage() {
                   )}
                 </p>
               </div>
+              <span className="stitch-chip">{sections.length} sections</span>
             </div>
 
             {hasBeat ? (
@@ -445,7 +449,7 @@ export default function MusicPage() {
           </section>
 
           {versions.length > 0 && (
-            <div className="max-w-2xl">
+            <div className="stitch-panel max-w-2xl p-5">
               <BeatVersions
                 versions={versions}
                 activeVersionId={activeVersion?.id ?? null}
