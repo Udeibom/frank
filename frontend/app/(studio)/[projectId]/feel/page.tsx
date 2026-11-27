@@ -293,7 +293,16 @@ export default function FeelingPage() {
           </div>
         </div>
 
-        <FrankNote aside={aside} answers={answers} material="feel" appearance="room" roleLabel="Producer Note">
+        <FrankNote
+          aside={aside}
+          answers={answers}
+          material="feel"
+          appearance="room"
+          roleLabel="Producer Note"
+          variant="feeling"
+          busy={making}
+          badge={making ? "Finding a sound" : keptId && ready.some((d) => d.id === keptId) ? "Feeling kept" : ready.length > 0 ? `${ready.length} sounds ready` : undefined}
+        >
           {note}
         </FrankNote>
 
