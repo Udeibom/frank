@@ -69,3 +69,14 @@ def structure_from_order(order: list[str]) -> dict:
         ],
         "from_user_message": True,
     }
+
+
+def structure_context(version_id: str, source: str = "user_message") -> dict[str, str]:
+    return {"facet": "structure", "facet_version_id": version_id, "source": source}
+
+
+def generation_for_stated_structure(version_id: str) -> dict:
+    return {
+        "type": "generate_full_beat",
+        "params": {"structure_context": structure_context(version_id)},
+    }

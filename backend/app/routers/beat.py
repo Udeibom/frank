@@ -29,7 +29,7 @@ from app.db import beat as beat_db
 from app.db import projects as projects_db
 from app.db import voice as voice_db
 from app.services.song import store as song_store
-from app.services.song.sections import parse_section_order, structure_from_order
+from app.services.song.sections import generation_for_stated_structure, parse_section_order, structure_from_order
 
 router = APIRouter(prefix="/projects/{project_id}/beat", tags=["beat"])
 
@@ -154,18 +154,16 @@ async def beat_conversation(
         for a in result.get("actions", [])
         if isinstance(a, dict) and a.get("type") in _ALLOWED_ACTIONS
     ]
-    if stated_structure_id:
-        for a in actions:
-            if a.type == "generate_full_beat":
-                a.params["structure_context"] = {
-                    "facet": "structure", "facet_version_id": stated_structure_id, "source": "user_message",
-                }
     from app.services.refine.resolve import wants_refine
 
     if wants_refine(body.message) and not any(a.type == "refine" for a in actions):
         # they can't say what is wrong: Frank listens instead of guessing (spec 08, requirement 1.1)
         actions = [ConversationAction(type="refine", params={"concern": body.message[:300]})]
         result["message"] = "I'll listen to the song properly and come back with a few ideas you can hear before choosing."
+    if stated_structure_id:
+        action = generation_for_stated_structure(stated_structure_id)
+        actions = [ConversationAction(type=action["type"], params=action["params"])]
+        result["message"] = "Got it — I'll rebuild the beat around that section order."
     # Protect the intention (spec 07, requirement 3.1): a change that fights the feeling they described is said
     # once, with three directions; their answer (or asking again) builds it.
     from app.services.team import intention

@@ -4,7 +4,7 @@ from __future__ import annotations
 from hypothesis import given, settings, strategies as st
 
 from app.services.generation import beat
-from app.services.song.sections import parse_section_order, structure_from_order
+from app.services.song.sections import generation_for_stated_structure, parse_section_order, structure_from_order
 
 NAMES = ["intro", "verse", "pre-chorus", "chorus", "bridge", "outro"]
 FP = {"tempo_bpm": 90, "key": "C minor", "energy_level": 0.6, "density": 0.5}
@@ -49,8 +49,19 @@ def test_a_stated_order_is_parsed():
     assert parse_section_order("Verse 1\nPre-chorus\nChorus\nBridge\nChorus\nOutro") == order
     assert parse_section_order("Make it Verse, Pre-chorus, Chorus, Bridge, Chorus, Outro") == order
     assert parse_section_order("Verse -> Pre-chorus -> Chorus -> Bridge -> Chorus -> Outro") == order
+    assert parse_section_order("Take note of the way the song is structured into sections: Verse 1 Your floor on which I built my love Pre-chorus Tell me why Chorus Villains are made by love Bridge Hear me Lord Chorus Villains are made by love Outro Maybe I will be redeemed") == order
     assert [s["name"] for s in structure_from_order(order)["sections"]] == order
     assert parse_section_order("Just make the drums busier") == []
+
+
+def test_a_stated_order_rebuilds_the_beat_from_that_facet():
+    action = generation_for_stated_structure("structure-7")
+    assert action["type"] == "generate_full_beat"
+    assert action["params"]["structure_context"] == {
+        "facet": "structure",
+        "facet_version_id": "structure-7",
+        "source": "user_message",
+    }
 
 
 def test_boarding_music_grows_the_sections_without_inventing_any():

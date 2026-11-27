@@ -251,7 +251,8 @@ it in the message ("I filled out the verses a little — how does that feel?").
 - You are given the current beat state (sections and what's in them). Use the \
 real section_index values from it.
 - When they tell you the order of the sections, keep it exactly: do not add an intro, \
-outro, pre-chorus or extra chorus they did not ask for. If the words or the room already \
+outro, pre-chorus or extra chorus they did not ask for, and do not answer with small section \
+edits. Let the whole beat be rebuilt from that order. If the words or the room already \
 carry an order, the beat follows that order.
 """
 

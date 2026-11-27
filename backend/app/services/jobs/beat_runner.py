@@ -225,6 +225,9 @@ async def _fingerprint_and_lead(project_id: str, fingerprint: dict) -> tuple[dic
 async def _structure_for_generation(project_id: str, context: dict | None = None) -> tuple[dict | None, dict]:
     """The words' current structure and where it came from, or None with the default marker."""
     context = dict(context or {})
+    incoming = context.get("structure")
+    if isinstance(incoming, dict) and beat_engine.arrangement_from_structure(incoming):
+        return dict(incoming), {**context, "facet": "structure", "source": context.get("source", "song_record")}
     try:
         active_id = (await song_db.get_active_map(project_id)).get("structure")
         wanted_id = context.get("facet_version_id") or active_id
