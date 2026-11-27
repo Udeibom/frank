@@ -436,16 +436,7 @@ export default function VoiceRoomPage() {
           />
         )}
 
-        <FrankNote
-          answers={answers}
-          material="voice"
-          busy={busy}
-          appearance="room"
-          roleLabel="Producer Note"
-          variant="voice"
-          badge={beat ? "Music is in" : "Voice only for now"}
-          aside={!beat ? "Nothing is lost. You can add music whenever you're ready." : undefined}
-        >
+        <FrankNote answers={answers} material="voice" busy={busy} appearance="room" roleLabel="Producer Note">
           {note}
         </FrankNote>
 

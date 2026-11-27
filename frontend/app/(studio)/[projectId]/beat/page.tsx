@@ -329,51 +329,9 @@ export default function MusicPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="flex xl:col-span-8">
-            <FrankNote
-              className="h-full"
-              aside={aside}
-              answers={answers}
-              material="music"
-              problem={work.kind === "failed"}
-              busy={busy}
-              appearance="room"
-              roleLabel="Producer Note"
-              variant="music"
-              badge={work.kind === "working" ? "Building" : work.kind === "failed" ? "Needs another try" : hasBeat ? "Music ready" : fingerprint ? "Feeling kept" : undefined}
-              meta={hasBeat ? activeVersion?.label : undefined}
-            >
-              {note}
-            </FrankNote>
-          </div>
-          <aside aria-label="Where Frank is" className="stitch-panel flex flex-col gap-4 p-5 xl:col-span-4">
-            <div>
-              <h2 className="stitch-kicker text-frank-text">Where Frank is</h2>
-              <p className="mt-2 text-base leading-relaxed text-on-surface">
-                {work.kind === "working"
-                  ? work.saying
-                  : work.kind === "failed"
-                    ? "The music did not finish, but nothing you made is lost."
-                    : hasBeat
-                      ? "The music is ready. Change anything from the arrangement below."
-                      : fingerprint
-                        ? "Your feeling is kept. Frank can build the music when you're ready."
-                        : "No feeling yet. Tell Frank how it should move, or choose one in the Feeling room."}
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <div className="stitch-bay flex items-center justify-between px-4 py-3 text-sm text-ink-2">
-                <span>Feeling</span>
-                <span className="text-on-surface">{fingerprint ? "Kept" : "Not set"}</span>
-              </div>
-              <div className="stitch-bay flex items-center justify-between px-4 py-3 text-sm text-ink-2">
-                <span>Music</span>
-                <span className="text-on-surface">{hasBeat ? "Ready" : work.kind === "working" ? "Building" : work.kind === "failed" ? "Try again" : "Not made yet"}</span>
-              </div>
-            </div>
-          </aside>
-        </div>
+        <FrankNote aside={aside} answers={answers} material="music" problem={work.kind === "failed"} busy={busy} appearance="room" roleLabel="Producer Note">
+          {note}
+        </FrankNote>
 
         {showAsk && (
           <form
