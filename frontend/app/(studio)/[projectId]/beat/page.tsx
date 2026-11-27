@@ -330,8 +330,9 @@ export default function MusicPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-8">
+          <div className="flex xl:col-span-8">
             <FrankNote
+              className="h-full"
               aside={aside}
               answers={answers}
               material="music"

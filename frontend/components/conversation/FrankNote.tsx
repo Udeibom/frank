@@ -45,20 +45,24 @@ export function FrankNote({ children, aside, answers = [], material, problem, bu
   const v = room ? variant : undefined
   const rootClass =
     v === "feeling"
-      ? "w-full flex-wrap rounded-2xl border border-line/60 bg-surface-container p-6 shadow-l2 md:items-center"
+      ? "w-full rounded-2xl border border-line/60 bg-surface-container p-6 shadow-l2 md:items-center"
       : v === "music"
         ? "w-full flex-col justify-between gap-4 rounded-xl border border-line/60 bg-surface-container p-5 shadow-l2"
         : v === "voice"
-          ? "w-full flex-wrap rounded-xl border border-line/60 bg-surface-container-low py-5 pr-6 pl-7 shadow-l2"
+          ? "w-full rounded-xl border border-line/60 bg-surface-container-low py-5 pr-6 pl-7 shadow-l2"
           : room
             ? "w-full rounded-xl border border-line/40 bg-surface-low p-4 shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
             : cn("rounded-r-lg border-l-[3px] border border-line/40 bg-surface px-5 py-4 shadow-l2", borderColor)
   const contentClass =
     v === "feeling"
-      ? "relative z-10 flex w-full min-w-0 flex-col gap-3"
-      : room
-        ? "flex min-w-0 flex-1 flex-col gap-1 max-w-xl"
-        : "flex min-w-0 flex-1 flex-col gap-1"
+      ? "relative z-10 flex min-w-0 flex-1 flex-col gap-3"
+      : v === "music"
+        ? "relative z-10 flex min-w-0 flex-1 self-stretch flex-col gap-2"
+        : v === "voice"
+          ? "relative z-10 flex min-w-0 flex-1 flex-col gap-2"
+          : room
+            ? "flex min-w-0 flex-1 flex-col gap-1 max-w-xl"
+            : "flex min-w-0 flex-1 flex-col gap-1"
   const noteClass =
     v === "feeling"
       ? "font-written text-2xl leading-snug text-on-surface"
