@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { getTextureWaveform, listTextures } from "@/lib/api/feel"
+import type { DirectionStartSeed } from "@/types/project"
 
 /**
  * Directions: the sounds Frank has played to find the song's feeling (the Feeling room's bench).
@@ -19,6 +20,7 @@ export interface Direction {
   note?: string
   /** The person said "not this" (this visit only). */
   setAside?: boolean
+  seed?: DirectionStartSeed
 }
 
 interface DirectionsState {
@@ -28,7 +30,7 @@ interface DirectionsState {
   load: (projectId: string) => Promise<void>
   /** A ghost card while a direction is being made. Returns its temporary id. */
   startMaking: () => string
-  finishMaking: (tempId: string, made: { id: string; url: string; waveform: number[] | null; note?: string }) => void
+  finishMaking: (tempId: string, made: { id: string; url: string; waveform: number[] | null; note?: string; seed?: DirectionStartSeed }) => void
   failMaking: (tempId: string) => void
   setAside: (id: string) => void
   setWaveform: (id: string, points: number[]) => void
@@ -69,6 +71,7 @@ async function fetchAll(projectId: string, set: Set, get: Get): Promise<void> {
       waveform: known.get(r.id)?.waveform ?? null,
       note: known.get(r.id)?.note,
       setAside: known.get(r.id)?.setAside,
+      seed: known.get(r.id)?.seed,
     }))
     const inFlight = s.directions.filter((d) => d.status !== "ready")
     return { directions: renumber([...fromServer, ...inFlight]), loaded: true }
@@ -127,7 +130,7 @@ export const useDirections = create<DirectionsState>()((set, get) => ({
         ? s.directions.filter((d) => d.id !== tempId)
         : s.directions.map((d) =>
             d.id === tempId
-              ? { ...d, id: made.id, url: made.url, status: "ready" as const, waveform: made.waveform, note: made.note, createdAt: new Date().toISOString() }
+              ? { ...d, id: made.id, url: made.url, status: "ready" as const, waveform: made.waveform, note: made.note, seed: made.seed, createdAt: new Date().toISOString() }
               : d,
           )
       return { directions: renumber(directions) }

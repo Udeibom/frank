@@ -20,7 +20,7 @@ from app.db import feel as feel_db
 from app.db import projects as projects_db
 from app.services.storage.files import upload_audio
 from app.services.generation import fingerprint as fp_utils
-from app.services.generation.texture import generate_texture_wav
+from app.services.generation.texture import generate_texture_wav, texture_seed
 from app.services.audio import shape
 
 
@@ -35,6 +35,7 @@ async def run_texture_job(
         await jobs_db.mark_processing(job_id)
 
         cache_key = fp_utils.texture_cache_key(fingerprint)
+        seed = texture_seed(fingerprint)
 
         # Cache hit — reuse the existing texture, no re-render.
         cached = await feel_db.find_cached_texture(project_id, cache_key)
@@ -42,7 +43,7 @@ async def run_texture_job(
             points = await asyncio.to_thread(shape.shape_of_texture, cached["id"], cached["audio_url"])
             await jobs_db.mark_complete(
                 job_id,
-                {"audio_url": cached["audio_url"], "texture_id": cached["id"], "cached": True, "waveform": points},
+                {"audio_url": cached["audio_url"], "texture_id": cached["id"], "cached": True, "waveform": points, "seed": seed},
             )
             return
 
@@ -63,7 +64,7 @@ async def run_texture_job(
             shape.remember(texture["id"], points)
         await jobs_db.mark_complete(
             job_id,
-            {"audio_url": audio_url, "texture_id": texture["id"], "cached": False, "waveform": points},
+            {"audio_url": audio_url, "texture_id": texture["id"], "cached": False, "waveform": points, "seed": seed},
         )
         # After the person has their sound: remember what it sounds like (frankenstein spec 14, 2.1). Best-effort.
         try:

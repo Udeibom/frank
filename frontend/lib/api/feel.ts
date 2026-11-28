@@ -1,5 +1,5 @@
 import { api, uploadFile } from "./client"
-import type { MusicalFingerprint } from "@/types/project"
+import type { DirectionStartSeed, MusicalFingerprint } from "@/types/project"
 import type { ConversationMessage, ConversationAction } from "@/types/api"
 
 export interface FeelConversationResult {
@@ -25,6 +25,14 @@ export interface FingerprintRecord {
   fingerprint: MusicalFingerprint
   conversation_summary: string | null
   created_at: string
+}
+
+export interface TextureJobResult {
+  audio_url?: string
+  texture_id?: string
+  cached?: boolean
+  waveform?: number[]
+  seed?: DirectionStartSeed
 }
 
 export async function sendFeelMessage(

@@ -20,6 +20,7 @@ from app.models.feel import JobResponse
 from app.models.song import FacetVersionResponse, LyricsReading, MelodySketch
 from app.services.intake import lyrics as lyrics_svc
 from app.services.intake import merge as merge_svc
+from app.services.generation import fingerprint as fp_utils
 from app.services.llm.groq_client import chat_json
 from app.services.intake.hints import fingerprint_hints
 from app.services.jobs.intake_runner import run_hum_intake_job, run_rhythm_intake_job
@@ -119,6 +120,36 @@ async def _counted_for_the_song(project_id: str, content: dict) -> dict:
         return content
 
 
+async def _record_hum_start(project_id: str, version_id: str) -> None:
+    try:
+        latest = await feel_db.get_latest_fingerprint(project_id)
+        base = dict((latest or {}).get("fingerprint") or {})
+        start = {"kind": "hum", "source_id": version_id}
+        if fp_utils.approved_start(base) == start:
+            return
+        saved = await feel_db.save_fingerprint(
+            project_id, fp_utils.with_approved_start(base, start), (latest or {}).get("conversation_summary")
+        )
+        await projects_db.update_project_active_state(project_id, {"active_fingerprint_id": saved["id"]})
+    except Exception:  # noqa: BLE001
+        log.warning("could not record the hum as the beat's start", exc_info=True)
+
+
+async def _clear_hum_start(project_id: str, version_ids: set[str]) -> None:
+    try:
+        latest = await feel_db.get_latest_fingerprint(project_id)
+        base = dict((latest or {}).get("fingerprint") or {})
+        start = fp_utils.approved_start(base)
+        if not start or start.get("kind") != "hum" or start.get("source_id") not in version_ids:
+            return
+        saved = await feel_db.save_fingerprint(
+            project_id, fp_utils.without_approved_start(base), (latest or {}).get("conversation_summary")
+        )
+        await projects_db.update_project_active_state(project_id, {"active_fingerprint_id": saved["id"]})
+    except Exception:  # noqa: BLE001
+        log.warning("could not clear the rejected hum as the beat's start", exc_info=True)
+
+
 @router.post("/melody/{version_id}/confirm", response_model=ConfirmMelodyResponse)
 async def confirm_melody(project_id: str, version_id: str) -> ConfirmMelodyResponse:
     """The person said "yes, that's my tune". Only now does it become the song's tune."""
@@ -134,6 +165,7 @@ async def confirm_melody(project_id: str, version_id: str) -> ConfirmMelodyRespo
     # Saying yes twice is the same as saying it once.
     if found.content.get("confirmed"):
         await store.activate_facet_version(project_id, "melody", found.id)
+        await _record_hum_start(project_id, found.id)
         return ConfirmMelodyResponse(
             version=FacetVersionResponse(**found.model_dump(), is_active=True),
             fingerprint_hints=fingerprint_hints(sketch, sketch.source_audio),
@@ -153,6 +185,7 @@ async def confirm_melody(project_id: str, version_id: str) -> ConfirmMelodyRespo
         )
     except VersionError as exc:
         raise HTTPException(status_code=400, detail="That tune can't be saved right now.") from exc
+    await _record_hum_start(project_id, confirmed.id)
     hints = fingerprint_hints(sketch, sketch.source_audio)
     return ConfirmMelodyResponse(
         version=FacetVersionResponse(**confirmed.model_dump(), is_active=True),
@@ -175,6 +208,7 @@ async def _tune_question(project_id: str, hints: dict) -> Optional[str]:
 async def reject_melody(project_id: str, version_id: str) -> dict:
     """The person said it is not their tune. Remember that, and leave the song's tune untouched."""
     found = await _find_melody(project_id, version_id)
+    await _clear_hum_start(project_id, {version_id, found.id})
     await song_db.insert_decision(
         project_id,
         {

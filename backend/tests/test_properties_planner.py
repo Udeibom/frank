@@ -85,3 +85,36 @@ def test_the_words_feeling_moves_the_energy():
     calm = beat.build_beat_plan(FP, beat.arrangement_from_structure(structure([("verse", 4, "sorrowful")])))[0]
     hot = beat.build_beat_plan(FP, beat.arrangement_from_structure(structure([("verse", 4, "angry")])))[0]
     assert hot[0].energy > calm[0].energy
+
+
+def test_an_approved_direction_starts_the_beat_and_the_rest_continues_from_it():
+    from app.services.generation import texture
+
+    seed = texture.texture_seed({**FP, "texture_palette": 5, "energy_level": 0.3, "density": 0.8})
+    fp = {**FP, "approved_start": {"kind": "direction", "source_id": "tex-1", "direction": seed}}
+    sections, _ = beat.build_beat_plan(fp)
+    first = sections[0]
+    assert first.parts["harmony"]["progression"] == seed["harmony"]
+    assert first.layers == seed["layers"]
+    assert first.energy == seed["fingerprint"]["energy_level"]
+    assert first.density == seed["fingerprint"]["density"]
+    assert len(sections) > 1
+
+
+def test_an_approved_hum_plays_from_the_start_and_still_returns_for_the_chorus():
+    from app.services.generation import lead as lead_mod
+
+    tune = lead_mod.Lead(notes=((60, 0, 1), (62, 1, 1), (64, 2, 1)), bars=4, key="C minor", source="melody-1")
+    fp = {**FP, "approved_start": {"kind": "hum", "source_id": "melody-1"}}
+    sections, planned_fp = beat.build_beat_plan(fp, lead=tune)
+    _, contexts, _ = beat.plan_contexts(sections, planned_fp, 7, tune)
+    assert sections[0].bars >= tune.bars
+    assert contexts[0].lead is tune
+    assert contexts[1].lead is None
+    assert 0 in beat.lead_info(sections, tune, fp)["sections"]
+
+
+def test_a_request_to_start_from_the_kept_feeling_is_recognised():
+    assert beat.wants_approved_start("Start from the feeling I kept and build the rest from it")
+    assert beat.wants_approved_start("Begin with my hum")
+    assert not beat.wants_approved_start("Make the chorus bigger")

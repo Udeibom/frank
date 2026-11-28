@@ -194,3 +194,24 @@ def test_the_founders_reactions_are_not_the_songs_description(said):
 ])
 def test_real_descriptions_are_still_kept(said):
     assert intent.looks_like_description("feel", said)
+
+
+def test_a_texture_keeps_the_exact_direction_that_was_played():
+    fp = {"key": "A minor", "energy_level": 0.7, "density": 0.8, "tempo_feel": "building", "texture_palette": 5}
+    seed = texture.texture_seed(fp)
+    assert seed["bars"] == texture.TEXTURE_BARS
+    assert seed["palette"] == texture.palette_for(fp)
+    assert seed["layers"] == ["keys", "pad", "drums", "arp"]
+    assert seed["harmony"]["degrees"]
+    assert seed["fingerprint"]["density"] == 0.45
+    assert seed["fingerprint"]["texture_palette"] == seed["palette"]
+
+
+def test_an_approved_start_is_kept_and_only_the_hum_can_be_set_aside():
+    base = {"tempo_bpm": 90}
+    start = {"kind": "hum", "source_id": "melody-1"}
+    stored = fp_utils.with_approved_start(base, start)
+    assert fp_utils.approved_start(stored) == start
+    assert fp_utils.without_approved_start(stored, kind="direction") == stored
+    assert fp_utils.without_approved_start(stored, source_id="melody-2") == stored
+    assert fp_utils.approved_start(fp_utils.without_approved_start(stored, kind="hum")) is None

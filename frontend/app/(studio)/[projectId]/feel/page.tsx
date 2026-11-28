@@ -19,7 +19,7 @@ import { DirectionCard, directionTrack } from "@/components/studio/DirectionCard
 import { rankedDirections } from "@/lib/api/organs"
 import { HumIntake } from "@/components/studio/HumIntake"
 import { RhythmIntake } from "@/components/studio/RhythmIntake"
-import { sendFeelMessage, generateTexture, saveFingerprint, getFingerprint, getTextureWaveform } from "@/lib/api/feel"
+import { sendFeelMessage, generateTexture, saveFingerprint, getFingerprint, getTextureWaveform, type TextureJobResult } from "@/lib/api/feel"
 import { pollJob } from "@/lib/api/jobs"
 import { useProjectStore } from "@/store/project"
 import { useSongStore } from "@/store/song"
@@ -129,11 +129,11 @@ export default function FeelingPage() {
     try {
       const { job_id } = await generateTexture(projectId, fingerprintRef.current)
       const result = await pollJob(job_id)
-      const payload = result.result as { audio_url?: string; texture_id?: string; waveform?: number[] } | null
+      const payload = result.result as TextureJobResult | null
       if (!payload?.audio_url || !payload.texture_id) throw new Error("no sound came back")
       const id = payload.texture_id
       lastTextureIdRef.current = id
-      finishMaking(tempId, { id, url: payload.audio_url, waveform: payload.waveform ?? null, note })
+      finishMaking(tempId, { id, url: payload.audio_url, waveform: payload.waveform ?? null, note, seed: payload.seed })
       if (!payload.waveform) {
         getTextureWaveform(projectId, id)
           .then((points) => setWaveform(id, points))
@@ -197,11 +197,12 @@ export default function FeelingPage() {
     say(content)
   }
 
-  function handleTuneConfirmed(info: { hints: Partial<MusicalFingerprint>; description: string; unsureAbout: string[] }) {
+  function handleTuneConfirmed(info: { hints: Partial<MusicalFingerprint>; description: string; versionId: string; unsureAbout: string[] }) {
     // The song now has a tune: let the rest of the studio (the strip) know.
     refresh(projectId).catch(() => {})
     // Only what Frank is confident about arrives here; nothing is filled in with a default.
     mergeFingerprint(info.hints)
+    fingerprintRef.current = { ...fingerprintRef.current, approved_start: { kind: "hum", source_id: info.versionId } }
     // One question at a time, the more important first. Never a list of things Frank is unsure about.
     const question = info.unsureAbout.includes("mood")
       ? " Does it feel bright and lifting to you, or heavier and deeper?"
@@ -210,6 +211,14 @@ export default function FeelingPage() {
         : ""
     sayAsFrank(`Lovely, I'll build around your tune.${question} While you think, let me play you a first sound.`)
     void runTextureGeneration()
+  }
+
+  function handleTuneRejected(versionId: string) {
+    const start = fingerprintRef.current.approved_start
+    if (start?.kind !== "hum" || start.source_id !== versionId) return
+    const next = { ...fingerprintRef.current }
+    delete next.approved_start
+    fingerprintRef.current = next
   }
 
   function handleRhythmConfirmed(hints: Partial<MusicalFingerprint>) {
@@ -221,7 +230,15 @@ export default function FeelingPage() {
 
   async function keepDirection(d: Direction) {
     // Lock in the direction the person chose as the reference for the feeling.
-    fingerprintRef.current = { ...fingerprintRef.current, reference_texture_id: d.id }
+    const approved_start = d.seed
+      ? { kind: "direction" as const, source_id: d.id, direction: d.seed }
+      : { kind: "direction" as const, source_id: d.id }
+    fingerprintRef.current = {
+      ...fingerprintRef.current,
+      reference_texture_id: d.id,
+      texture_palette: d.seed?.palette ?? fingerprintRef.current.texture_palette,
+      approved_start,
+    }
     try {
       const saved = await saveFingerprint(projectId, fingerprintRef.current as MusicalFingerprint, summaryRef.current)
       updateActiveState({ active_fingerprint_id: saved.id })
@@ -396,7 +413,7 @@ export default function FeelingPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="stitch-bay flex flex-col gap-3 p-5">
               <span className="flex items-center gap-2 text-base text-on-surface"><Music className="h-4 w-4 text-feel" aria-hidden="true" /> Hum your tune</span>
-              <HumIntake projectId={projectId} onConfirmed={handleTuneConfirmed} onSay={sayAsFrank} appearance="stage" />
+              <HumIntake projectId={projectId} onConfirmed={handleTuneConfirmed} onRejected={handleTuneRejected} onSay={sayAsFrank} appearance="stage" />
             </div>
             <div className="stitch-bay flex flex-col gap-3 p-5">
               <span className="flex items-center gap-2 text-base text-on-surface"><Drum className="h-4 w-4 text-frank" aria-hidden="true" /> Tap a rhythm</span>

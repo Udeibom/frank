@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field, replace
 from typing import Optional
 
@@ -100,6 +101,25 @@ class SectionPlan:
 
 def _clamp(v: float) -> float:
     return max(0.0, min(1.0, v))
+
+
+def lead_section_names(sections: list[SectionPlan], fingerprint: dict | None) -> set[str]:
+    names = set(lead_mod.LEAD_SECTIONS)
+    start = fp_utils.approved_start(fingerprint)
+    if start and start.get("kind") == "hum" and sections:
+        names.add(sections[0].name)
+    return names
+
+
+APPROVED_START_REQUEST = re.compile(
+    r"\b(?:start|begin|build|base|continue|grow)\b.{0,60}\b(?:feeling|direction|tune|hum|what i kept|what i chose)\b"
+    r"|\buse\b.{0,40}\b(?:feeling|direction|tune|hum)\b",
+    re.I,
+)
+
+
+def wants_approved_start(text: str) -> bool:
+    return bool(APPROVED_START_REQUEST.search(text or ""))
 
 
 def _stamp_repeats(sections: list[SectionPlan]) -> None:
@@ -202,32 +222,58 @@ def build_beat_plan(
     heard. Returns (sections, normalized_fingerprint).
     """
     fp = fp_utils.normalize(fingerprint)
-    style = pick_style(fp)
+    start = fp_utils.approved_start(fp)
+    direction = start.get("direction") if start and start.get("kind") == "direction" else None
+    direction = direction if isinstance(direction, dict) else None
+    seed_fp = fp_utils.normalize({**fp, **(direction.get("fingerprint") or {})}) if direction else fp
+    style = pick_style(seed_fp)
     arrangement = fit_arrangement(arrangement or DEFAULT_ARRANGEMENT, float(fp["tempo_bpm"]), min_seconds)
     base_energy = fp["energy_level"]
     base_density = fp["density"]
+    lead_names = set(lead_mod.LEAD_SECTIONS)
+    if lead and start and start.get("kind") == "hum" and arrangement:
+        lead_names.add(arrangement[0][0])
 
     sections: list[SectionPlan] = []
     feelings: list[Optional[str]] = []
     for i, entry in enumerate(arrangement):
         name, bars = entry[0], entry[1]
         feelings.append(entry[2] if len(entry) > 2 else None)
-        if lead and name in lead_mod.LEAD_SECTIONS:
+        if direction and i == 0:
+            try:
+                bars = max(int(bars), int(direction.get("bars") or 0))
+            except (TypeError, ValueError, OverflowError):
+                pass
+        if lead and name in lead_names:
             bars = max(int(bars), lead.bars)
         sections.append(SectionPlan(i, name, name.capitalize(), int(bars), 0.0, 0.0, layers=[]))
     _stamp_repeats(sections)
     for s, feeling in zip(sections, feelings):
         mult = energy_multiplier(s, feeling)
         s.energy = _clamp(base_energy * mult)
-        # Density tracks energy a bit so bigger sections feel fuller
         s.density = _clamp(base_density * (0.8 + 0.4 * mult))
         s.layers = composer.layers_for_section(s.name, s.energy, s.density, s.repeat, s.final, style)
-    if isinstance(fp.get("texture_palette"), int):
-        # The beat keeps the sound of the direction they said yes to (core-path spec 15, 4.1)
+        if lead and s.name in lead_names and "melody" not in s.layers:
+            s.layers.append("melody")
+    if direction and sections:
+        first = sections[0]
+        try:
+            first.energy = _clamp(float(seed_fp.get("energy_level") or fp["energy_level"]))
+            first.density = _clamp(float(seed_fp.get("density") or fp["density"]))
+        except (TypeError, ValueError, OverflowError):
+            pass
+        layers = direction.get("layers")
+        if isinstance(layers, list) and layers:
+            first.layers = [str(x) for x in layers]
+        harmony = direction.get("harmony")
+        if isinstance(harmony, dict):
+            first.parts["harmony"] = {"progression": harmony}
+    palette = seed_fp.get("texture_palette") if direction else fp.get("texture_palette")
+    if isinstance(palette, int):
         from app.services.generation.texture import PALETTES
 
-        if 0 <= fp["texture_palette"] < len(PALETTES):
-            _, keys, pad, _ = PALETTES[fp["texture_palette"]]
+        if 0 <= palette < len(PALETTES):
+            _, keys, pad, _ = PALETTES[palette]
             for s in sections:
                 s.parts.setdefault("keys", {}).setdefault("preset", keys)
                 s.parts.setdefault("pad", {}).setdefault("preset", pad)
@@ -307,14 +353,20 @@ def plan_contexts(
     Everything the composer needs per section: the style, where it sits in the song, and the chord
     progression for each kind of section (a verse keeps the same chords every time it comes back).
     """
-    style = pick_style(fp)
+    start = fp_utils.approved_start(fp)
+    direction = start.get("direction") if start and start.get("kind") == "direction" else None
+    style_fp = fp
+    if isinstance(direction, dict) and isinstance(direction.get("fingerprint"), dict):
+        style_fp = fp_utils.normalize({**fp, **direction["fingerprint"]})
+    style = pick_style(style_fp)
     if isinstance(fp.get("groove"), dict):
         # the person's own tapped rhythm replaces the style's kick and hat lanes
         from app.services.intake.rhythm import groove_to_style_drums
         style = replace(style, drums=groove_to_style_drums(fp["groove"], style.drums), own_groove=True)
     offset = derive_seed(seed, "chords") % 4
+    lead_names = lead_section_names(sections, fp)
     if lead:
-        playing = [s.bars for s in sections if s.name in lead_mod.LEAD_SECTIONS]
+        playing = [s.bars for s in sections if s.name in lead_names]
         if playing and min(playing) < lead.bars:
             lead = lead_mod.fit_to(lead, min(playing))      # one consistent, whole-phrase version of the tune
     progressions: dict[str, dict] = {}
@@ -327,7 +379,7 @@ def plan_contexts(
     for s in sorted({x.name: x for x in sections}.values(), key=lambda x: (kind_order.get(x.name, 9), x.name)):
         if s.name in progressions:
             continue
-        if lead and s.name in lead_mod.LEAD_SECTIONS:
+        if lead and s.name in lead_names:
             progressions[s.name] = lead_mod.harmonize(lead, key, style.extension)
         else:
             variant = (ROLE_VARIANT.get(s.name, 0) + offset) % 4
@@ -351,12 +403,18 @@ def plan_contexts(
             )
     for s in sections:
         harmony = (s.parts or {}).get("harmony")
-        if isinstance(harmony, dict) and harmony.get("degrees"):
+        if not isinstance(harmony, dict):
+            continue
+        own_key = f"{s.name}#{s.uid if s.uid is not None else s.index}"
+        saved = harmony.get("progression")
+        if isinstance(saved, dict) and saved.get("degrees"):
+            progressions[own_key] = saved
+        elif harmony.get("degrees"):
             try:
                 deg = [int(d) % 7 for d in harmony["degrees"]]
                 sev = [bool(x) for x in (harmony.get("sevenths") or [False] * len(deg))][: len(deg)]
                 sev += [False] * (len(deg) - len(sev))
-                progressions[f"{s.name}#{s.uid if s.uid is not None else s.index}"] = lead_mod.progression_from_degrees(
+                progressions[own_key] = lead_mod.progression_from_degrees(
                     key, deg, sev, family="from_singing")
             except (TypeError, ValueError):
                 pass
@@ -376,7 +434,7 @@ def plan_contexts(
                 next_name=nxt.name if nxt else None,
                 next_energy=nxt.energy if nxt else None,
                 moments=planned.get(s.index, []),
-                lead=lead if (lead and s.name in lead_mod.LEAD_SECTIONS) else None,
+                lead=lead if (lead and s.name in lead_names) else None,
                 tempo_feel=fp["tempo_feel"],
             )
         )
@@ -595,14 +653,15 @@ def lead_from_params(params: dict) -> Optional[lead_mod.Lead]:
     return lead
 
 
-def lead_info(sections: list[SectionPlan], lead: Optional[lead_mod.Lead]) -> dict:
+def lead_info(sections: list[SectionPlan], lead: Optional[lead_mod.Lead], fingerprint: Optional[dict] = None) -> dict:
     """
     What happened to the person's tune in this beat, in plain facts Frank can turn into words: was it used,
     where, and was any of it left out.
     """
     if lead is None:
         return {"used": False}
-    playing = [s for s in sections if s.name in lead_mod.LEAD_SECTIONS and "melody" in s.layers]
+    names = lead_section_names(sections, fingerprint)
+    playing = [s for s in sections if s.name in names and "melody" in s.layers]
     if not playing:
         return {"used": False, "reason": "no_chorus_plays_it", "key": lead.key}
     heard = min(lead.bars, min(s.bars for s in playing))

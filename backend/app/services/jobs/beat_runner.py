@@ -27,6 +27,7 @@ from app.db import projects as projects_db
 from app.db import song as song_db
 from app.services.storage.files import upload_audio
 from app.services.generation import beat as beat_engine
+from app.services.generation import fingerprint as fp_utils
 from app.services.generation import renderer
 from app.services.generation.renderer import to_mp3_bytes
 from app.services.generation import lead as lead_mod
@@ -64,7 +65,7 @@ def _arrangement_params(
         "mix_chain": True,
         "seed": seed,
         "lead": lead.to_dict() if lead else None,
-        "lead_info": beat_engine.lead_info(sections, lead),
+        "lead_info": beat_engine.lead_info(sections, lead, fp),
         "style": style.name,
         "unsupported_hints": list(dict.fromkeys([*style.unsupported, *list(fp.get("unsupported_hints") or [])])),
         "sections": [
@@ -197,6 +198,9 @@ async def _fingerprint_and_lead(project_id: str, fingerprint: dict) -> tuple[dic
     replaced); the key always comes from the tune, because the tune is what has to fit.
     A problem reading the tune never stops a beat from being built.
     """
+    start = fp_utils.approved_start(fingerprint)
+    if start and start.get("kind") == "direction":
+        return fingerprint, None
     try:
         found = await song_record.active_melody(project_id)
     except Exception:  # noqa: BLE001

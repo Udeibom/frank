@@ -22,8 +22,11 @@ from app.services.song.record import system_with_brief
 from app.services.team import conversation_store as convo
 from app.services.llm.prompts import BEAT_ROOM_SYSTEM, build_beat_room_messages
 from app.services.jobs.beat_runner import run_full_beat_job, run_operations_job
+from app.services.generation import beat as beat_engine
+from app.services.generation import fingerprint as fp_utils
 from app.services.generation import ops as ops_mod
 from app.services.jobs.mix_runner import run_vocal_preview_job
+from app.db import feel as feel_db
 from app.db import jobs as jobs_db
 from app.db import beat as beat_db
 from app.db import projects as projects_db
@@ -39,6 +42,7 @@ _ALLOWED_ACTIONS = {
     "restore_version",
     "set_section_label",
     "refine",
+    "restart_from_approved",
 }
 
 
@@ -125,6 +129,16 @@ async def beat_conversation(
     history = [{"role": m.role, "content": m.content} for m in body.history]
     if not history:   # after a reload the page has nothing; the stored conversation is the memory
         history = convo.recent_messages(await convo.history(project_id, "beat"))
+    if beat_engine.wants_approved_start(body.message):
+        try:
+            latest = await feel_db.get_latest_fingerprint(project_id)
+        except Exception:  # noqa: BLE001
+            latest = None
+        if fp_utils.approved_start((latest or {}).get("fingerprint")):
+            return BeatConversationResponse(
+                message="I'll start from the feeling you kept and let the rest grow out of it.",
+                actions=[ConversationAction(type="restart_from_approved", params={})],
+            )
     early = await _version_reply(project_id, "beat", body.message)
     if early:
         return BeatConversationResponse(**early)

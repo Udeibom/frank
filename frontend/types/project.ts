@@ -50,6 +50,20 @@ export interface LyricsVersion {
 
 export type TempoFeel = "steady" | "building" | "floating" | "driving"
 
+export interface DirectionStartSeed {
+  bars: number
+  palette: number
+  layers: string[]
+  harmony: Record<string, unknown>
+  fingerprint: Partial<MusicalFingerprint>
+}
+
+export interface ApprovedStart {
+  kind: "hum" | "direction"
+  source_id: string
+  direction?: DirectionStartSeed
+}
+
 export interface MusicalFingerprint {
   tempo_bpm: number | null
   tempo_feel: TempoFeel | null
@@ -63,6 +77,8 @@ export interface MusicalFingerprint {
   instrumentation_hints: string[]
   reference_texture_id: string | null
   hum_reference_file: string | null
+  texture_palette?: number | null
+  approved_start?: ApprovedStart | null
   /** The person's own tapped rhythm: 16-step lanes, x = a hit. Optional: only present once they have tapped one. */
   groove?: { kick: string; hat: string } | null
 }

@@ -96,6 +96,28 @@ def normalize(fingerprint: dict) -> dict:
     return fp
 
 
+def approved_start(fingerprint: dict | None) -> dict | None:
+    start = (fingerprint or {}).get("approved_start")
+    return start if isinstance(start, dict) and start.get("kind") in ("hum", "direction") else None
+
+
+def with_approved_start(fingerprint: dict, start: dict) -> dict:
+    return {**(fingerprint or {}), "approved_start": start}
+
+
+def without_approved_start(fingerprint: dict, kind: str | None = None, source_id: str | None = None) -> dict:
+    start = approved_start(fingerprint)
+    if not start:
+        return fingerprint
+    if kind is not None and start.get("kind") != kind:
+        return fingerprint
+    if source_id is not None and start.get("source_id") != source_id:
+        return fingerprint
+    out = dict(fingerprint)
+    out.pop("approved_start", None)
+    return out
+
+
 def _unique(values: list) -> list:
     """Keep the first mention of each unsupported hint."""
     out: list = []

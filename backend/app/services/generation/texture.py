@@ -73,31 +73,46 @@ def contrast(fp: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def generate_texture_wav(fingerprint: dict) -> bytes:
-    """
-    Render a short atmospheric texture from a fingerprint. Returns WAV bytes.
-    Synchronous and CPU-bound — always call this from a background job, never
-    directly in a request handler.
-    """
-    fp = fp_utils.normalize(fingerprint)
+TEXTURE_FINGERPRINT_FIELDS = (
+    "key", "mode", "tempo_bpm", "tempo_feel", "energy_level", "density", "brightness", "warmth",
+    "texture_palette", "genre_proximity", "instrumentation_hints",
+)
 
+
+def texture_seed(fingerprint: dict) -> dict:
+    fp = fp_utils.normalize(fingerprint)
     prog = theory.build_progression(
         key=fp["key"],
         energy=fp["energy_level"],
         tempo_feel=fp["tempo_feel"],
         mode=fp["mode"],
     )
-
-    # Textures are intentionally sparse: keys + pad, drums only if energetic.
-    # We cap density low so it stays atmospheric rather than a full beat.
     texture_density = min(fp["density"], 0.45)
     layers = ["keys", "pad"]
     if fp["energy_level"] >= 0.55:
         layers.append("drums")
     if fp["tempo_feel"] in ("building", "driving") and fp["energy_level"] >= 0.4:
         layers.append("arp")
+    palette = palette_for(fp)
+    snapshot = {k: fp.get(k) for k in TEXTURE_FINGERPRINT_FIELDS}
+    snapshot["density"] = texture_density
+    snapshot["texture_palette"] = palette
+    return {"bars": TEXTURE_BARS, "palette": palette, "layers": layers, "harmony": prog, "fingerprint": snapshot}
 
-    _, keys, pad, _ = PALETTES[palette_for(fp)]
+
+def generate_texture_wav(fingerprint: dict) -> bytes:
+    """
+    Render a short atmospheric texture from a fingerprint. Returns WAV bytes.
+    Synchronous and CPU-bound — always call this from a background job, never
+    directly in a request handler.
+    """
+    seed = texture_seed(fingerprint)
+    fp = fp_utils.normalize({**(fingerprint or {}), **seed["fingerprint"]})
+    prog = seed["harmony"]
+    texture_density = seed["fingerprint"]["density"]
+    layers = seed["layers"]
+
+    _, keys, pad, _ = PALETTES[seed["palette"]]
     ctx = composer.SectionContext(name="intro", parts={"keys": {"preset": keys}, "pad": {"preset": pad},
                                                         "arp": {"preset": keys}}, style=pick_style(fp),
                                   tempo_feel=fp["tempo_feel"])

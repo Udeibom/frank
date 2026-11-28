@@ -217,6 +217,14 @@ export default function MusicPage() {
   async function dispatchAction(action: ConversationAction, message = "") {
     const p = action.params as Record<string, unknown>
     switch (action.type) {
+      case "restart_from_approved":
+        setStagedEdits([])
+        await runJob(
+          () => generateBeat(projectId, fingerprint ?? {}, (p.structure_context as Record<string, unknown>) ?? structureContext),
+          "Starting from the feeling you kept and growing the rest from it. This takes about a minute.",
+          null,
+        )
+        break
       case "generate_full_beat":
         await runJob(
           () => generateBeat(projectId, fingerprint ?? {}, (p.structure_context as Record<string, unknown>) ?? structureContext),
@@ -319,6 +327,7 @@ export default function MusicPage() {
   const hasVoice = Boolean(record?.vocal)
   const busy = work.kind === "working"
   const lead = describeLead(activeVersion?.params.lead_info)
+  const approvedStart = (fingerprint?.approved_start ?? (activeVersion?.params.fingerprint as Partial<MusicalFingerprint> | undefined)?.approved_start)
 
   // ─── What Frank is saying on the stage ───
   let note: React.ReactNode
@@ -342,10 +351,15 @@ export default function MusicPage() {
     ]
   } else if (hasBeat) {
     const follows = Boolean((activeVersion?.params.fingerprint as { follows_voice?: boolean } | undefined)?.follows_voice)
-    note = follows
+    const startedFrom = approvedStart?.kind === "hum"
+      ? "This music starts with your tune, and everything after it grows out of it."
+      : approvedStart?.kind === "direction"
+        ? "This music starts from the feeling you kept, and everything after it grows out of it."
+        : null
+    note = startedFrom ?? (follows
       ? "This music is built around your singing: your speed, chords that fit your notes, and your verses and choruses. Play it, then change anything."
-      : "Play it, then change anything. Press a part in a section to make it busier, simpler or leave it out."
-    aside = lead ?? undefined
+      : "Play it, then change anything. Press a part in a section to make it busier, simpler or leave it out.")
+    aside = startedFrom ? [lead, "Play it, then change anything."].filter(Boolean).join(" ") : lead ?? undefined
     answers = [
       ...(hasVoice && !follows
         ? [{
@@ -364,7 +378,9 @@ export default function MusicPage() {
         : []),
     ]
   } else if (fingerprint) {
-    note = "Your feeling is kept. Ready for Frank to build the music from it?"
+    note = approvedStart
+      ? "Your feeling is kept. I'll start there and grow the rest of the music from it."
+      : "Your feeling is kept. Ready for Frank to build the music from it?"
     answers = [{ label: "Build the music", onClick: buildMusic, primary: true }]
   } else {
     note = "First, the feeling. Tell me how the song should move, or find it by listening in the Feeling room."

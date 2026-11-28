@@ -230,6 +230,7 @@ Always a JSON object:
 }
 ACTION TYPES:
 - Build the first/whole beat: { "type": "generate_full_beat", "params": {} }
+- Start from the feeling/tune they kept and continue from it: { "type": "restart_from_approved", "params": {} }
 - Change the beat (everything except building and going back):
   { "type": "beat_operations", "params": { "operations": [ ...up to 3 operations... ] } }
 - Go back to a version (a real id from the list you are given): { "type": "restore_version", "params": { "version_id": "<id>" } }

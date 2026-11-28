@@ -29,9 +29,11 @@ interface HumIntakeProps {
   onConfirmed: (info: {
     hints: Partial<MusicalFingerprint>
     description: string
+    versionId: string
     /** What Frank could not pin down, most important first: "mood" and/or "speed". */
     unsureAbout: string[]
   }) => void
+  onRejected?: (versionId: string) => void
   /** Anything Frank wants to say in the conversation (kind reasons, next steps). */
   onSay: (message: string) => void
   /** "stage": a real control on the room's stage. "chat": the compact link above the conversation input. */
@@ -56,7 +58,7 @@ function explainFailure(err: unknown): string {
   return "Something went wrong while I was listening. Want to try again?"
 }
 
-export function HumIntake({ projectId, onConfirmed, onSay, appearance = "chat" }: HumIntakeProps) {
+export function HumIntake({ projectId, onConfirmed, onRejected, onSay, appearance = "chat" }: HumIntakeProps) {
   const recorder = useRecorder()
   const pendingUpload = useRef(false)
   const [working, setWorking] = useState(false)
@@ -143,6 +145,7 @@ export function HumIntake({ projectId, onConfirmed, onSay, appearance = "chat" }
       onConfirmed({
         hints: fingerprint_hints,
         description: current.description,
+        versionId: current.version_id,
         unsureAbout: current.unsure_about,
       })
       // A tune that disagrees with what the song already settled: Frank asks which should lead (spec 02, req 6.5).
@@ -160,6 +163,7 @@ export function HumIntake({ projectId, onConfirmed, onSay, appearance = "chat" }
     setHeard(null)
     try {
       await rejectTune(projectId, current.version_id)
+      onRejected?.(current.version_id)
     } catch {
       /* remembering the "no" is best-effort; the person can simply hum again */
     }
