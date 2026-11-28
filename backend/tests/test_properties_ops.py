@@ -31,8 +31,8 @@ def score(sections, seed=SEED):
     return out
 
 
-# Parts that are built FROM other parts (a reply to the tune, the closing chord) may follow an edit to those parts.
-DERIVED = {"color", "color_once", "riser", "sweep", "finale_keys", "finale_pad", "finale_bass", "finale_drums"}
+# Parts that are built FROM other parts (a reply to the tune) may follow an edit to those parts.
+DERIVED = {"color", "color_once", "riser", "sweep"}
 
 
 @settings(max_examples=25, deadline=None)

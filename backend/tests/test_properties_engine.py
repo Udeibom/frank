@@ -399,16 +399,44 @@ def full_song_parts(seed: int, fp=None):
 
 @given(seeds)
 @settings(max_examples=25, deadline=None)
-def test_the_song_ends_on_one_held_chord_with_a_crash(seed):
+def test_the_song_fades_out_without_forcing_a_new_final_chord(seed):
     s, ctx, prog, parts = full_song_parts(seed)[-1]
-    lo = s.bars * 4.0 - 4.0
-    for p in parts:
-        if p.name.startswith("finale"):
-            continue
-        assert not [e for e in p.events if e.start >= lo], p.name
-    names = {p.name for p in parts}
-    assert {"finale_keys", "finale_drums", "finale_bass"} <= names
-    assert any(e.note == composer.CRASH for p in parts if p.name == "finale_drums" for e in p.events)
+    end = s.bars * 4.0
+    last_bar = end - 4.0
+    fade_from = max(0.0, end - 8.0)
+    assert not [p.name for p in parts if p.name.startswith("finale")]
+    assert not [e for p in parts if p.is_drums for e in p.events if e.start >= last_bar]
+    early = [e.velocity for p in parts if not p.lead and not p.is_drums
+             for e in p.events if fade_from <= e.start < fade_from + 2.0]
+    late = [e.velocity for p in parts if not p.lead and not p.is_drums
+            for e in p.events if end - 2.0 <= e.start < end]
+    assert early and late
+    assert max(late) < max(early)
+
+
+def test_the_ending_fades_drums_out_and_leaves_the_tune_alone():
+    prog = theory.build_progression("C minor", 0.6, "steady", variant=0, seed=7)
+    ctx = composer.SectionContext(name="outro", moments=[mo.Moment("ending")])
+    notes = [composer.NoteEvent(36, t, 0.2, 100) for t in (8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0)]
+    drums = composer.Part("drums", 0, True, notes)
+    lead = composer.Part("melody", 0, False, [composer.NoteEvent(72, 15.0, 0.5, 110)], lead=True)
+    assert touches._ending([drums, lead], prog, 4, ctx) == []
+    assert not [e for e in drums.events if e.start >= 12.0]
+    assert max(e.velocity for e in drums.events) < 100
+    assert lead.events[0].velocity == 110
+
+
+def test_removing_drums_keeps_them_out_of_the_ending():
+    sections, f = beat.build_beat_plan(BASE_FP, [("chorus", 4)])
+    for s in sections:
+        if "drums" in s.layers:
+            s.layers.remove("drums")
+    _, contexts, progs = beat.plan_contexts(sections, f, 7)
+    s = sections[0]
+    parts = composer.compose_section(
+        s.name, progs[s.name], s.bars, s.energy, s.density, layers=s.layers, ctx=contexts[0],
+    )
+    assert not [p for p in parts if p.name == "finale_drums" or (p.is_drums and p.events)]
 
 
 @given(seeds)

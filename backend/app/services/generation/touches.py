@@ -3,16 +3,15 @@ Touches: turns the planned moments (moments.py) into notes (song-engine spec 04)
 
 Applied to the parts of one section after they are composed. A touch can take notes away (a bar where
 the drums drop out, a beat of silence), add a new part (a riser, a one-time bell, an answer to the
-tune), change a part's sound (a different instrument in the bridge), or replace the last bar with a
-proper ending. Every note it adds is a note of the chord playing at that moment.
+tune), change a part's sound (a different instrument in the bridge), or let the last bars settle and
+fade. Every note it adds is a note of the chord playing at that moment.
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-from app.services.generation import theory
-from app.services.generation.composer import CRASH, GAP, KICK, NoteEvent, Part, SectionContext, _scale_pool, _vel
+from app.services.generation.composer import GAP, NoteEvent, Part, SectionContext, _scale_pool, _vel
 from app.services.generation.moments import REVERSE_CYMBAL, RISER_PROGRAM, Moment
 from app.services.generation.rng import rng_for
 
@@ -88,28 +87,33 @@ def _riser(bars: int, progression: dict, has_stop: bool, ctx: SectionContext) ->
     return [p for p in (run, sweep) if p.events]
 
 
+def _fade(part: Part, lo: float, hi: float) -> None:
+    span = max(0.25, hi - lo)
+    for e in part.events:
+        if e.start >= hi:
+            continue
+        if e.start + e.duration > hi:
+            e.duration = max(0.05, hi - e.start - GAP)
+        if e.start < lo:
+            continue
+        progress = min(1.0, (e.start + min(e.duration, 0.5) - lo) / span)
+        e.velocity = max(1, int(round(e.velocity * (1.0 - 0.82 * progress))))
+
+
 def _ending(parts: list[Part], progression: dict, bars: int, ctx: SectionContext) -> list[Part]:
-    """The last bar becomes one held chord on the home note with a crash. The bar before loses its drums."""
+    """The last two bars settle and fade; any part the person left out stays out."""
     end = bars * 4.0
-    lo = end - 4.0
+    last_bar = end - 4.0
+    fade_from = max(0.0, end - 8.0)
     for p in parts:
         if p.lead:
-            continue        # the person's own tune is never cut: it plays out over the closing chord
-        _remove(p, lo, end)
-        if p.is_drums and bars >= 3:
-            _remove(p, lo - 4.0, lo)
-    home = theory.chord_for_degree(progression["root"], progression["mode"], 0, 3)
-    keys = Part("finale_keys", ctx.style.instruments["keys"], False)
-    pad = Part("finale_pad", ctx.style.instruments["strings"], False)
-    bass = Part("finale_bass", ctx.style.instruments["bass"], False)
-    drums = Part("finale_drums", 0, True)
-    for n in home:
-        keys.events.append(NoteEvent(n, lo, 3.9, 78))
-        pad.events.append(NoteEvent(n + 12, lo, 3.95, 56))
-    bass.events.append(NoteEvent(home[0] - 12, lo, 3.9, 84))
-    drums.events.append(NoteEvent(CRASH, lo, 2.0, 92))
-    drums.events.append(NoteEvent(KICK, lo, 0.3, 96))
-    return [keys, pad, bass, drums]
+            continue
+        if p.is_drums:
+            _remove(p, last_bar, end)
+            _fade(p, fade_from, last_bar)
+        else:
+            _fade(p, fade_from, end)
+    return []
 
 
 def apply_moments(parts: list[Part], moments: list[Moment], progression: dict, bars: int, ctx: SectionContext) -> list[Part]:

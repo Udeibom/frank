@@ -346,7 +346,7 @@ export default function MusicPage() {
     note = `${stagedEdits.length} change${stagedEdits.length === 1 ? "" : "s"} waiting. Nothing has been made yet — tell Frank when to apply.`
     aside = stagedEdits.map((edit) => edit.words).join(" · ")
     answers = [
-      { label: "Go ahead, Frank", primary: true, onClick: () => void applyChanges() },
+      { label: "Apply Changes", primary: true, onClick: () => void applyChanges() },
       { label: "Clear changes", onClick: clearStaged },
     ]
   } else if (hasBeat) {
@@ -517,7 +517,7 @@ export default function MusicPage() {
             </div>
             {hasBeat && (
               <p className="mt-3 text-sm text-ink-2">
-                Choose the changes you want, then tell Frank to go ahead. Press a section name to play from there.
+                Choose the changes you want, then apply them. Press a section name to play from there.
                 {sections.length > 0 && ` ${sections.length} sections, from ${sectionWords(sections, 0)} to ${sectionWords(sections, sections.length - 1)}.`}
               </p>
             )}
@@ -533,7 +533,7 @@ export default function MusicPage() {
                 {stagedEdits.map((edit) => <li key={edit.id}>{edit.words}</li>)}
               </ul>
               <div className="mt-4 flex flex-wrap gap-3">
-                <button type="button" onClick={() => void applyChanges()} disabled={busy} className="stitch-primary min-h-11 px-5 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none">Go ahead, Frank</button>
+                <button type="button" onClick={() => void applyChanges()} disabled={busy} className="stitch-primary min-h-11 px-5 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none">Apply Changes</button>
                 <button type="button" onClick={clearStaged} disabled={busy} className="stitch-secondary min-h-11 px-5 text-sm disabled:text-ink-3">Clear changes</button>
               </div>
             </section>

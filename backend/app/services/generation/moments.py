@@ -73,7 +73,7 @@ def _colour(seed: int, name: str, tone_score: float) -> int:
 
 def one_off_section(facts: list[Facts], seed: int) -> Optional[int]:
     """The single section that gets the song's one-time sound: the bridge, or else the last chorus."""
-    # The ending clears the last bar, so a very short last section cannot keep the sound.
+    # The ending fades the last bars, so a very short last section cannot keep the sound.
     usable = [f for f in facts if not (f is facts[-1] and f.bars < 3)]
     bridges = [f.index for f in usable if f.name == "bridge"]
     choruses = [f.index for f in usable if f.name == "chorus" and f.final]
