@@ -78,13 +78,13 @@ export function WorldStarts({ projectId, onSay, onChanged }: WorldStartsProps) {
     <section aria-label="Start from something around you" className="flex flex-col gap-3">
       <p className="text-xs text-ink-3">Or start from something around you</p>
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => picture.current?.click()} disabled={Boolean(working)} className="flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
+        <button onClick={() => picture.current?.click()} disabled={Boolean(working)} className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
           <ImageIcon className="h-4 w-4" aria-hidden="true" /> A picture
         </button>
-        <button onClick={rightNow} disabled={Boolean(working)} className="flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
+        <button onClick={rightNow} disabled={Boolean(working)} className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
           <CloudSun className="h-4 w-4" aria-hidden="true" /> Right now, where I am
         </button>
-        <button onClick={() => setPanel(panel === "song" ? null : "song")} aria-expanded={panel === "song"} disabled={Boolean(working)} className="flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
+        <button onClick={() => setPanel(panel === "song" ? null : "song")} aria-expanded={panel === "song"} disabled={Boolean(working)} className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
           <Music2 className="h-4 w-4" aria-hidden="true" /> A song I love
         </button>
         <input ref={picture} type="file" accept="image/*" className="hidden" onChange={(e) => onPicture(e.target.files?.[0])} aria-label="Choose a picture" />
@@ -101,8 +101,8 @@ export function WorldStarts({ projectId, onSay, onChanged }: WorldStartsProps) {
               if (named.trim()) void referenceJob("Looking that song up…", () => nameASong(projectId, named.trim()))
             }}
           >
-            <input value={named} onChange={(e) => setNamed(e.target.value)} placeholder="Name a song, like Nights by Frank Ocean" aria-label="Name a song" className="min-w-0 flex-1 rounded-md border border-line bg-raised px-3 py-1.5 text-ink" />
-            <button type="submit" className="rounded-md border border-line px-3 py-1.5 text-ink hover:border-ink-3">Tell Frank</button>
+            <input value={named} onChange={(e) => setNamed(e.target.value)} placeholder="Name a song, like Nights by Frank Ocean" aria-label="Name a song" className="min-h-11 min-w-0 flex-1 rounded-md border border-line bg-raised px-3 py-1.5 text-ink" />
+            <button type="submit" className="flex min-h-11 items-center rounded-md border border-line px-3 py-1.5 text-ink hover:border-ink-3">Tell Frank</button>
           </form>
 
           <div className="flex flex-col gap-2">
@@ -117,8 +117,8 @@ export function WorldStarts({ projectId, onSay, onChanged }: WorldStartsProps) {
                 })
               }}
             >
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Or find free music by feeling: late night soul" aria-label="Find free music by feeling" className="min-w-0 flex-1 rounded-md border border-line bg-raised px-3 py-1.5 text-ink" />
-              <button type="submit" className="rounded-md border border-line px-3 py-1.5 text-ink hover:border-ink-3">Find</button>
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Or find free music by feeling: late night soul" aria-label="Find free music by feeling" className="min-h-11 min-w-0 flex-1 rounded-md border border-line bg-raised px-3 py-1.5 text-ink" />
+              <button type="submit" className="flex min-h-11 items-center rounded-md border border-line px-3 py-1.5 text-ink hover:border-ink-3">Find</button>
             </form>
             {freeNote && <p className="text-ink-3">{freeNote}</p>}
             {tracks && tracks.length > 0 && (
@@ -146,7 +146,7 @@ export function WorldStarts({ projectId, onSay, onChanged }: WorldStartsProps) {
             <button
               onClick={() => songFile.current?.click()}
               disabled={!ownsIt || Boolean(working)}
-              className="self-start rounded-md border border-line px-3 py-1.5 text-ink hover:border-ink-3 disabled:text-ink-3"
+              className="flex min-h-11 items-center self-start rounded-md border border-line px-3 py-1.5 text-ink hover:border-ink-3 disabled:text-ink-3"
             >
               Use a song file
             </button>

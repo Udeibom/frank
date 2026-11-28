@@ -40,7 +40,7 @@ function Switch({ on, label, disabled, onChange }: { on: boolean; label: string;
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={cn(
-        "w-14 shrink-0 rounded-md border px-2 py-1 text-sm font-medium transition-colors disabled:opacity-60",
+        "min-h-11 w-14 shrink-0 rounded-md border px-2 py-1 text-sm font-medium transition-colors disabled:opacity-60",
         on ? "border-voice/60 bg-raised text-ink" : "border-dashed border-ink-3 text-ink-3",
       )}
     >
@@ -69,7 +69,7 @@ function Lane({
   onSwitch?: (on: boolean) => void
 }) {
   return (
-    <li className={cn("flex items-center gap-3 rounded-md bg-surface px-3 py-2.5", !on && "bg-transparent outline outline-1 outline-dashed outline-ink-3/50")}>
+    <li className={cn("flex flex-wrap items-center gap-3 rounded-md bg-surface px-3 py-2.5", !on && "bg-transparent outline outline-1 outline-dashed outline-ink-3/50")}>
       <span aria-hidden="true" className={cn("h-8 w-1 shrink-0 rounded-[2px]", material === "voice" ? "bg-voice" : "bg-music", !on && "opacity-30")} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-base text-ink">{name}</span>
@@ -80,7 +80,7 @@ function Lane({
           disabled={busy || !on}
           onClick={onSofter}
           aria-label={`${name} a bit softer`}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink hover:border-ink-3 disabled:text-ink-3"
+          className="flex h-11 w-11 items-center justify-center rounded-md border border-line text-ink hover:border-ink-3 disabled:text-ink-3"
         >
           <Minus className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -90,7 +90,7 @@ function Lane({
           disabled={busy || !on}
           onClick={onLouder}
           aria-label={`${name} a bit louder`}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink hover:border-ink-3 disabled:text-ink-3"
+          className="flex h-11 w-11 items-center justify-center rounded-md border border-line text-ink hover:border-ink-3 disabled:text-ink-3"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
         </button>

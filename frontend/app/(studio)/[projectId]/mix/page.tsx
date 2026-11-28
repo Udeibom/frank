@@ -326,8 +326,8 @@ export default function MixRoomPage() {
 
   return (
     <div className="flex h-full">
-      <div className="stitch-room flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
-        <div className="flex items-end justify-between gap-4 border-b border-line/60 pb-5">
+      <div className="stitch-room flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-6 md:px-10 md:py-8 [--sweep:var(--voice)]">
+        <div className="flex flex-col gap-4 border-b border-line/60 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-frank shadow-[0_0_12px_rgb(var(--frank)/0.6)]" />
@@ -343,8 +343,8 @@ export default function MixRoomPage() {
         </FrankNote>
 
         {(hasMix || rendering) && (
-          <section aria-labelledby="listen-heading" className="stitch-panel flex flex-col gap-4 p-5">
-            <div className="flex items-center gap-5">
+          <section aria-labelledby="listen-heading" className="stitch-panel flex flex-col gap-4 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-5">
               {track ? <PlayButton track={track} size="stage" keepPosition /> : <span className="sweep h-12 w-12 rounded-full" aria-hidden="true" />}
               <div className="min-w-0 flex-1">
                 <h2 id="listen-heading" className="stitch-kicker text-frank-text">The song right now</h2>
@@ -354,7 +354,7 @@ export default function MixRoomPage() {
                 </p>
               </div>
               {previous && track && (
-                <div role="group" aria-label="Compare with the blend before" className="flex items-center gap-3 border-l border-line pl-5">
+                <div role="group" aria-label="Compare with the blend before" className="flex flex-wrap items-center gap-3 border-line pl-0 sm:border-l sm:pl-5">
                   <span className="text-sm text-ink-2">Compare with before</span>
                   <PlayButton track={mixTrack(previous)} size="card" keepPosition />
                 </div>
@@ -420,9 +420,9 @@ export default function MixRoomPage() {
           </div>
         )}
 
-        <div className="grid max-w-[1000px] gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid w-full max-w-[1000px] gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           {(hasVocal || hasBeat) && (
-            <div className="stitch-panel p-5">
+            <div className="stitch-panel p-4 sm:p-5">
               <StemBalance
                 hasVocal={hasVocal}
                 hasBeat={hasBeat}

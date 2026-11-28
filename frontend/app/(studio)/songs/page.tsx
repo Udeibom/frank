@@ -68,7 +68,7 @@ export default function DashboardPage() {
   return (
     <div className="songs-design min-h-screen text-ink">
       {/* Top bar — matches Stitch songs/screen.png header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line/70 bg-ground/95 px-6 py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line/70 bg-ground/95 px-4 py-3 backdrop-blur sm:px-6">
         <div className="flex items-center gap-2">
           <div
             className="flex h-7 w-7 items-center justify-center rounded-md"
@@ -81,15 +81,16 @@ export default function DashboardPage() {
         </div>
         <Link
           href="/taste"
-          className="font-mono text-[10px] uppercase tracking-wider text-ink-3 transition-colors hover:text-frank"
+          className="flex min-h-11 items-center font-mono text-[10px] uppercase tracking-wider text-ink-3 transition-colors hover:text-frank"
         >
-          ✦ What Frank knows about your taste
+          <span className="hidden sm:inline">✦ What Frank knows about your taste</span>
+          <span className="sm:hidden">✦ Taste</span>
         </Link>
         <div className="flex items-center gap-2">
           <button
             onClick={handleSignOut}
             title="Sign out"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-ground transition-opacity hover:opacity-80"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-xs font-bold text-ground transition-opacity hover:opacity-80"
             style={{ background: "rgb(var(--frank))" }}
           >
             JD
@@ -97,9 +98,9 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-10">
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
         {/* Page heading */}
-        <div className="mb-8 flex items-start justify-between">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="stitch-title text-ink">Your Songs</h1>
             <p className="mt-2 text-sm text-ink-2">Pick up where you left off, or start something new.</p>
@@ -108,7 +109,7 @@ export default function DashboardPage() {
             onClick={handleNewProject}
             disabled={creating}
             id="new-song-btn"
-            className="stitch-primary flex items-center gap-2 px-5 py-3 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
+            className="stitch-primary flex min-h-12 items-center justify-center gap-2 px-5 py-3 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             {creating ? "Opening…" : "New Song"}
@@ -124,7 +125,7 @@ export default function DashboardPage() {
           </div>
         ) : projects.length === 0 ? (
           /* Empty state */
-          <div className="stitch-panel flex flex-col items-center gap-5 rounded-2xl border-dashed py-20 text-center">
+          <div className="stitch-panel flex flex-col items-center gap-5 rounded-2xl border-dashed py-12 text-center sm:py-20">
             <div
               className="flex h-16 w-16 items-center justify-center rounded-xl"
               style={{
@@ -151,7 +152,7 @@ export default function DashboardPage() {
             <button
               onClick={handleNewProject}
               disabled={creating}
-              className="stitch-primary flex items-center gap-2 px-6 py-3 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
+              className="stitch-primary flex min-h-12 items-center justify-center gap-2 px-6 py-3 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
             >
               <Plus className="h-4 w-4" />
               {creating ? "Opening…" : "Start a Song"}
@@ -160,7 +161,7 @@ export default function DashboardPage() {
         ) : (
           <>
             {/* Column headers */}
-            <div className="mb-2 flex items-center justify-between px-1">
+            <div className="mb-2 hidden items-center justify-between px-1 sm:flex">
               <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">
                 Recent Projects ({projects.length})
               </span>
@@ -177,7 +178,7 @@ export default function DashboardPage() {
                   <button
                     key={project.id}
                     onClick={() => router.push(`/${project.id}/idea`)}
-                    className="stitch-panel group flex w-full items-center gap-5 rounded-2xl px-6 py-5 text-left transition-all hover:border-frank/40 hover:bg-surface-highest"
+                    className="stitch-panel group flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left transition-all hover:border-frank/40 hover:bg-surface-highest sm:gap-5 sm:px-6 sm:py-5"
                   >
                     <div
                       className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all"
@@ -210,7 +211,7 @@ export default function DashboardPage() {
                       ● {statusLabel}
                     </div>
                     {/* Arrow */}
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-lg text-ink-3 transition-all group-hover:border-frank/60 group-hover:text-frank">
+                    <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-lg text-ink-3 transition-all group-hover:border-frank/60 group-hover:text-frank sm:flex">
                       ›
                     </div>
                   </button>
@@ -221,7 +222,7 @@ export default function DashboardPage() {
         )}
 
         {/* Taste drawer — persistent memory section */}
-        <section className="stitch-panel mt-16 rounded-2xl p-6">
+        <section className="stitch-panel mt-12 rounded-2xl p-4 sm:mt-16 sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div

@@ -298,8 +298,8 @@ export default function FeelingPage() {
 
   return (
     <div className="flex h-full">
-      <div className="stitch-room room-feel flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-10 py-8">
-        <div className="flex items-end justify-between gap-4 border-b border-line/60 pb-5">
+      <div className="stitch-room room-feel flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-6 md:px-10 md:py-8">
+        <div className="flex flex-col gap-4 border-b border-line/60 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-feel shadow-[0_0_12px_rgb(var(--feel)/0.6)]" />
@@ -318,7 +318,7 @@ export default function FeelingPage() {
 
         {showAsk && (
           <form
-            className="stitch-panel flex flex-col gap-4 p-5"
+            className="stitch-panel flex flex-col gap-4 p-4 sm:p-5"
             onSubmit={(e) => {
               e.preventDefault()
               const text = stageText.trim()
@@ -327,13 +327,13 @@ export default function FeelingPage() {
               void handleSend(text)
             }}
           >
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <label htmlFor="feeling-ask" className="text-base font-medium text-on-surface">
                 How should it feel?
               </label>
               <span className="stitch-kicker text-ink-3">Your words, in your own way</span>
             </div>
-            <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <textarea
                 id="feeling-ask"
                 value={stageText}
@@ -347,12 +347,12 @@ export default function FeelingPage() {
                 rows={3}
                 autoFocus
                 placeholder="Walking home alone after a party, slow and warm, a little lonely…"
-                className="min-h-[96px] max-w-xl flex-1 resize-none rounded-xl border border-line/60 bg-surface-lowest px-5 py-4 font-written text-[17px] leading-[25px] text-on-surface placeholder:font-sans placeholder:text-base placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-feel/40 transition-shadow"
+                className="min-h-[96px] w-full max-w-xl flex-1 resize-none rounded-xl border border-line/60 bg-surface-lowest px-4 py-4 font-written text-[17px] leading-[25px] text-on-surface placeholder:font-sans placeholder:text-base placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-feel/40 transition-shadow sm:px-5"
               />
               <button
                 type="submit"
                 disabled={!stageText.trim() || isThinking}
-                className="stitch-primary h-11 whitespace-nowrap px-5 text-base disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
+                className="stitch-primary min-h-12 w-full px-5 text-base disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none sm:w-auto sm:shrink-0 sm:whitespace-nowrap"
               >
                 {isThinking ? "Listening…" : "Play me a first sound"}
               </button>
@@ -369,7 +369,7 @@ export default function FeelingPage() {
             <span className="stitch-chip">{ordered.length} directions</span>
           </div>
           {ordered.length === 0 ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
@@ -383,7 +383,7 @@ export default function FeelingPage() {
               ))}
             </div>
           ) : (
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
               {ordered.map((d) => (
                 <li key={d.id}>
                   <DirectionCard
@@ -411,11 +411,11 @@ export default function FeelingPage() {
             <p className="mt-1 text-sm text-ink-2">Give Frank a melody or groove directly. No need to be a singer or drummer.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="stitch-bay flex flex-col gap-3 p-5">
+            <div className="stitch-bay flex flex-col gap-3 p-4 sm:p-5">
               <span className="flex items-center gap-2 text-base text-on-surface"><Music className="h-4 w-4 text-feel" aria-hidden="true" /> Hum your tune</span>
               <HumIntake projectId={projectId} onConfirmed={handleTuneConfirmed} onRejected={handleTuneRejected} onSay={sayAsFrank} appearance="stage" />
             </div>
-            <div className="stitch-bay flex flex-col gap-3 p-5">
+            <div className="stitch-bay flex flex-col gap-3 p-4 sm:p-5">
               <span className="flex items-center gap-2 text-base text-on-surface"><Drum className="h-4 w-4 text-frank" aria-hidden="true" /> Tap a rhythm</span>
               <RhythmIntake projectId={projectId} onConfirmed={handleRhythmConfirmed} onSay={sayAsFrank} appearance="stage" />
             </div>

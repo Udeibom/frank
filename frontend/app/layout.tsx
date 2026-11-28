@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import localFont from "next/font/local"
 import "./globals.css"
 
@@ -38,6 +38,12 @@ const mono = localFont({
 export const metadata: Metadata = {
   title: "Frank",
   description: "Use Frank. Turn your ideas into songs.",
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#121316",
 }
 
 export default function RootLayout({

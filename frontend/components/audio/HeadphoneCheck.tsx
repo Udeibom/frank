@@ -72,12 +72,12 @@ export function HeadphoneCheck({ onResult, onClose }: HeadphoneCheckProps) {
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {answers.length === step && (
-              <button onClick={() => void playStep(step === 0 ? 0 : 1)} className="rounded-md border border-line bg-raised px-3 py-1.5 text-ink hover:border-ink-3">
+              <button onClick={() => void playStep(step === 0 ? 0 : 1)} className="flex min-h-11 items-center rounded-md border border-line bg-raised px-3 py-1.5 text-ink hover:border-ink-3">
                 {step === 0 ? "Play the chime" : "Play it again"}
               </button>
             )}
             {(["left", "right", "both"] as Heard[]).map((h) => (
-              <button key={h} onClick={() => answer(h)} className="rounded-md border border-line px-3 py-1.5 text-ink-2 hover:text-ink">
+              <button key={h} onClick={() => answer(h)} className="flex min-h-11 items-center rounded-md border border-line px-3 py-1.5 text-ink-2 hover:text-ink">
                 {h === "left" ? "Left ear" : h === "right" ? "Right ear" : "Both / speakers"}
               </button>
             ))}

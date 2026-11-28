@@ -45,7 +45,7 @@ export function ListenPanel({ projectId, onFix }: { projectId: string; onFix: (c
         <h2 id="listen-frank" className="flex items-center gap-2 text-base text-ink">
           <Ear className="h-4 w-4" aria-hidden="true" /> Have Frank listen
         </h2>
-        <button onClick={() => void listen()} disabled={working} className="rounded-md border border-line px-3 py-1 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
+        <button onClick={() => void listen()} disabled={working} className="flex min-h-11 items-center rounded-md border border-line px-3 py-1 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
           {working ? "Listening…" : heard || plain.length ? "Listen again" : "Listen"}
         </button>
       </div>
@@ -111,17 +111,17 @@ export function AtmospherePanel({ projectId, current, onDone }: { projectId: str
           : "Rain on a window, a city at night, an old record: a real sound under the song, from its feeling."}
       </p>
       <div className="flex flex-wrap gap-2">
-        <button disabled={Boolean(working)} onClick={() => void run("Finding a real sound…", () => addAtmosphere(projectId, "recorded"))} className="rounded-md border border-line px-3 py-1 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
+        <button disabled={Boolean(working)} onClick={() => void run("Finding a real sound…", () => addAtmosphere(projectId, "recorded"))} className="flex min-h-11 items-center rounded-md border border-line px-3 py-1 text-sm text-ink hover:border-ink-3 disabled:text-ink-3">
           {current?.plain ? "Try another real sound" : "Add a real sound"}
         </button>
-        <button disabled={Boolean(working)} onClick={() => void run("Making a sound from the feeling…", () => addAtmosphere(projectId, "generated"))} className="rounded-md border border-line px-3 py-1 text-sm text-ink-2 hover:text-ink disabled:text-ink-3">
+        <button disabled={Boolean(working)} onClick={() => void run("Making a sound from the feeling…", () => addAtmosphere(projectId, "generated"))} className="flex min-h-11 items-center rounded-md border border-line px-3 py-1 text-sm text-ink-2 hover:text-ink disabled:text-ink-3">
           Make one from the feeling
         </button>
         {current?.plain && (
           <button
             disabled={Boolean(working)}
             onClick={() => void run(current.enabled === false ? "Putting it back…" : "Taking it out…", () => switchAtmosphere(projectId, current.enabled === false))}
-            className="rounded-md border border-line px-3 py-1 text-sm text-ink-2 hover:text-ink disabled:text-ink-3"
+            className="flex min-h-11 items-center rounded-md border border-line px-3 py-1 text-sm text-ink-2 hover:text-ink disabled:text-ink-3"
           >
             {current.enabled === false ? "Put it back" : "Take it out"}
           </button>
@@ -194,7 +194,7 @@ export function ConductPanel({ parts, onSet }: { parts: string[]; onSet: (part: 
       </h2>
       <p className="text-sm text-ink-2">Raise your hand to bring a part up, lower it to bring it down, then keep the level. Your camera stays on this computer.</p>
       <div className="flex flex-wrap items-center gap-2">
-        <select value={part} onChange={(e) => setPart(e.target.value)} aria-label="Which part to conduct" className="rounded-md border border-line bg-raised px-2 py-1 text-sm text-ink">
+        <select value={part} onChange={(e) => setPart(e.target.value)} aria-label="Which part to conduct" className="min-h-11 rounded-md border border-line bg-raised px-2 py-1 text-sm text-ink">
           {parts.map((p) => (
             <option key={p} value={p}>
               {PART_NAMES[p] ?? p}
@@ -211,7 +211,7 @@ export function ConductPanel({ parts, onSet }: { parts: string[]; onSet: (part: 
                 if (level) onSet(part, level)
                 stopRef.current()
               }}
-              className="rounded-md border border-line px-3 py-1 text-sm text-ink hover:border-ink-3 disabled:text-ink-3"
+              className="flex min-h-11 items-center rounded-md border border-line px-3 py-1 text-sm text-ink hover:border-ink-3 disabled:text-ink-3"
             >
               Keep this level
             </button>

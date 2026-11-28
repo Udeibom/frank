@@ -127,7 +127,7 @@ export function Arrangement({ sections, progress, busy, working, onPlayFrom, sta
   const columns = sections.map((s) => `minmax(80px, ${s.bars}fr)`).join(" ")
 
   return (
-    <div role="group" aria-label="The music, section by section" aria-busy={busy} className="relative">
+    <div role="group" aria-label="The music, section by section" aria-busy={busy} className="relative min-w-[640px]">
       <div
         className="grid gap-x-1 gap-y-1.5"
         style={{ gridTemplateColumns: `112px ${columns}`, gridTemplateRows: `auto repeat(${parts.length}, 36px)` }}
@@ -155,7 +155,7 @@ export function Arrangement({ sections, progress, busy, working, onPlayFrom, sta
                     if (e.key === "Enter") e.currentTarget.blur()
                     if (e.key === "Escape") setRenaming(null)
                   }}
-                  className="w-full rounded-sm bg-raised px-2 py-1.5 text-sm text-ink"
+                  className="min-h-11 w-full rounded-sm bg-raised px-2 py-1.5 text-sm text-ink"
                 />
               ) : (
                 <ChoiceMenu
@@ -168,7 +168,7 @@ export function Arrangement({ sections, progress, busy, working, onPlayFrom, sta
                       onClick={toggle}
                       disabled={busy}
                       aria-label={`${label}: choices`}
-                      className="group relative flex w-full min-w-0 items-center rounded-sm px-2 py-1.5 text-left text-sm font-medium text-ink hover:bg-raised disabled:cursor-default"
+                      className="group relative flex min-h-11 w-full min-w-0 items-center rounded-sm px-2 py-1.5 text-left text-sm font-medium text-ink hover:bg-raised disabled:cursor-default"
                     >
                       <span className="truncate">{label}</span>
                       <Pencil aria-hidden="true" className="absolute right-1.5 h-3 w-3 text-ink-3 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />

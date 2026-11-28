@@ -251,7 +251,7 @@ export default function WordsPage() {
 
   return (
     <div className="words-design flex h-full">
-      <div className="room-words flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-6">
+      <div className="room-words flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
         <header className="mx-auto flex w-full max-w-[1020px] flex-col justify-between gap-4 border-b border-line/50 pb-4 md:flex-row md:items-end">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
@@ -271,7 +271,7 @@ export default function WordsPage() {
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="flex min-w-0 flex-col gap-5">
               {loaded ? (
-                <div className="rounded-xl border border-line/40 bg-surface-low p-6 shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+                <div className="rounded-xl border border-line/40 bg-surface-low p-4 shadow-[0_8px_30px_rgba(0,0,0,0.4)] sm:p-6">
                   <LyricsEditor
                     projectId={projectId}
                     initialContent={editorContent}
@@ -299,7 +299,7 @@ export default function WordsPage() {
               <WordsFeel projectId={projectId} getWords={() => currentLyricsRef.current} onSay={(m) => sayAsFrank(m)} />
             </div>
 
-            <aside aria-label="About your words" className="hidden w-[280px] shrink-0 flex-col gap-6 lg:flex">
+            <aside aria-label="About your words" className="flex w-full flex-col gap-6 lg:w-[280px] lg:shrink-0">
               <section aria-labelledby="sections-heading" className="flex flex-col gap-3 rounded-xl bg-surface-low p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
                 <div className="flex items-center justify-between pb-1">
                   <h2 id="sections-heading" className="text-label-sm font-semibold uppercase tracking-[0.06em] text-on-surface-variant">
@@ -394,11 +394,11 @@ function SuggestionBlock({
                 onAdd(content, sectionLabel)
                 setResolved("added")
               }}
-              className="rounded bg-frank px-3 py-1 text-label-sm font-semibold text-on-primary"
+              className="flex min-h-11 items-center rounded bg-frank px-3 py-1 text-label-sm font-semibold text-on-primary"
             >
               Add to my words
             </button>
-            <button onClick={() => setResolved("ignored")} className="rounded bg-surface-highest px-3 py-1 text-label-sm text-on-surface-variant">
+            <button onClick={() => setResolved("ignored")} className="flex min-h-11 items-center rounded bg-surface-highest px-3 py-1 text-label-sm text-on-surface-variant">
               Leave it
             </button>
           </>

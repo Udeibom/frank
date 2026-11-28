@@ -79,7 +79,7 @@ export function SongTree({ projectId }: { projectId: string }) {
       <div role="tablist" aria-label="Which part of the song" className="flex flex-wrap gap-2">
         {FACETS.map((f) => (
           <button key={f.facet} role="tab" aria-selected={facet === f.facet} onClick={() => setFacet(f.facet)}
-            className={facet === f.facet ? "rounded-full border border-ink-3 px-3 py-1 text-sm text-ink" : "rounded-full border border-line px-3 py-1 text-sm text-ink-2 hover:text-ink"}>
+            className={facet === f.facet ? "flex min-h-11 items-center rounded-full border border-ink-3 px-3 py-1 text-sm text-ink" : "flex min-h-11 items-center rounded-full border border-line px-3 py-1 text-sm text-ink-2 hover:text-ink"}>
             {f.label}
           </button>
         ))}
@@ -89,7 +89,7 @@ export function SongTree({ projectId }: { projectId: string }) {
       ) : versions.length === 0 ? (
         <p className="text-sm text-ink-3">Nothing here yet. Every version will appear as the song grows.</p>
       ) : (
-        <div className="h-[340px] w-full rounded-md border border-line bg-ground">
+        <div className="h-[300px] w-full rounded-md border border-line bg-ground sm:h-[340px]">
           <ReactFlow nodes={nodes} edges={edges} fitView nodesDraggable={false} nodesConnectable={false} proOptions={{ hideAttribution: true }}
             onNodeClick={(_, n) => setPicked(versions.find((v) => v.id === n.id) ?? null)}>
             <Background color="rgb(var(--line))" gap={24} />
@@ -109,7 +109,7 @@ export function SongTree({ projectId }: { projectId: string }) {
                   .then(() => setSaid("Brought back. Everything after it is still kept."))
                   .catch(() => setSaid("I couldn't bring that one back just now."))
               }
-              className="rounded-md border border-line px-3 py-1 text-ink hover:border-ink-3"
+              className="flex min-h-11 items-center rounded-md border border-line px-3 py-1 text-ink hover:border-ink-3"
             >
               Bring this one back
             </button>

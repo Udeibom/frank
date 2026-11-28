@@ -37,7 +37,7 @@ export function VersionChoice({ candidates, onPick, onClose, material = "music" 
               />
             )}
             <span className="flex-1 truncate text-base text-ink">{c.label ?? "Version"}</span>
-            <button onClick={() => onPick(c.id)} className="rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3">
+            <button onClick={() => onPick(c.id)} className="flex min-h-11 items-center rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3">
               This one
             </button>
           </div>

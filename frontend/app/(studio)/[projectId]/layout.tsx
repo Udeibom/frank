@@ -60,7 +60,7 @@ export default function ProjectLayout({
   }, [pathname])
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-ground">
+    <div className="studio-viewport flex flex-col overflow-hidden bg-ground">
       <a
         href="#stage"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-frank focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-ground"
@@ -73,7 +73,7 @@ export default function ProjectLayout({
       )}
       <div className="flex min-h-0 flex-1">
         <Rail projectId={projectId} onStart={() => setShowStart(true)} />
-        <main id="stage" tabIndex={-1} className="min-h-0 min-w-0 flex-1 overflow-auto outline-none">
+        <main id="stage" tabIndex={-1} className="min-h-0 min-w-0 flex-1 overflow-auto pb-20 outline-none md:pb-0">
           {loading ? (
             <div className="flex h-full items-center justify-center" role="status">
               <p className="text-sm text-ink-2">Opening your studio…</p>

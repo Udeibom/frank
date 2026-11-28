@@ -155,7 +155,7 @@ export function ConversationPanel({
       <aside
         aria-label="Frank"
         className={cn(
-          "flex w-[340px] shrink-0 flex-col border-l border-line bg-surface max-[1200px]:fixed max-[1200px]:bottom-0 max-[1200px]:right-0 max-[1200px]:top-12 max-[1200px]:z-30 max-[1200px]:shadow-l3",
+          "flex w-[340px] shrink-0 flex-col border-l border-line bg-surface max-[1200px]:fixed max-[1200px]:bottom-0 max-[1200px]:right-0 max-[1200px]:top-16 max-[1200px]:z-40 max-[1200px]:w-full max-[1200px]:max-w-[420px] max-[1200px]:shadow-l3",
           panelRoom && "bg-surface-low",
         )}
       >
@@ -187,14 +187,14 @@ export function ConversationPanel({
                 window.localStorage.setItem("frank.speaks", next ? "yes" : "no")
               }}
               aria-pressed={speaks}
-              className={panelRoom ? "rounded-sm p-1 text-on-surface-variant hover:text-on-surface" : "rounded-sm px-1.5 py-1 text-[10px] text-ink-3 hover:text-ink"}
+              className={panelRoom ? "min-h-11 rounded-sm px-2 text-on-surface-variant hover:text-on-surface" : "min-h-11 rounded-sm px-2 text-[10px] text-ink-3 hover:text-ink"}
             >
               {speaks ? "Reading aloud" : "Read aloud"}
             </button>
             <button
               onClick={() => setOpen(false)}
               aria-label="Hide the conversation with Frank"
-              className={panelRoom ? "rounded-sm p-1 text-on-surface-variant hover:text-on-surface" : "rounded-sm p-1 text-ink-3 hover:text-ink"}
+              className={cn("flex min-h-11 min-w-11 items-center justify-center rounded-sm", panelRoom ? "text-on-surface-variant hover:text-on-surface" : "text-ink-3 hover:text-ink")}
             >
               <ChevronsRight className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -211,7 +211,7 @@ export function ConversationPanel({
           </div>
         )}
 
-        <div ref={scrollRef} className={panelRoom ? "flex-1 overflow-y-auto px-4 py-4" : "flex-1 overflow-y-auto px-4 py-5"} aria-live="polite" aria-relevant="additions">
+        <div ref={scrollRef} className={cn("overscroll-contain", panelRoom ? "flex-1 overflow-y-auto px-4 py-4" : "flex-1 overflow-y-auto px-4 py-5")} aria-live="polite" aria-relevant="additions">
           {earlier.length > 0 && (
             <div className="mb-5 flex flex-col gap-4" role="group" aria-label="Earlier conversation">
               <p className={panelRoom ? "text-code uppercase tracking-widest text-on-surface-variant" : "text-xs font-semibold uppercase tracking-[0.06em] text-ink-3"}>Earlier</p>
@@ -271,7 +271,7 @@ export function ConversationPanel({
         </div>
 
         {/* Input */}
-        <form onSubmit={handleSubmit} className={panelRoom ? "border-t border-line bg-surface-container p-4" : "border-t border-line p-4"}>
+        <form onSubmit={handleSubmit} className={cn("safe-bottom", panelRoom ? "border-t border-line bg-surface-container p-4" : "border-t border-line p-4")}>
           {inputAccessory && <div className="mb-3">{inputAccessory}</div>}
           <div className="flex items-end gap-2">
             <textarea
@@ -292,7 +292,7 @@ export function ConversationPanel({
               type="submit"
               disabled={!input.trim() || isThinking}
               aria-label="Send message"
-              className={panelRoom ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-frank text-on-primary transition-all hover:bg-frank/90 hover:scale-105 disabled:bg-surface-high disabled:text-on-surface-variant disabled:scale-100" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-frank text-ground transition-all hover:bg-frank/90 hover:scale-105 disabled:bg-raised disabled:text-ink-3 disabled:scale-100"}
+              className={panelRoom ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-frank text-on-primary transition-all hover:bg-frank/90 hover:scale-105 disabled:bg-surface-high disabled:text-on-surface-variant disabled:scale-100" : "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-frank text-ground transition-all hover:bg-frank/90 hover:scale-105 disabled:bg-raised disabled:text-ink-3 disabled:scale-100"}
             >
               <Send className="h-4 w-4" aria-hidden="true" />
             </button>

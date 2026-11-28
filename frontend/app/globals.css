@@ -153,8 +153,17 @@
     --ink-3: 148 163 184;
   }
   html {
+    color-scheme: dark;
     scroll-behavior: smooth;
     scroll-padding-top: 56px; /* height of sticky nav */
+  }
+
+  button, a, [role="button"], input, select, textarea {
+    touch-action: manipulation;
+  }
+
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* One focus ring everywhere: 2px, Frank amber, offset so it never hides the control. */
@@ -180,6 +189,19 @@
 }
 
 @layer utilities {
+  .studio-viewport {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-bottom-space {
+    height: env(safe-area-inset-bottom);
+  }
+
   /* ── Elevation shadows (analog hardware depth) ───────────────────────────────
      L2: cards, active channels.
      L3: modals, overlays, popovers. */

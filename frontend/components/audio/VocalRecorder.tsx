@@ -186,7 +186,7 @@ export function VocalRecorder({
           <select
             value={startAt}
             onChange={(e) => setStartAt(Number(e.target.value))}
-            className="rounded-md border border-line bg-raised px-2 py-1.5 text-sm text-ink"
+            className="min-h-11 rounded-md border border-line bg-raised px-2 py-1.5 text-sm text-ink"
             aria-label="Start from"
           >
             <option value={-1}>the very start</option>

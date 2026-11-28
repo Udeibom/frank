@@ -54,8 +54,8 @@ export function MatchedFinish({ projectId, mixVersionId, frankUrl }: { projectId
               if (q.trim()) void searchFreeMusic(projectId, q.trim()).then((r) => setTracks(r.tracks)).catch(() => setTracks([]))
             }}
           >
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find free music by feeling" aria-label="Find free music" className="min-w-0 flex-1 rounded-md border border-line bg-raised px-3 py-1.5 text-sm text-ink" />
-            <button type="submit" className="rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3">Find</button>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find free music by feeling" aria-label="Find free music" className="min-h-11 min-w-0 flex-1 rounded-md border border-line bg-raised px-3 py-1.5 text-sm text-ink" />
+            <button type="submit" className="flex min-h-11 items-center rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3">Find</button>
           </form>
           {tracks.length > 0 && (
             <ul className="flex flex-col gap-1 text-sm">
@@ -74,7 +74,7 @@ export function MatchedFinish({ projectId, mixVersionId, frankUrl }: { projectId
             Or use a song file I&apos;m allowed to use
           </label>
           {owns && (
-            <button onClick={() => file.current?.click()} disabled={Boolean(working)} className="self-start rounded-md border border-line px-3 py-1 text-sm text-ink hover:border-ink-3">Choose the file</button>
+            <button onClick={() => file.current?.click()} disabled={Boolean(working)} className="flex min-h-11 items-center self-start rounded-md border border-line px-3 py-1 text-sm text-ink hover:border-ink-3">Choose the file</button>
           )}
           <input ref={file} type="file" accept="audio/*" className="hidden" aria-label="Song file to match" onChange={(e) => e.target.files?.[0] && void make({ file: e.target.files[0] })} />
           {working && <p className="flex items-center gap-2 text-xs text-ink-3" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> {working}</p>}

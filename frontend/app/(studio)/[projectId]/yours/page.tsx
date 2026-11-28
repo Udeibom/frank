@@ -50,7 +50,7 @@ export default function YoursPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-8 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-8 sm:py-10">
       <h1 className="text-xl font-semibold text-foreground">What makes this song yours</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Frank keeps this so every change protects what&apos;s yours. If something here would be lost, Frank says so once,
@@ -88,7 +88,7 @@ export default function YoursPage() {
           })}
         </div>
       )}
-      <Button variant="outline" size="sm" className="mt-6" onClick={refresh} disabled={working}>
+      <Button variant="outline" size="sm" className="mt-6 min-h-11 w-full sm:w-auto" onClick={refresh} disabled={working}>
         {working ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Look again
       </Button>
       <SongTree projectId={projectId} />

@@ -53,8 +53,8 @@ export default function TastePage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-8 py-10">
-      <Link href="/songs" className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-8 sm:py-10">
+      <Link href="/songs" className="mb-6 flex min-h-11 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-3.5 w-3.5" /> All Songs
       </Link>
       <h1 className="text-xl font-semibold text-foreground">What Frank knows about your taste</h1>
@@ -90,7 +90,7 @@ export default function TastePage() {
                       if (e.key === "Enter") save(t.id)
                       if (e.key === "Escape") setEditing(null)
                     }}
-                    className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    className="min-h-11 w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
                   />
                 ) : (
                   <p className="text-sm text-foreground">{t.statement}</p>
@@ -107,11 +107,11 @@ export default function TastePage() {
                   setEditing(t.id)
                 }}
                 aria-label={`Change: ${t.statement}`}
-                className="rounded p-1 text-muted-foreground hover:text-foreground"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded text-muted-foreground hover:text-foreground"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
-              <button onClick={() => forget(t.id)} aria-label={`Forget: ${t.statement}`} className="rounded p-1 text-muted-foreground hover:text-red-400">
+              <button onClick={() => forget(t.id)} aria-label={`Forget: ${t.statement}`} className="flex min-h-11 min-w-11 items-center justify-center rounded text-muted-foreground hover:text-red-400">
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </li>
@@ -122,7 +122,7 @@ export default function TastePage() {
       {items && items.length > 0 && (
         <div className="mt-8">
           {confirmAll ? (
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-foreground">Forget everything Frank has learned about your taste?</span>
               <Button size="sm" variant="outline" onClick={() => setConfirmAll(false)}>Keep it</Button>
               <Button size="sm" onClick={forgetAll}>Yes, forget everything</Button>

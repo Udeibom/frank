@@ -78,7 +78,7 @@ export function WordsFeel({ projectId, getWords, onSay }: { projectId: string; g
       <button
         onClick={() => void read()}
         disabled={working}
-        className="self-start rounded-lg bg-surface-high px-3 py-1.5 text-label-md text-on-surface hover:bg-surface-highest disabled:text-on-surface-variant"
+        className="flex min-h-11 items-center self-start rounded-lg bg-surface-high px-3 py-1.5 text-label-md text-on-surface hover:bg-surface-highest disabled:text-on-surface-variant"
       >
         {working ? "Reading how it feels…" : "How do my words feel?"}
       </button>

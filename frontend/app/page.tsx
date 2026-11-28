@@ -6,12 +6,22 @@ import { createClient } from "@/lib/supabase/client"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { Menu, X } from "lucide-react"
+
+const NAV_ITEMS: [string, string][] = [
+  ["Overview", "overview"],
+  ["Rooms", "rooms"],
+  ["How It Works", "why-frank"],
+  ["Philosophy", "philosophy"],
+  ["Listen", "listen"],
+]
 
 export default function LandingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [slowStart, setSlowStart] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Ping the backend the moment the page loads so it starts waking up
@@ -62,14 +72,18 @@ export default function LandingPage() {
       : "Opening your studio…"
     : "Start a Song — Free Session"
 
+  function goTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })
+    setMenuOpen(false)
+  }
+
   return (
     <div className="min-h-screen bg-ground text-ink">
 
       {/* ── Sticky nav ───────────────────────────────────────────────────────── */}
       <nav className="sticky top-0 z-50 w-full border-b border-line/60 bg-ground/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          {/* Wordmark */}
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-2 sm:px-6 sm:py-3">
+          <div className="flex shrink-0 items-center gap-2">
             <div
               className="flex h-8 w-8 items-center justify-center rounded-lg"
               style={{ background: "rgb(var(--frank))", boxShadow: "0 0 12px rgba(245,158,11,0.3)" }}
@@ -77,45 +91,58 @@ export default function LandingPage() {
               <span className="font-written italic text-base leading-none text-ground select-none">f</span>
             </div>
             <span className="text-sm font-semibold tracking-tight text-ink">Frank</span>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3 ml-0.5">Studio</span>
+            <span className="hidden font-mono text-[10px] uppercase tracking-widest text-ink-3 ml-0.5 sm:inline">Studio</span>
           </div>
-          {/* Nav links — smooth-scroll to page sections */}
           <div className="hidden items-center gap-6 md:flex">
-            {([
-              ["Overview",    "overview"],
-              ["Rooms",       "rooms"],
-              ["How It Works","why-frank"],
-              ["Philosophy",  "philosophy"],
-              ["Listen",      "listen"],
-            ] as [string, string][]).map(([label, id]) => (
+            {NAV_ITEMS.map(([label, id]) => (
               <button
                 key={label}
-                onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}
-                className="text-xs font-medium uppercase tracking-wide text-ink-2 transition-colors hover:text-ink"
+                onClick={() => goTo(id)}
+                className="min-h-11 text-xs font-medium uppercase tracking-wide text-ink-2 transition-colors hover:text-ink"
               >
                 {label}
               </button>
             ))}
           </div>
-          {/* Auth + CTA */}
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="text-xs text-ink-2 hover:text-ink transition-colors">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <Link href="/login" className="flex min-h-11 items-center px-1 text-xs text-ink-2 transition-colors hover:text-ink">
               Sign in
             </Link>
             <button
               onClick={handleStart}
               disabled={loading}
-              className="rounded-md px-4 py-2 text-xs font-semibold text-ground transition-all disabled:opacity-60"
+              className="min-h-11 rounded-md px-3 py-2 text-xs font-semibold text-ground transition-all disabled:opacity-60 sm:px-4"
               style={{ background: "rgb(var(--frank))", boxShadow: "0 0 14px rgba(245,158,11,0.3)" }}
             >
               {loading ? "Opening…" : "Open Studio"}
             </button>
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              className="flex h-11 w-11 items-center justify-center rounded-md border border-line text-ink-2 md:hidden"
+            >
+              {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+            </button>
           </div>
         </div>
+        {menuOpen && (
+          <div className="border-t border-line/60 bg-ground/95 px-4 py-2 md:hidden">
+            {NAV_ITEMS.map(([label, id]) => (
+              <button
+                key={label}
+                onClick={() => goTo(id)}
+                className="flex min-h-11 w-full items-center text-left text-xs font-medium uppercase tracking-wide text-ink-2"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
-      <section id="overview" className="relative overflow-hidden px-6 pb-0 pt-24 text-center">
+      <section id="overview" className="relative overflow-hidden px-4 pb-0 pt-16 text-center sm:px-6 sm:pt-24">
         {/* Ambient amber glow behind hero */}
         <div
           className="pointer-events-none absolute inset-0 -z-10"
@@ -129,7 +156,7 @@ export default function LandingPage() {
           Songwriter &bull; Production &bull; Master Calibration
         </p>
         {/* Headline */}
-        <h1 className="font-written text-5xl font-normal leading-tight text-ink md:text-6xl landing-fade landing-fade-1">
+        <h1 className="font-written text-4xl font-normal leading-tight text-ink sm:text-5xl md:text-6xl landing-fade landing-fade-1">
           You have a song in your head.
           <br />
           <em style={{ color: "rgb(var(--frank))" }}>Let&apos;s get it out.</em>
@@ -149,15 +176,15 @@ export default function LandingPage() {
           <button
             onClick={handleStart}
             disabled={loading}
-            className="cta-glow flex items-center gap-2 rounded-md px-6 py-3 text-sm font-semibold text-ground transition-all disabled:opacity-60"
+            className="cta-glow flex min-h-12 items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-semibold text-ground transition-all disabled:opacity-60"
             style={{ background: "rgb(var(--frank))", boxShadow: "0 0 28px rgba(245,158,11,0.45)" }}
           >
             <span>▶</span>
             <span>{buttonLabel}</span>
           </button>
           <button
-            onClick={() => document.getElementById("listen")?.scrollIntoView({ behavior: "smooth" })}
-            className="rounded-md border border-line px-6 py-3 text-sm text-ink-2 transition-colors hover:border-line hover:text-ink"
+            onClick={() => goTo("listen")}
+            className="flex min-h-12 items-center justify-center rounded-md border border-line px-6 py-3 text-sm text-ink-2 transition-colors hover:border-line hover:text-ink"
           >
             Listen to Records Made in Frank
           </button>
@@ -466,15 +493,15 @@ export default function LandingPage() {
             <button
               onClick={handleStart}
               disabled={loading}
-              className="cta-glow flex items-center gap-2 rounded-md px-6 py-3 text-sm font-semibold text-ground transition-all disabled:opacity-60"
+              className="cta-glow flex min-h-12 items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-semibold text-ground transition-all disabled:opacity-60"
               style={{ background: "rgb(var(--frank))", boxShadow: "0 0 28px rgba(245,158,11,0.45)" }}
             >
               <span>▶</span>
               <span>Open Frank Studio — Free Session</span>
             </button>
             <button
-              onClick={() => document.getElementById("rooms")?.scrollIntoView({ behavior: "smooth" })}
-              className="rounded-md border border-line px-6 py-3 text-sm text-ink-2 transition-colors hover:text-ink"
+              onClick={() => goTo("rooms")}
+              className="flex min-h-12 items-center justify-center rounded-md border border-line px-6 py-3 text-sm text-ink-2 transition-colors hover:text-ink"
             >
               Explore All 6 Rooms
             </button>

@@ -114,15 +114,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
           </div>
           <span className="text-sm font-semibold text-ink">Frank</span>
           <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3 ml-0.5">Studio</span>
-          <span className="ml-1 font-mono text-[10px] uppercase tracking-widest text-ink-3">· Workstation Core</span>
+          <span className="ml-1 hidden font-mono text-[10px] uppercase tracking-widest text-ink-3 sm:inline">· Workstation Core</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full" style={{ background: "rgb(var(--ok))" }} />
-          <span className="font-mono text-[11px] text-ink-2">Session Ready</span>
+          <span className="hidden font-mono text-[11px] text-ink-2 sm:inline">Session Ready</span>
         </div>
       </header>
 
-      <main className="relative flex flex-1 flex-col items-center justify-center px-4 py-16">
+      <main className="relative flex flex-1 flex-col items-center justify-center px-4 py-10 sm:py-16">
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-0 -z-10"
@@ -134,7 +134,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         />
 
         <div className={isSignup ? "w-full max-w-[490px]" : "w-full max-w-[460px]"}>
-          <div className="stitch-auth-card p-8">
+          <div className="stitch-auth-card p-6 sm:p-8">
             <span className="stitch-auth-rail" aria-hidden="true" />
             <span className="absolute left-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-surface-highest opacity-60" aria-hidden="true" />
             <span className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-surface-highest opacity-60" aria-hidden="true" />
@@ -215,7 +215,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-3 hover:text-ink transition-colors"
+                    className="absolute right-2 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center text-xs text-ink-3 hover:text-ink transition-colors"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? "hide" : "show"}
@@ -270,7 +270,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
               {/* Remember + forgot (login only) */}
               {!isSignup && (
                 <div className="flex items-center justify-between pt-1">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-2 hover:text-ink transition-colors select-none">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ink-2 hover:text-ink transition-colors select-none">
                     <input
                       type="checkbox"
                       className="h-4 w-4 rounded border-line bg-raised"
@@ -280,7 +280,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
                   </label>
                   <Link
                     href="/login?forgot=1"
-                    className="text-xs transition-colors hover:underline"
+                    className="flex min-h-11 items-center text-xs transition-colors hover:underline"
                     style={{ color: "rgb(var(--frank))" }}
                   >
                     Forgot password?

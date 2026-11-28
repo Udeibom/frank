@@ -391,8 +391,8 @@ export default function MusicPage() {
 
   return (
     <div className="flex h-full">
-      <div className="stitch-room room-music flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-10 py-8 [--sweep:var(--music)]">
-        <div className="flex items-end justify-between gap-4 border-b border-line/60 pb-5">
+      <div className="stitch-room room-music flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-6 md:px-10 md:py-8 [--sweep:var(--music)]">
+        <div className="flex flex-col gap-4 border-b border-line/60 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-music shadow-[0_0_12px_rgb(var(--music)/0.6)]" />
@@ -411,7 +411,7 @@ export default function MusicPage() {
 
         {showAsk && (
           <form
-            className="stitch-panel flex flex-col gap-4 p-5"
+            className="stitch-panel flex flex-col gap-4 p-4 sm:p-5"
             onSubmit={(e) => {
               e.preventDefault()
               const text = stageText.trim()
@@ -420,13 +420,13 @@ export default function MusicPage() {
               void handleSend(text)
             }}
           >
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <label htmlFor="music-ask" className="text-base font-medium text-on-surface">
                 How should it move?
               </label>
               <span className="stitch-kicker text-ink-3">In your own words</span>
             </div>
-            <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <textarea
                 id="music-ask"
                 value={stageText}
@@ -439,12 +439,12 @@ export default function MusicPage() {
                 }}
                 rows={2}
                 placeholder="Slow and warm, soft piano and gentle drums…"
-                className="min-h-[56px] max-w-xl flex-1 resize-none rounded-lg border border-line/60 bg-surface-lowest px-4 py-3 font-written text-[17px] leading-[25px] text-on-surface placeholder:font-sans placeholder:text-base placeholder:text-ink-3"
+                className="min-h-[56px] w-full max-w-xl flex-1 resize-none rounded-lg border border-line/60 bg-surface-lowest px-4 py-3 font-written text-[17px] leading-[25px] text-on-surface placeholder:font-sans placeholder:text-base placeholder:text-ink-3"
               />
               <button
                 type="submit"
                 disabled={!stageText.trim() || isThinking}
-                className="stitch-primary h-11 px-5 text-base disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none"
+                className="stitch-primary min-h-12 w-full px-5 text-base disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none sm:w-auto sm:shrink-0"
               >
                 {isThinking ? "Listening…" : "Tell Frank"}
               </button>
@@ -480,8 +480,8 @@ export default function MusicPage() {
         )}
 
         <div className="flex min-w-0 flex-col gap-6">
-          <section aria-labelledby="arrangement-heading" className="stitch-panel min-w-0 p-5">
-            <div className="mb-5 flex items-center gap-4 border-b border-line/50 pb-4">
+          <section aria-labelledby="arrangement-heading" className="stitch-panel min-w-0 p-4 sm:p-5">
+            <div className="mb-5 flex flex-wrap items-center gap-4 border-b border-line/50 pb-4">
               {track && <PlayButton track={track} size="stage" />}
               <div className="min-w-0 flex-1">
                 <h2 id="arrangement-heading" className="stitch-kicker text-frank-text">
@@ -499,20 +499,22 @@ export default function MusicPage() {
               <span className="stitch-chip">{hasBeat ? sections.length : preview.length} sections</span>
             </div>
 
-            {hasBeat ? (
-              <Arrangement
-                sections={sections}
-                progress={playback.isCurrent && playback.duration > 0 ? playback.progress : null}
-                busy={busy}
-                working={work.kind === "working" ? work.where : null}
-                onPlayFrom={playFrom}
-                stagedEdits={stagedEdits}
-                onStageEdit={stageEdit}
-                onStageRename={stageRename}
-              />
-            ) : (
-              <GhostArrangement making={work.kind === "working"} sections={preview} />
-            )}
+            <div className="overflow-x-auto">
+              {hasBeat ? (
+                <Arrangement
+                  sections={sections}
+                  progress={playback.isCurrent && playback.duration > 0 ? playback.progress : null}
+                  busy={busy}
+                  working={work.kind === "working" ? work.where : null}
+                  onPlayFrom={playFrom}
+                  stagedEdits={stagedEdits}
+                  onStageEdit={stageEdit}
+                  onStageRename={stageRename}
+                />
+              ) : (
+                <GhostArrangement making={work.kind === "working"} sections={preview} />
+              )}
+            </div>
             {hasBeat && (
               <p className="mt-3 text-sm text-ink-2">
                 Choose the changes you want, then tell Frank to go ahead. Press a section name to play from there.
@@ -522,7 +524,7 @@ export default function MusicPage() {
           </section>
 
           {hasBeat && stagedEdits.length > 0 && (
-            <section aria-labelledby="waiting-changes-heading" className="stitch-panel max-w-[1020px] p-5">
+            <section aria-labelledby="waiting-changes-heading" className="stitch-panel w-full max-w-[1020px] p-4 sm:p-5">
               <div className="flex items-center justify-between gap-4 border-b border-line/50 pb-4">
                 <h2 id="waiting-changes-heading" className="stitch-kicker text-frank-text">Waiting to apply</h2>
                 <span className="stitch-chip">{stagedEdits.length} change{stagedEdits.length === 1 ? "" : "s"}</span>
@@ -531,14 +533,14 @@ export default function MusicPage() {
                 {stagedEdits.map((edit) => <li key={edit.id}>{edit.words}</li>)}
               </ul>
               <div className="mt-4 flex flex-wrap gap-3">
-                <button type="button" onClick={() => void applyChanges()} disabled={busy} className="stitch-primary h-10 px-5 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none">Go ahead, Frank</button>
-                <button type="button" onClick={clearStaged} disabled={busy} className="stitch-secondary h-10 px-5 text-sm disabled:text-ink-3">Clear changes</button>
+                <button type="button" onClick={() => void applyChanges()} disabled={busy} className="stitch-primary min-h-11 px-5 text-sm disabled:bg-surface-high disabled:text-ink-3 disabled:shadow-none">Go ahead, Frank</button>
+                <button type="button" onClick={clearStaged} disabled={busy} className="stitch-secondary min-h-11 px-5 text-sm disabled:text-ink-3">Clear changes</button>
               </div>
             </section>
           )}
 
           {versions.length > 0 && (
-            <div className="stitch-panel max-w-2xl p-5">
+            <div className="stitch-panel w-full max-w-2xl p-4 sm:p-5">
               <BeatVersions
                 versions={versions}
                 activeVersionId={activeVersion?.id ?? null}
@@ -570,7 +572,7 @@ export default function MusicPage() {
 /** The shape the music will take, before there is any: named sections, empty rows, a sweep while it's made. */
 function GhostArrangement({ making, sections }: { making: boolean; sections: PreviewSection[] }) {
   return (
-    <div aria-hidden="true" className="grid gap-x-1 gap-y-1.5" style={{ gridTemplateColumns: `112px repeat(${Math.max(1, sections.length)}, minmax(80px, 1fr))` }}>
+    <div aria-hidden="true" className="grid min-w-[640px] gap-x-1 gap-y-1.5" style={{ gridTemplateColumns: `112px repeat(${Math.max(1, sections.length)}, minmax(80px, 1fr))` }}>
       <div />
       {sections.map((s, i) => (
         <span key={`g${i}`} className="px-2 py-1.5 text-sm text-ink-3">

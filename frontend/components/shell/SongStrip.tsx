@@ -22,6 +22,7 @@ import { useSongStore } from "@/store/song"
 import { useDirections } from "@/store/directions"
 import { updateProject } from "@/lib/api/projects"
 import { buildStripModel, sectionAt, sectionStart, type LaneState } from "@/lib/songShape"
+import { YouMenu } from "@/components/shell/YouMenu"
 
 
 function Cell({ state, fill, ring }: { state: LaneState; fill: string; ring: string }) {
@@ -124,10 +125,10 @@ export function SongStrip({ projectId, onStart }: { projectId: string; onStart: 
   return (
     <header
       aria-label="Your song"
-      className="flex h-12 shrink-0 flex-col border-b border-line bg-ground"
+      className="shrink-0 border-b border-line bg-ground"
     >
       {/* Main row: title / transport / all-songs */}
-      <div className="flex flex-1 items-center gap-4 px-4">
+      <div className="flex min-h-12 items-center gap-3 px-4 py-2 md:h-12 md:py-0 md:gap-4">
         {/* Song title — editable inline */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {editing ? (
@@ -141,7 +142,7 @@ export function SongStrip({ projectId, onStart }: { projectId: string; onStart: 
                 if (e.key === "Escape") setEditing(false)
               }}
               aria-label="Song name"
-              className="min-w-0 max-w-xs rounded-md bg-raised px-1.5 font-written italic text-base text-ink outline-none border border-frank/40"
+              className="min-w-0 w-full rounded-md bg-raised px-1.5 font-written italic text-base text-ink outline-none border border-frank/40"
             />
           ) : (
             <button
@@ -178,7 +179,7 @@ export function SongStrip({ projectId, onStart }: { projectId: string; onStart: 
                 : "Nothing is playing"
             }
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-150",
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-all duration-150 md:h-7 md:w-7",
               playing
                 ? "border-frank bg-frank text-ground shadow-play-bloom"
                 : track
@@ -193,20 +194,23 @@ export function SongStrip({ projectId, onStart }: { projectId: string; onStart: 
             )}
           </button>
           {track && (
-            <span className="font-mono text-code tabular-nums text-ink-3">
+            <span className="hidden font-mono text-code tabular-nums text-ink-3 sm:inline">
               {formatTime(position)} / {formatTime(duration)}
             </span>
           )}
         </div>
 
         {/* Right: back to songs */}
-        <div className="flex shrink-0 items-center">
+        <div className="flex shrink-0 items-center gap-1">
           <Link
             href="/songs"
-            className="text-xs text-ink-3 hover:text-ink transition-colors"
+            className="min-h-11 px-1 text-xs text-ink-3 hover:text-ink transition-colors"
           >
             All songs
           </Link>
+          <div className="md:hidden">
+            <YouMenu projectId={projectId} onStart={onStart} />
+          </div>
         </div>
       </div>
 
@@ -222,10 +226,10 @@ export function SongStrip({ projectId, onStart }: { projectId: string; onStart: 
             `Music: ${STATE_WORDS[model.music]}`,
             `Voice: ${STATE_WORDS[model.voice]}`,
           ].join("; ")}
-          className="flex items-end gap-px px-4 pb-0.5"
+          className="flex items-end gap-px overflow-x-auto px-4 pb-1"
         >
           {/* Words lane — per section */}
-          <div className="flex flex-1 gap-px">
+          <div className="flex min-w-[96px] flex-1 gap-px">
             {model.sections.map((sec, i) => (
               <Cell
                 key={i}
@@ -236,19 +240,19 @@ export function SongStrip({ projectId, onStart }: { projectId: string; onStart: 
             ))}
           </div>
           {/* Feel lane — global model state across every section */}
-          <div className="flex flex-1 gap-px">
+          <div className="flex min-w-[96px] flex-1 gap-px">
             {model.sections.map((_, i) => (
               <Cell key={i} state={model.feel} fill="bg-feel" ring="border-feel" />
             ))}
           </div>
           {/* Music lane — global model state */}
-          <div className="flex flex-1 gap-px">
+          <div className="flex min-w-[96px] flex-1 gap-px">
             {model.sections.map((_, i) => (
               <Cell key={i} state={model.music} fill="bg-music" ring="border-music" />
             ))}
           </div>
           {/* Voice lane — global model state */}
-          <div className="flex flex-1 gap-px">
+          <div className="flex min-w-[96px] flex-1 gap-px">
             {model.sections.map((_, i) => (
               <Cell key={i} state={model.voice} fill="bg-voice" ring="border-voice" />
             ))}

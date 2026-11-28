@@ -15,8 +15,8 @@ type Size = "stage" | "card" | "row"
 
 const SIZE: Record<Size, { box: string; icon: string }> = {
   stage: { box: "h-16 w-16", icon: "h-6 w-6" },   // 64px — Stitch stage large
-  card:  { box: "h-10 w-10", icon: "h-4 w-4" },   // 40px — card medium
-  row:   { box: "h-7 w-7",   icon: "h-3.5 w-3.5" }, // 28px — row small
+  card:  { box: "h-11 w-11 sm:h-10 sm:w-10", icon: "h-4 w-4" },   // 40px — card medium
+  row:   { box: "h-11 w-11 sm:h-7 sm:w-7", icon: "h-4 w-4 sm:h-3.5 sm:w-3.5" }, // 28px — row small
 }
 
 interface PlayButtonProps {

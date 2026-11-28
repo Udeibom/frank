@@ -210,7 +210,7 @@ export default function ExportRoomPage() {
   if (!activeMix) {
     // Blocked: say what is missing and offer the way there.
     return (
-      <div className="stitch-room flex h-full flex-col gap-6 px-10 py-8">
+      <div className="stitch-room flex h-full flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-6 md:px-10 md:py-8">
         <div className="flex items-center gap-3 border-b border-line/60 pb-5">
           <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-frank shadow-[0_0_12px_rgb(var(--frank)/0.6)]" />
           <h1 className="stitch-title text-ink">Finish</h1>
@@ -230,7 +230,7 @@ export default function ExportRoomPage() {
   const step = needsIntentCheck ? "ask" : !finished ? "finish" : "download"
 
   return (
-    <div className="stitch-room flex h-full flex-col overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
+    <div className="stitch-room flex h-full flex-col overflow-y-auto px-4 py-6 sm:px-6 md:px-10 md:py-8 [--sweep:var(--voice)]">
       <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6">
         <div className="flex items-end justify-between gap-4 border-b border-line/60 pb-5">
           <div className="min-w-0">
@@ -244,13 +244,13 @@ export default function ExportRoomPage() {
         </div>
 
 
-        <section aria-labelledby="song-name" className="stitch-panel relative flex flex-col gap-5 overflow-hidden p-8">
+        <section aria-labelledby="song-name" className="stitch-panel relative flex flex-col gap-5 overflow-hidden p-5 sm:p-8">
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-frank/10 blur-3xl" />
-          <div className="relative flex items-center gap-5">
+          <div className="relative flex flex-wrap items-center gap-4 sm:gap-5">
             <PlayButton track={track!} size="stage" keepPosition />
             <div className="min-w-0">
               <span className="stitch-chip">Ready to share</span>
-              <h2 id="song-name" className="mt-2 truncate font-written text-[34px] leading-[40px] text-on-surface">
+              <h2 id="song-name" className="mt-2 truncate font-written text-[28px] leading-[34px] text-on-surface sm:text-[34px] sm:leading-[40px]">
                 {title}
               </h2>
               <p className="text-base text-ink-2">
@@ -281,7 +281,7 @@ export default function ExportRoomPage() {
                   aria-pressed={which === w}
                   onClick={() => setWhich(w)}
                   className={cn(
-                    "rounded-md border px-3 py-1.5 text-base",
+                    "flex min-h-11 items-center rounded-md border px-3 py-1.5 text-base",
                     which === w ? "border-voice bg-raised text-ink" : "border-line text-ink-2 hover:text-ink",
                   )}
                 >
@@ -320,18 +320,18 @@ export default function ExportRoomPage() {
             <label className="text-sm font-medium text-ink-2" htmlFor="what-missing">
               What's missing, in your own words? (You can leave it blank.)
             </label>
-            <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <input
                  id="what-missing"
                  value={said}
                  disabled={working !== null}
                  onChange={(e) => setSaid(e.target.value)}
 
-                className="max-w-xl flex-1 rounded-md bg-raised px-3 py-2.5 font-written text-[17px] text-words placeholder:font-sans placeholder:text-base placeholder:text-ink-3"
+                className="min-h-11 w-full max-w-xl flex-1 rounded-md bg-raised px-3 py-2.5 font-written text-[17px] text-words placeholder:font-sans placeholder:text-base placeholder:text-ink-3"
                 placeholder="It should feel lonelier…"
                 autoFocus
               />
-              <button type="submit" disabled={working !== null} className="h-10 rounded-md border border-line bg-raised px-5 text-base text-ink hover:border-ink-3 disabled:opacity-60">
+              <button type="submit" disabled={working !== null} className="min-h-11 w-full rounded-md border border-line bg-raised px-5 text-base text-ink hover:border-ink-3 disabled:opacity-60 sm:w-auto">
                 Find a few ideas
               </button>
             </div>
@@ -373,11 +373,11 @@ export default function ExportRoomPage() {
         )}
 
         {step === "download" && (
-          <div className="grid max-w-[1000px] gap-4 xl:grid-cols-2">
-            <div className="stitch-panel p-5">
+          <div className="grid w-full max-w-[1000px] gap-4 xl:grid-cols-2">
+            <div className="stitch-panel p-4 sm:p-5">
               <NotesAndCredits projectId={projectId} onDownload={clickDownload} />
             </div>
-            <div className="stitch-panel p-5">
+            <div className="stitch-panel p-4 sm:p-5">
               <MatchedFinish projectId={projectId} mixVersionId={activeMix.id} frankUrl={finished?.url ?? null} />
             </div>
           </div>
@@ -401,23 +401,23 @@ export default function ExportRoomPage() {
           </FrankNote>
         )}
         {surpriseState === "ready" && surprise && (
-          <section aria-label="Frank's idea" className="stitch-panel flex items-center gap-4 p-5">
+          <section aria-label="Frank's idea" className="stitch-panel flex flex-wrap items-center gap-4 p-4 sm:p-5">
             <PlayButton track={{ id: `surprise:${surprise.beat_version_id}`, url: surprise.render_url, label: surprise.title, material: "music", onSong: true }} size="card" keepPosition />
             <div className="min-w-0 flex-1">
               <p className="font-written text-xl text-ink">{surprise.title}</p>
               <p className="text-sm text-ink-2">{surprise.plain}</p>
             </div>
-            <button onClick={() => void chooseSurprise()} className="rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3">
+            <button onClick={() => void chooseSurprise()} className="flex min-h-11 items-center rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-ink-3">
               Use this one instead
             </button>
-            <button onClick={() => setSurpriseState("done")} className="text-sm text-ink-2 hover:text-ink">
+            <button onClick={() => setSurpriseState("done")} className="flex min-h-11 items-center text-sm text-ink-2 hover:text-ink">
               Keep mine
             </button>
           </section>
         )}
 
         {exports.length > 0 && (
-          <section aria-labelledby="past-heading" className="stitch-panel flex flex-col gap-2 p-5">
+          <section aria-labelledby="past-heading" className="stitch-panel flex flex-col gap-2 p-4 sm:p-5">
             <h2 id="past-heading" className="stitch-kicker text-frank-text">
               Past downloads
             </h2>
@@ -429,7 +429,7 @@ export default function ExportRoomPage() {
                       const info = await getDownloadInfo(projectId, e.id)
                       clickDownload(info.url, info.filename)
                     }}
-                    className="flex w-full items-center justify-between py-2.5 text-left text-base text-ink hover:text-frank"
+                    className="flex min-h-11 w-full items-center justify-between py-2.5 text-left text-base text-ink hover:text-frank"
                   >
                     {new Date(e.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                     <span className="flex items-center gap-1.5 text-sm text-ink-2">

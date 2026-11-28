@@ -301,7 +301,7 @@ export function RefinePanel({ projectId, room, concern, startKey, onSay, onCommi
                   onKeyDown={(e) => e.key === "Enter" && sendDisagree()}
                   placeholder="What do you hear instead?"
                   aria-label="What do you hear instead?"
-                  className="flex-1 rounded-md bg-raised px-3 py-1.5 text-base text-ink"
+                  className="min-h-11 flex-1 rounded-md bg-raised px-3 py-1.5 text-base text-ink"
                   autoFocus
                 />
                 <Button size="sm" variant="outline" disabled={disagreeing || !said.trim()} onClick={sendDisagree}>Tell Frank</Button>

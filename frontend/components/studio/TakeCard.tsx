@@ -162,7 +162,7 @@ export function TakeCard({ projectId, take, versions, activeId, busy, picked, ca
               {...aria}
               onClick={toggle}
               disabled={busy}
-              className="flex items-center gap-1.5 rounded-md border border-line bg-raised px-3 py-1.5 text-base text-ink hover:border-ink-3 disabled:text-ink-3"
+              className="flex min-h-11 items-center gap-1.5 rounded-md border border-line bg-raised px-3 py-1.5 text-base text-ink hover:border-ink-3 disabled:text-ink-3"
             >
               Change this recording… <ChevronDown className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -189,7 +189,7 @@ export function TakeCard({ projectId, take, versions, activeId, busy, picked, ca
             value={harmonyType}
             onChange={(e) => setHarmonyType(e.target.value as "above" | "below" | "both")}
             aria-label="Above or below"
-            className="rounded-md border border-line bg-surface px-2 py-1 text-ink"
+            className="min-h-11 rounded-md border border-line bg-surface px-2 py-1 text-ink"
           >
             <option value="above">above mine</option>
             <option value="below">below mine</option>
@@ -199,7 +199,7 @@ export function TakeCard({ projectId, take, versions, activeId, busy, picked, ca
             value={harmonyPlace}
             onChange={(e) => setHarmonyPlace(Number(e.target.value))}
             aria-label="Where in the song"
-            className="rounded-md border border-line bg-surface px-2 py-1 text-ink"
+            className="min-h-11 rounded-md border border-line bg-surface px-2 py-1 text-ink"
           >
             {HARMONY_PLACES.map((p, i) => (
               <option key={p.label} value={i}>
@@ -213,11 +213,11 @@ export function TakeCard({ projectId, take, versions, activeId, busy, picked, ca
               setShowHarmony(false)
               onAction(target, { kind: "harmony", type: harmonyType, sections: HARMONY_PLACES[harmonyPlace].sections })
             }}
-            className="rounded-md border border-line bg-surface px-3 py-1 text-ink hover:border-ink-3 disabled:text-ink-3"
+            className="flex min-h-11 items-center rounded-md border border-line bg-surface px-3 py-1 text-ink hover:border-ink-3 disabled:text-ink-3"
           >
             Make it
           </button>
-          <button onClick={() => setShowHarmony(false)} className="text-ink-2 hover:text-ink">
+          <button onClick={() => setShowHarmony(false)} className="flex min-h-11 items-center text-ink-2 hover:text-ink">
             Not now
           </button>
         </div>

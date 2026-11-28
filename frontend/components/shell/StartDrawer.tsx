@@ -23,13 +23,13 @@ export function StartDrawer({ projectId, onClose }: { projectId: string; onClose
       onClick={(e) => e.target === e.currentTarget && onClose()}
       onKeyDown={(e) => e.key === "Escape" && onClose()}
     >
-      <div className="h-full w-full max-w-md overflow-y-auto border-l border-line bg-surface p-6">
+      <div className="safe-bottom h-full w-full max-w-md overflow-y-auto overscroll-contain border-l border-line bg-surface p-4 sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-medium text-ink">Start with whatever you have</h2>
           <button
             ref={closeRef}
             onClick={onClose}
-            className="rounded-sm px-2 py-1 text-sm text-ink-2 hover:text-ink"
+            className="min-h-11 rounded-sm px-3 text-sm text-ink-2 hover:text-ink"
           >
             Close
           </button>

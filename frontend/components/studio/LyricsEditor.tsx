@@ -271,7 +271,7 @@ export function LyricsEditor({ projectId, initialContent, onSelectionChange, onC
             type="button"
             onClick={() => setShowRhythm((v) => !v)}
             aria-pressed={showRhythm}
-            className="rounded-lg bg-surface-container px-3 py-1 text-label-md text-on-surface-variant hover:bg-surface-high hover:text-on-surface"
+            className="flex min-h-11 items-center rounded-lg bg-surface-container px-3 py-1 text-label-md text-on-surface-variant hover:bg-surface-high hover:text-on-surface"
           >
             {showRhythm ? "Hide the rhythm" : "Show the rhythm"}
           </button>

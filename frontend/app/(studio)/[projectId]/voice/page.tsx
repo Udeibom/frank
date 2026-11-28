@@ -397,7 +397,7 @@ export default function VoiceRoomPage() {
 
   return (
     <div className="flex h-full">
-      <div className="stitch-room room-voice flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-10 py-8 [--sweep:var(--voice)]">
+      <div className="stitch-room room-voice flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-6 md:px-10 md:py-8 [--sweep:var(--voice)]">
         <div className="flex flex-col gap-4 border-b border-line/60 pb-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
@@ -410,12 +410,12 @@ export default function VoiceRoomPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {!showHeadphoneCheck && (
-                <button onClick={() => setShowHeadphoneCheck(true)} className="stitch-secondary px-3 py-2 text-sm">
+                <button onClick={() => setShowHeadphoneCheck(true)} className="stitch-secondary min-h-11 px-3 py-2 text-sm">
                   Check my headphones
                 </button>
               )}
               {beat && words && (
-                <button onClick={() => void wantSungGuide()} disabled={busy} className="stitch-secondary px-3 py-2 text-sm disabled:text-ink-3">
+                <button onClick={() => void wantSungGuide()} disabled={busy} className="stitch-secondary min-h-11 px-3 py-2 text-sm disabled:text-ink-3">
                   {sungGuideUrl ? "Hear the guide sing it again" : "Hear it sung with my words"}
                 </button>
               )}
@@ -454,21 +454,21 @@ export default function VoiceRoomPage() {
           />
         )}
 
-        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)]">
-          <section aria-labelledby="your-words" className="stitch-panel flex min-w-0 flex-col p-5">
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+          <section aria-labelledby="your-words" className="stitch-panel order-2 flex min-w-0 flex-col p-4 sm:p-5 xl:order-1">
             <div className="mb-4 flex items-center justify-between gap-3 border-b border-line/50 pb-4">
               <h2 id="your-words" className="stitch-kicker text-frank-text">Your words</h2>
               <span className="stitch-chip">Follows along while recording</span>
             </div>
             {words ? (
-              <div className="max-h-[440px] overflow-y-auto rounded-xl bg-surface-lowest p-5">
+              <div className="max-h-[300px] overflow-y-auto rounded-xl bg-surface-lowest p-4 sm:max-h-[440px] sm:p-5">
                 <p className="whitespace-pre-wrap font-written text-xl leading-[1.6] text-on-surface">{words}</p>
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-line/70 bg-surface-lowest/50 p-5">
+              <div className="rounded-xl border border-dashed border-line/70 bg-surface-lowest/50 p-4 sm:p-5">
                 <p className="text-base text-ink-2">
                   No words yet. Sing whatever you have, or write them first in{" "}
-                  <button onClick={() => router.push(`/${projectId}/idea`)} className="text-on-surface underline underline-offset-4 hover:text-frank">
+                  <button onClick={() => router.push(`/${projectId}/idea`)} className="inline-flex min-h-11 items-center text-on-surface underline underline-offset-4 hover:text-frank">
                     Words
                   </button>
                   .
@@ -476,7 +476,7 @@ export default function VoiceRoomPage() {
               </div>
             )}
           </section>
-          <section aria-label="Record" className="stitch-panel flex flex-col items-center p-5">
+          <section aria-label="Record" className="stitch-panel order-1 flex flex-col items-center p-4 sm:p-5 xl:order-2">
             <div className="mb-4 flex w-full items-center justify-between border-b border-line/50 pb-4">
               <span className="stitch-kicker text-frank-text">Studio recorder</span>
               <span className="stitch-chip">Safe takes</span>
@@ -496,7 +496,7 @@ export default function VoiceRoomPage() {
           </section>
         </div>
 
-        <section aria-labelledby="takes-heading" className="stitch-panel flex max-w-[920px] flex-col gap-3 p-5">
+        <section aria-labelledby="takes-heading" className="stitch-panel flex w-full max-w-[920px] flex-col gap-3 p-4 sm:p-5">
           <div className="mb-1 flex items-center justify-between gap-3 border-b border-line/50 pb-4">
             <h2 id="takes-heading" className="stitch-kicker text-frank-text">
               Your recordings
